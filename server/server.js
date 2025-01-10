@@ -10,9 +10,9 @@ import OpenAIApi, { OpenAI } from 'openai'; // Configuration not found
 // dotenv.config({ path: path.resolve(dirname(fileURLToPath(import.meta.url)), './.env') });
 dotenv.config();
 
-console.log(process.env.OPENAI_API_KEY); // debug - make sure to remove
+console.log(process.env.OPENAI_API_KEY); // debug - make sure to remove in production
 
-// deprecated
+// deprecated - remove in production
 // const configuration = new OpenAI({
 //     apiKey: process.env.OPENAI_API_KEY,
 // });
