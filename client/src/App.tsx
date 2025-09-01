@@ -8,6 +8,8 @@ import Register from './pages/Register';
 import Chat from './pages/Chat';
 import Layout from './pages/_Layout';
 
+import './App.css';
+
 const App: React.FC = () => {
   return (
     <Router>

@@ -1,10 +1,37 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* Chat bubble speech tails */
+.chat-bubble-user {
+  position: relative;
+}
+.chat-bubble-user::after {
+  content: '';
+  position: absolute;
+  right: -12px;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-top: 12px solid transparent;
+  border-left: 12px solid #4f46e5;
+  border-bottom: 0 solid transparent;
+  z-index: 1;
 }
 
+.chat-bubble-bot {
+  position: relative;
+}
+.chat-bubble-bot::after {
+  content: '';
+  position: absolute;
+  left: -12px;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-top: 12px solid transparent;
+  border-right: 12px solid #e5e7eb;
+  border-bottom: 0 solid transparent;
+  z-index: 1;
+}
+
+/* OG Styles */
 .logo {
   height: 6em;
   padding: 1.5em;
