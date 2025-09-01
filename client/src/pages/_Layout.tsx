@@ -59,7 +59,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="flex-1 flex flex-col">
         <Header onOpenSidebar={() => setIsPanelOpen(true)} />
         <main className="flex-1 p-6 overflow-y-auto">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             {children}
           </div>
         </main>
