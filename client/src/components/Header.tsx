@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import logo from '../assets/gp_healthmedagentix_logo.jpeg'; 
 
 interface HeaderProps {
   onOpenSidebar: () => void;
@@ -19,7 +20,8 @@ const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
         </svg>
       </button>
-      <h1 className="text-md font-bold text-gray-800">GP HealthMedAgentix</h1>
+      <img src={logo} style={{ maxWidth: "200px", height: "auto", borderRadius: "12px" }} alt="logo" />
+      {/* <h1 className="text-md font-bold text-gray-800">GP HealthMedAgentix</h1> */}
       {/* Profile/Menu button */}
       <div className="relative">
         <button
