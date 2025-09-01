@@ -23,10 +23,26 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loading }) => {
   return (
     <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
       <div className="space-y-4">
-        {messages.map((msg) => (
-          <ChatMessage key={msg.id} {...msg} />
-        ))}
-        {loading && <ChatMessage sender="bot" content="..." />}
+        {messages.length === 0 && !loading ? (
+          <div className="flex flex-col items-center justify-center h-full py-16 text-gray-500">
+            <div className="mb-4 text-lg font-semibold text-gray-700">No messages yet</div>
+            <div className="mb-2">Start a conversation or try one of these prompts:</div>
+            <ul className="mb-4 space-y-2">
+              <li className="bg-gray-200 px-4 py-2 rounded cursor-pointer hover:bg-gray-300 transition">What are the symptoms of flu vs. cold?</li>
+              <li className="bg-gray-200 px-4 py-2 rounded cursor-pointer hover:bg-gray-300 transition">Summarize this medical document for me.</li>
+              <li className="bg-gray-200 px-4 py-2 rounded cursor-pointer hover:bg-gray-300 transition">What are the side effects of ibuprofen?</li>
+              <li className="bg-gray-200 px-4 py-2 rounded cursor-pointer hover:bg-gray-300 transition">How can I improve my sleep quality?</li>
+            </ul>
+            <div className="text-sm text-gray-400">Or type your own question below to get started.</div>
+          </div>
+        ) : (
+          <>
+            {messages.map((msg) => (
+              <ChatMessage key={msg.id} {...msg} />
+            ))}
+            {loading && <ChatMessage sender="bot" content="..." />}
+          </>
+        )}
         <div ref={endRef} />
       </div>
     </div>
