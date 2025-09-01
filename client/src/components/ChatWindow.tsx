@@ -21,12 +21,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loading }) => {
   }, [messages, loading]);
 
   return (
-    <div style={{ minHeight: 300, maxHeight: 400, overflowY: 'auto', marginBottom: 16 }}>
-      {messages.map((msg) => (
-        <ChatMessage key={msg.id} {...msg} />
-      ))}
-      {loading && <ChatMessage sender="bot" content="..." />}
-      <div ref={endRef} />
+    <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
+      <div className="space-y-4">
+        {messages.map((msg) => (
+          <ChatMessage key={msg.id} {...msg} />
+        ))}
+        {loading && <ChatMessage sender="bot" content="..." />}
+        <div ref={endRef} />
+      </div>
     </div>
   );
 };

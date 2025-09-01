@@ -73,7 +73,7 @@ const Chat: React.FC = () => {
   };
 
   return (
-    <Layout>
+    <>
       {/* Provider selection dropdown */}
       <ProviderSelector provider={provider} setProvider={setProvider} />
       {/* Chat history window */}
@@ -83,7 +83,7 @@ const Chat: React.FC = () => {
         onSend={handleSend}
         loading={loading}
       />
-    </Layout>
+    </>
   );
 };
 
