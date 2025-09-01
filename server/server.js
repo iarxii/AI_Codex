@@ -4,6 +4,7 @@ import cors from 'cors';
 import { OpenAI } from 'openai';
 import { GoogleGenAI } from '@google/genai';
 import logger from './logger.js';
+import { createConversation, createMessage } from './database.js';
 
 // configure dotenv if ,env file exists outside of server root directory
 // import path from 'path';
@@ -42,16 +43,31 @@ app.get('/', async (req, res) => {
 
 
 // POST /
-// Body: { prompt: string, provider: 'openai' | 'gemini' }
+// Body: { prompt: string, provider: 'openai' | 'gemini', conversationId?: number }
 app.post('/', async (req, res) => {
-    const { prompt, provider = 'openai' } = req.body;
-    logger.info(`POST / - Received request for provider: ${provider}`, { prompt: prompt.substring(0, 50) + '...' });
+    let { prompt, provider = 'openai', conversationId } = req.body;
+    logger.info(`POST / - Received request for provider: ${provider}`, { conversationId, prompt: prompt.substring(0, 50) + '...' });
 
     if (!prompt) {
         logger.warn('POST / - Request rejected: Missing prompt');
         return res.status(400).json({ message: 'Missing prompt' });
     }
     try {
+        // If no conversationId, create a new conversation
+        if (!conversationId) {
+            const title = prompt.substring(0, 50); // Use first 50 chars as title
+            conversationId = createConversation(title);
+            logger.info(`Started new conversation with ID: ${conversationId}`);
+        }
+
+        // Save user's message
+        createMessage({
+            conversation_id: conversationId,
+            sender: 'user',
+            provider,
+            content: prompt,
+        });
+
         let result;
         if (provider === 'gemini') {
             // Gemini 2.5 Flash (Google AI Studio) - latest @google/genai usage
@@ -78,7 +94,16 @@ app.post('/', async (req, res) => {
             result = openaiRes.choices?.[0]?.message?.content || '';
             logger.info('Successfully received response from OpenAI');
         }
-        res.status(200).json({ bot: result });
+
+        // Save bot's message
+        createMessage({
+            conversation_id: conversationId,
+            sender: 'bot',
+            provider,
+            content: result,
+        });
+
+        res.status(200).json({ bot: result, conversationId });
     } catch (error) {
         logger.error('An error occurred in the POST / handler', { error: error.message, stack: error.stack });
         res.status(500).json({ message: 'Server error', error: error.message });
