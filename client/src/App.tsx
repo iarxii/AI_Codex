@@ -1,18 +1,26 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
+import Landing from './pages/Landing';
+import Login from './pages/Login';
+import Register from './pages/Register';
 import Chat from './pages/Chat';
 import Layout from './pages/_Layout';
 
 const App: React.FC = () => {
   return (
     <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Chat />} />
-          {/* Add more routes here as needed */}
-        </Routes>
-      </Layout>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/chat" element={
+          <Layout>
+            <Chat />
+          </Layout>
+        } />
+      </Routes>
     </Router>
   );
 };

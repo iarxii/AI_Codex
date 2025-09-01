@@ -16,4 +16,16 @@ for dir in client server; do
   cd ..
 done
 
+  # Run database migration
+  echo "Running database migration..."
+  if command -v sqlite3 >/dev/null 2>&1; then
+    if [ -f db_lite/migrations/001_create_schema.sql ]; then
+      sqlite3 db_lite/chat.db < db_lite/migrations/001_create_schema.sql
+      echo "Migration applied to db_lite/chat.db."
+    else
+      echo "Migration file not found: db_lite/migrations/001_create_schema.sql"
+    fi
+  else
+    echo "sqlite3 not found. Please install SQLite3 and run the migration manually."
+  fi
 echo "Setup complete."

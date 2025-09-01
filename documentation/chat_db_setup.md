@@ -1,42 +1,51 @@
-# Chat Database Setup for GP HealthMedAgentix
 
-This document describes how to set up and use the SQLite database for storing chat conversations and messages in the GP HealthMedAgentix project.
+# Database Migration & Setup Guide
+
+This guide explains how to run database migrations for the GP HealthMedAgentix chat application using SQLite.
 
 ---
 
 ## 1. Database Location
 - The SQLite database file is named `chat.db` and is located in the `db_lite` directory at the project root.
 
-## 2. Creating the Database
-You can create the database and tables using the SQLite CLI:
+## 2. Running Migrations
 
-```sh
-cd db_lite
-sqlite3 chat.db
-```
+1. **Open a terminal and navigate to the project root:**
+  ```sh
+  cd E:/webdev/AI_Codex
+  ```
 
-Once inside the SQLite shell, run the following commands:
+2. **Run the migration SQL script using sqlite3:**
+   - **On Linux/macOS (bash):**
+     ```sh
+     sqlite3 db_lite/chat.db < db_lite/migrations/001_create_schema.sql
+     ```
+   - **On Windows PowerShell:**
+     ```powershell
+     Get-Content db_lite/migrations/001_create_schema.sql | sqlite3 db_lite/chat.db
+     ```
+   - This will create or update all tables as defined in the migration file.
 
-```sql
-CREATE TABLE Conversation (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+3. **Verify the schema (optional):**
+  ```sh
+  sqlite3 db_lite/chat.db ".tables"
+  sqlite3 db_lite/chat.db ".schema User"
+  ```
 
-CREATE TABLE Message (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  conversation_id INTEGER,
-  sender TEXT,
-  provider TEXT,
-  content TEXT,
-  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(conversation_id) REFERENCES Conversation(id)
-);
-```
+## Notes
+- You can add more migration scripts in the `db_lite/migrations/` folder and run them in order.
+- If you need to reset the database, you can delete `chat.db` and re-run the migrations.
+- For production, always back up your data before running migrations.
 
-- Type `.tables` to verify the tables were created.
-- Type `.exit` to leave the SQLite shell.
+---
+
+**Troubleshooting:**
+- If you get an error about missing `sqlite3`, install it from https://www.sqlite.org/download.html or use your system's package manager.
+- If you see errors about existing tables, the migration may have already been applied.
+
+---
+
+For more details, see the schema documentation in `documentation/chat_schema.md`.
 
 ## 3. Schema Overview
 - **Conversation**: Stores each chat session (id, title, created_at).
