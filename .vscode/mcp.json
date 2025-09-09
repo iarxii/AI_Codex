@@ -1,0 +1,17 @@
+{
+	"servers": {
+		"ai-codex-mcp-test": {
+			"type": "stdio",
+			"command": "node",
+			"args": ["build/server.js"],
+			"cwd": "${workspaceFolder}/mcp",
+			"dev": {
+				"watch": "build/**/*.js",
+				"debug": {
+					"type": "node"
+				}
+			}
+		}
+	},
+	"inputs": []
+}
