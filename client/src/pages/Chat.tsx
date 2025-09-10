@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import Layout from './_Layout';
+// import Layout from './_Layout';
 import ChatWindow from '../components/ChatWindow';
 import ChatInput from '../components/ChatInput';
 import ProviderSelector from '../components/ProviderSelector';
@@ -12,6 +12,8 @@ type Message = {
   provider?: string;
   timestamp?: string;
 };
+
+const API_BASE_URL = 'http://localhost:3000';
 
 // Helper to generate unique IDs for messages
 const generateUniqueId = () => `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -38,7 +40,7 @@ const Chat: React.FC = () => {
 
     try {
       // Send POST request to server
-      const response = await fetch('http://localhost:3000/', {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: msg, provider }),
@@ -63,7 +65,7 @@ const Chat: React.FC = () => {
       setMessages(prev => [...prev, {
         id: generateUniqueId(),
         sender: 'bot',
-        content: 'Something went wrong: ' + (err.message || err),
+        content: provider + ' error: Something went wrong: ' + (err.message || err),
         provider,
         timestamp: new Date().toISOString(),
       }]);
