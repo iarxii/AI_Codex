@@ -17,7 +17,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, loading }) => {
   };
 
   return (
-    <div className="p-4 border-t border-gray-200 bg-gray-800" style={{ boxShadow: '0 -2px 5px rgba(0, 0, 0, 0.1)' , position: 'sticky', bottom: 0, zIndex: 10 , borderRadius: '12px' }}>
+    <div className="p-4 border-t border-gray-200 bg-[#00509d] -gray-800" style={{ boxShadow: '0 -2px 5px rgba(0, 0, 0, 0.1)' , position: 'sticky', bottom: 0, zIndex: 10 , borderRadius: '12px' }}>
       <form onSubmit={handleSubmit} className="flex items-center space-x-4">
         <input
           type="text"
@@ -30,7 +30,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, loading }) => {
         <button
           type="submit"
           disabled={loading || !value.trim()}
-          className="px-6 py-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 disabled:bg-indigo-300"
+          className="px-6 py-2 bg-indigo-600 text-[#00509d] -white rounded-full hover:bg-indigo-700 disabled:bg-indigo-300"
         >
           Send
         </button>

@@ -26,7 +26,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ sender, content }) => {
       <div
         className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg break-words whitespace-pre-wrap ${
           isUser
-            ? 'bg-indigo-600 text-white rounded-br-none chat-bubble-user'
+            ? 'bg-[#00509d] -indigo-600 text-white rounded-br-none chat-bubble-user'
             : 'bg-gray-200 text-gray-800 rounded-bl-none chat-bubble-bot'
         }`}
       >
