@@ -21,7 +21,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loading }) => {
   }, [messages, loading]);
 
   return (
-    <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
+    <div className="flex-1 p-5 overflow-y-auto bg-gray-50 shadow" style={{ paddingBottom: '80px', borderRadius: '12px' }}>
       <div className="space-y-4">
         {messages.length === 0 && !loading ? (
           <div className="flex flex-col items-center justify-center h-full py-16 text-gray-500">

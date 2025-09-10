@@ -13,11 +13,11 @@ type ConversationPanelProps = {
 
 const ConversationPanel: React.FC<ConversationPanelProps> = ({ conversations, onSelectConversation, onCreateNew }) => {
   return (
-    <div className="bg-gray-800 text-white h-full p-4 flex flex-col">
+    <div className="bg-[#00509d] -gray-800 text-white h-full p-4 flex flex-col">
       <h2 className="text-xl font-bold mb-4">History</h2>
       <button
         onClick={onCreateNew}
-        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded mb-4"
+        className="w-full bg-indigo-600 hover:bg-indigo-700 text-[#00509d]  font-bold py-2 px-4 rounded mb-4"
       >
         + New Chat
       </button>
