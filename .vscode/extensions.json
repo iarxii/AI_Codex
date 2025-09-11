@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "google.geminicodeassist",
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "eamodio.gitlens",
+    "ms-python.debugpy",
+    "ms-python.vscode-python-envs",
+    "qwtel.sqlite-viewer",
+    "github.copilot",
+    "github.copilot-chat",
+    "dbaeumer.vscode-eslint"
+  ]
+}
