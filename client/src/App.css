@@ -39,7 +39,7 @@
   width: 0;
   height: 0;
   border-top: 12px solid transparent;
-  border-left: 12px solid #4f46e5;
+  border-left: 12px solid #196ab8;
   border-bottom: 0 solid transparent;
   z-index: 1;
 }
@@ -95,4 +95,59 @@
 
 .read-the-docs {
   color: #888;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.grid {
+  display: grid;
+}
+
+/* ===== Scrollbar CSS ===== */
+/* General scrollbar styling for WebKit browsers */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #00509d;
+  border-radius: 10px;
+  border: 2px solid #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* More subtle scrollbar for textareas */
+textarea::-webkit-scrollbar {
+  width: 8px;
+}
+
+textarea::-webkit-scrollbar-track {
+  background: transparent; /* Make track invisible, so it looks "clipped" inside */
+}
+
+textarea::-webkit-scrollbar-thumb {
+  background-color: #ccc; /* Thumb color, matching the general scrollbar */
+  border-radius: 8px;
+  border: 2px solid transparent; /* Creates padding around thumb */
+  background-clip: content-box; /* Clips the background to the content area */
+}
+
+textarea::-webkit-scrollbar-thumb:hover {
+  background-color: #a8a8a8; /* Darker thumb on hover */
 }

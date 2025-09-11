@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 // import Layout from './_Layout';
 import ChatWindow from '../components/ChatWindow';
 import ChatInput from '../components/ChatInput';
-import ProviderSelector from '../components/ProviderSelector';
 
 // Message type for chat history
 type Message = {
@@ -18,10 +17,22 @@ const API_BASE_URL = 'http://localhost:3000';
 // Helper to generate unique IDs for messages
 const generateUniqueId = () => `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const Chat: React.FC = () => {
+const Chat: React.FC<{ provider: 'openai' | 'gemini' }> = ({ provider }) => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [provider, setProvider] = useState<'openai' | 'gemini'>('openai');
   const [loading, setLoading] = useState(false);
+  const [currentPrompt, setCurrentPrompt] = useState('');
+
+  useEffect(() => {
+    // Fetch messages for the selected conversation from the server
+    const fetchMessages = async () => {
+      const response = await fetch(`http://localhost:3000/api/conversations/1`);
+      const data = await response.json();
+      setMessages(data.messages);
+    };
+
+    fetchMessages();
+  }, []);
+
 
   // Handle sending a message
   const handleSend = async (msg: string) => {
@@ -74,16 +85,24 @@ const Chat: React.FC = () => {
     }
   };
 
+  const handleSuggestedPromptClick = (prompt: string) => {
+    setCurrentPrompt(prompt);
+  };
+
   return (
     <>
-      {/* Provider selection dropdown */}
-      <ProviderSelector provider={provider} setProvider={setProvider} />
       {/* Chat history window */}
-      <ChatWindow messages={messages} loading={loading} />
+      <ChatWindow
+        onSuggestedPromptClick={handleSuggestedPromptClick}
+        messages={messages}
+        loading={loading}
+        provider={provider}
+      />
       {/* Input box for sending messages */}
-      <ChatInput 
+      <ChatInput
         onSend={handleSend}
         loading={loading}
+        initialValue={currentPrompt}
       />
     </>
   );

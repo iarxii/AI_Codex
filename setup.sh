@@ -4,7 +4,7 @@
 set -e
 
 # Install dependencies in client and server
-for dir in client server; do
+for dir in client server mcp; do
   echo "Installing dependencies in $dir..."
   cd "$dir"
   npm install

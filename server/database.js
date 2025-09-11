@@ -32,6 +32,22 @@ export function createConversation(title) {
 }
 
 /**
+ * Retrieves all conversations from the database.
+ * @returns {Array<object>} A list of all conversations.
+ */
+export function getConversations() {
+  try {
+    const stmt = db.prepare('SELECT * FROM Conversation ORDER BY created_at DESC');
+    const conversations = stmt.all();
+    logger.info(`Retrieved ${conversations.length} conversations.`);
+    return conversations;
+  } catch (error) {
+    logger.error('Failed to retrieve conversations.', { error: error.message });
+    throw error;
+  }
+}
+
+/**
  * Creates a new message in a conversation.
  * @param {object} messageData - The message data.
  * @param {number} messageData.conversation_id - The ID of the conversation.
@@ -51,5 +67,34 @@ export function createMessage({ conversation_id, sender, provider, content }) {
         throw error;
     }
 }
+
+/**
+ * Retrieves all messages for a specific conversation from the database.
+ * @param {number} conversationId - The ID of the conversation.
+ * @returns {Array<object>} A list of all messages in the conversation.
+ */
+export function getMessagesByConversationId(conversationId) {
+  try {
+    const stmt = db.prepare('SELECT * FROM Message WHERE conversation_id = ? ORDER BY timestamp ASC');
+    const messages = stmt.all(conversationId);
+    logger.info(`Retrieved ${messages.length} messages for conversation ID: ${conversationId}`);
+    return messages;
+  } catch (error) {
+    logger.error('Failed to retrieve messages for conversation.', { error: error.message });
+    throw error;
+  }
+}
+
+/**
+ * Retrieves a conversation by its ID.
+ * @param {number} conversationId - The ID of the conversation to retrieve.
+ * @returns {object|undefined} The conversation object, or undefined if not found.
+ */
+export function getConversationById(conversationId) {
+  const stmt = db.prepare('SELECT * FROM Conversation WHERE id = ?');
+  const conversation = stmt.get(conversationId);
+  return conversation;
+}
+
 
 export default db;
