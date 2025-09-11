@@ -16,7 +16,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
         className="md:hidden p-2 rounded-md hover:bg-gray-200"
         aria-label="Open sidebar"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-[#02396e]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
         </svg>
       </button>
@@ -26,10 +26,10 @@ const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
       <div className="relative">
         <button
           onClick={() => setMenuOpen((open) => !open)}
-          className="p-2 rounded-full bg-[#00509d] hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          aria-label="Open menu"
+          className="p-2 rounded-full bg-[#00509d] hover:bg-[#02396e] focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          aria-label="Open menu" 
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 15c2.485 0 4.797.657 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </button>

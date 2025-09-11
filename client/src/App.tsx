@@ -19,7 +19,7 @@ const App: React.FC = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/chat" element={
           <Layout>
-            <Chat />
+            <Chat provider="gemini" />
           </Layout>
         } />
       </Routes>
