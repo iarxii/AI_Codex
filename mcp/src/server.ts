@@ -1,8 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import fs from "node:fs/promises";
-import { text } from "node:stream/consumers";
+import db, { initializeDatabase } from "./db.js";
+import yargs from "yargs";
 
 const server = new McpServer({
     name: "mcp test",
@@ -16,32 +16,6 @@ const server = new McpServer({
     // host: "localhost",
 })
 
-server.resource(
-    "users",
-    "users://all",
-    {
-        description: "Get all users data from the database",
-        title: "Users",
-        mimeType: "application/json",
-    }, async uri => {
-        const users = await import("./data/users.json", {
-            with: { type: "json" }
-        }).then(mod => mod.default) //mod is the 'module' object
-
-        return {
-            contents: [
-                {
-                    uri: uri.href,
-                    text: JSON.stringify(users),
-                    mimeType: "application/json"
-                }
-
-            ]
-        }
-
-    }
-)
-
 // name: z.string().describe("The name of the user"),
 // email: z.string().email().describe("The email of the user"),
 // address: z.string().optional().describe("The address of the user"),
@@ -51,7 +25,7 @@ server.tool("create-user", "Create a new user in the database", {
     name: z.string().describe("The name of the user"),
     email: z.string().email().describe("The email of the user"),
     address: z.string().describe("The address of the user"),
-    phone: z.string().describe("The address of the user"),
+    phone: z.string().describe("The phone number of the user"),
 }, {
     title: "Create User",
     readOnlyHint: false,
@@ -81,7 +55,24 @@ server.tool("create-user", "Create a new user in the database", {
     // const userId = Math.floor(Math.random() * 10000);
     // return { userId, ...params }; 
 })
-
+server.tool("get-user-by-id", "Get a user's details from the database by their ID", {
+    id: z.number().int().describe("The ID of the user to retrieve"),
+}, {
+    title: "Get User by ID",
+    description: "Retrieves a single user's information from the database using their unique ID.",
+}, async ({ id }) => {
+    const user = await db.get('SELECT * FROM users WHERE id = ?', id);
+    if (!user) {
+        return {
+            content: [{ type: "text", text: `User with ID ${id} not found.` }]
+        }
+    }
+    return {
+        content: [
+            { type: "text", text: `User Details:\n${JSON.stringify(user, null, 2)}` }
+        ]
+    }
+});
 
 async function createUser(user: {
     name: string;
@@ -89,32 +80,30 @@ async function createUser(user: {
     address: string;
     phone: string;
 }) {
-    const users = await import("./data/users.json", {
-        with: { type: "json" }
-    }).then(mod => mod.default) //mod is the 'module' object
-
-    const id = users.length + 1
-
-    users.push({ id, ...user })
-
-    await fs.writeFile("./data/users.json", JSON.stringify(users, null, 2))
-
-    return id
+    // Use parameterized queries to prevent SQL injection.
+    const result = await db.run(
+        'INSERT INTO users (name, email, address, phone) VALUES (?, ?, ?, ?)',
+        user.name,
+        user.email,
+        user.address,
+        user.phone
+    );
+    // Return the ID of the newly inserted row.
+    return result.lastID;
 }
 
 async function main() {
-    const transport = new StdioServerTransport()
-    await server.connect(transport)
+    const argv = await yargs(process.argv.slice(2)).option("stdio", {
+        type: "boolean",
+        description: "Run the server in stdio mode",
+    }).parse();
 
-    // transport protocol: standard-input-io / http / websocket 
-    // const transport = "http"
-    // if (transport === "standard-input-io") {
-    //     server.startStdio()
-    // } else if (transport === "http") {
-    //     server.startHttp()
-    // } else if (transport === "websocket") {
-    //     server.startWebSocket()
-    // }
+    await initializeDatabase();
+
+    if (argv.stdio) {
+        const transport = new StdioServerTransport();
+        await server.connect(transport);
+    }
 }
 
 main()
