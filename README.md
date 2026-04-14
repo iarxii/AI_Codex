@@ -1,7 +1,7 @@
 
-# GP HealthMedAgentix
+# AdaptivIntelligenceCodex (AICodex)
 
-**GP HealthMedAgentix** is an AI-powered Health and Oversight Data Analysis and Feedback engine. It supports both OpenAI (gpt-4o) and Google Gemini (2.5 Flash) models. You can select the provider per request.
+**AdaptivIntelligenceCodex (AICodex)** is a comprehensive knowledge base and code generation pipeline for Senior AI Engineers, designed for rapid prototyping and architecture mapping. It features an AI-powered Health and Oversight Data Analysis engine supporting both OpenAI (gpt-4o) and Google Gemini (2.5 Flash) models.
 
 ## Setup
 
