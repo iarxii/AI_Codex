@@ -40,3 +40,11 @@ Or manually:
 - Designed for health data analysis, oversight, and feedback
 
 ---
+
+
+## License
+This project is distributed under the MIT License. See `LICENSE` for more information.
+
+
+## Contributing
+Please see the [CONTRIBUTING.md](CONTRIBUTING.md) file for details on how to contribute to this project.
