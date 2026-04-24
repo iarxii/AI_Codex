@@ -64,11 +64,23 @@ async def reason_node(state: AgentState) -> Dict[str, Any]:
             logger.warning(f"Context building failed: {e}")
 
     # 3. Invoke LLM with grounded prompt
-    # We pass the full_prompt as the content of the last HumanMessage
+    # We maintain the message sequence but ensure the grounding context 
+    # is available. We'll prepend the grounding to the latest turn if it's a new turn,
+    # or just use the history as is if we are in a tool loop.
     messages = list(state["messages"])
-    messages[-1] = HumanMessage(content=full_prompt)
     
-    response = await llm.ainvoke(messages)
+    # If the last message is a ToolMessage, we are continuing a loop.
+    # If it's a HumanMessage, it's a new turn.
+    if isinstance(messages[-1], HumanMessage):
+        messages[-1] = HumanMessage(content=full_prompt)
+    
+    try:
+        response = await llm.ainvoke(messages)
+    except Exception as e:
+        err_msg = str(e)
+        if "connection" in err_msg.lower() or "11434" in err_msg:
+            raise Exception("AICodex: Connection to Ollama failed. Ensure Ollama is running (ollama serve).")
+        raise e
     
     # Extract tool calls if any
     tool_calls = getattr(response, "tool_calls", [])

@@ -21,10 +21,10 @@ const Chat: React.FC = () => {
   const [currentConvId, setCurrentConvId] = useState<number | null>(null);
   
   // UI State
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [currentToolCalls, setCurrentToolCalls] = useState<any[]>([]);
   const [currentContext, setCurrentContext] = useState<any[]>([]);
+  const [thoughtLog, setThoughtLog] = useState<string[]>([]);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 15, latency: '0ms' });
 
   const ws = useRef<WebSocket | null>(null);
@@ -44,7 +44,7 @@ const Chat: React.FC = () => {
   // 2. WebSockets management
   useEffect(() => {
     // Main Agent WS
-    const socket = new WebSocket('ws://localhost:8000/ws/agent');
+    const socket = new WebSocket('ws://127.0.0.1:8000/api/chat/ws/agent');
     ws.current = socket;
     socket.onopen = () => setConnected(true);
     socket.onclose = () => setConnected(false);
@@ -61,11 +61,18 @@ const Chat: React.FC = () => {
             return [...prev, { id: Date.now().toString(), sender: 'bot', content: data.content, status: 'typing' }];
           }
         });
+      } else if (data.type === 'status') {
+        setThoughtLog(prev => [...prev, data.status]);
       } else if (data.type === 'tool_call') {
         setCurrentToolCalls(data.tool_calls);
         setIsInspectorOpen(true);
+      } else if (data.type === 'tool_result') {
+        setCurrentToolCalls(prev => prev.map(tc => 
+          tc.id === data.tool_call_id ? { ...tc, result: data.content } : tc
+        ));
       } else if (data.type === 'done') {
         setLoading(false);
+        setThoughtLog([]);
         setMessages(prev => {
           const updated = [...prev];
           if (updated.length > 0 && updated[updated.length - 1].sender === 'bot') {
@@ -80,7 +87,7 @@ const Chat: React.FC = () => {
     };
 
     // Metrics WS
-    const mSocket = new WebSocket('ws://localhost:8000/ws/metrics');
+    const mSocket = new WebSocket('ws://127.0.0.1:8000/api/metrics/ws/metrics');
     metricsWs.current = mSocket;
     mSocket.onmessage = (event) => {
       setMetrics(JSON.parse(event.data));
@@ -256,6 +263,33 @@ const Chat: React.FC = () => {
               </div>
             </div>
           ))}
+
+          {thoughtLog.length > 0 && (
+            <div className="flex justify-start animate-in fade-in slide-in-from-left-4 duration-500">
+              <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-none p-4 w-full max-w-2xl backdrop-blur-sm">
+                <details open className="group">
+                  <summary className="flex items-center gap-3 cursor-pointer list-none text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 select-none">
+                    <div className="relative">
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full animate-ping absolute inset-0"></div>
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full relative"></div>
+                    </div>
+                    Thinking Process
+                    <svg className="w-3 h-3 ml-auto transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </summary>
+                  <div className="mt-4 space-y-2 pl-5 border-l border-white/10">
+                    {thoughtLog.map((thought, i) => (
+                      <div key={i} className="text-[11px] text-slate-500 font-mono flex items-center gap-2">
+                        <span className="text-indigo-500/50">[{i+1}]</span>
+                        {thought}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            </div>
+          )}
           <div ref={scrollRef} />
         </main>
 
