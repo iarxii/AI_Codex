@@ -73,7 +73,7 @@ _initialized_retriever = None
 _initialized_context_builder = None
 
 def get_retriever():
-    """Returns an initialized Retriever instance."""
+    """Returns an initialized Retriever instance with fallback endpoint support."""
     global _initialized_retriever
     if _initialized_retriever:
         return _initialized_retriever
@@ -86,14 +86,41 @@ def get_retriever():
         OllamaEmbedder = getattr(rag_module, "OllamaEmbedder")
         Retriever = getattr(rag_module, "Retriever")
         
+        # Monkey-patch OllamaEmbedder to support /api/embed if /api/embeddings fails
+        original_embed_text = OllamaEmbedder.embed_text
+        
+        def patched_embed_text(self, text: str):
+            # Try legacy endpoint first (original logic)
+            res = original_embed_text(self, text)
+            if res is not None:
+                return res
+            
+            # If 404/failure, try modern /api/embed
+            import requests
+            try:
+                modern_endpoint = f"{self.api_base}/api/embed"
+                payload = {"model": self.model, "input": text}
+                resp = requests.post(modern_endpoint, json=payload, timeout=self.timeout)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    # /api/embed returns 'embeddings' (plural) for multiple or a list of lists
+                    embeddings = data.get("embeddings")
+                    if embeddings and len(embeddings) > 0:
+                        return [float(v) for v in embeddings[0]]
+            except Exception:
+                pass
+            return None
+
+        OllamaEmbedder.embed_text = patched_embed_text
+        
         store = QdrantVectorStore(
-            collection_name="ollamaopt_docs",
+            collection_name="aicodex_vectors",
             persist_dir="data/qdrant",
-            embedding_dim=768,
+            embedding_dim=384, # all-minilm is 384
         )
         embedder = OllamaEmbedder(
             api_base=settings.OLLAMA_BASE_URL,
-            model="nomic-embed-text",
+            model="all-minilm", # Use a smaller, more common model for compatibility
         )
         _initialized_retriever = Retriever(
             store=store,

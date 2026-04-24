@@ -9,7 +9,7 @@ router = APIRouter()
 
 class RAGQueryRequest(BaseModel):
     query: str
-    collection: str = "ollamaopt_docs"
+    collection: str = "aicodex_vectors"
     limit: int = 5
 
 @router.post("/query")
@@ -30,9 +30,9 @@ async def query_rag(request: RAGQueryRequest):
         store = QdrantVectorStore(
             collection_name=request.collection,
             persist_dir="data/qdrant",
-            embedding_dim=768,
+            embedding_dim=384,
         )
-        embedder = OllamaEmbedder()
+        embedder = OllamaEmbedder(model="all-minilm")
         retriever = Retriever(store=store, embedder=embedder, top_k=request.limit)
 
         results = retriever.retrieve(request.query)
@@ -51,7 +51,7 @@ async def query_rag(request: RAGQueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/ingest")
-async def ingest_document(file: UploadFile = File(...), collection: str = "ollamaopt_docs"):
+async def ingest_document(file: UploadFile = File(...), collection: str = "aicodex_vectors"):
     """
     Ingest a document into the RAG system.
     """

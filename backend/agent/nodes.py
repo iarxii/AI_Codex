@@ -15,7 +15,8 @@ tools = get_agent_tools()
 llm = ChatOllama(
     model=settings.DEFAULT_MODEL,
     base_url=settings.OLLAMA_BASE_URL,
-    temperature=0
+    temperature=0,
+    streaming=True
 ).bind_tools(tools)
 
 async def reason_node(state: AgentState) -> Dict[str, Any]:
@@ -51,11 +52,12 @@ async def reason_node(state: AgentState) -> Dict[str, Any]:
                 } for r in retrieval_results
             ]
             
-            # Build context (including history and RAG)
+            # Build context (including history, RAG, and memory)
             assembled = context_builder.build(
                 user_query=last_query,
                 chat_history=state["messages"][:-1],
                 retrieved_chunks=chunks,
+                memory_items=[], # Long-term memory handled here
                 tool_results=[] # Tool results are handled in the loop
             )
             full_prompt = context_builder.assemble_prompt_string(assembled, last_query)
@@ -74,16 +76,21 @@ async def reason_node(state: AgentState) -> Dict[str, Any]:
     if isinstance(messages[-1], HumanMessage):
         messages[-1] = HumanMessage(content=full_prompt)
     
+    logger.info(f"Invoking LLM for reasoning turn...")
     try:
         response = await llm.ainvoke(messages)
+        logger.info(f"LLM Response received (length: {len(response.content)})")
     except Exception as e:
         err_msg = str(e)
+        logger.error(f"LLM Invocation failed: {err_msg}")
         if "connection" in err_msg.lower() or "11434" in err_msg:
             raise Exception("AICodex: Connection to Ollama failed. Ensure Ollama is running (ollama serve).")
         raise e
     
     # Extract tool calls if any
     tool_calls = getattr(response, "tool_calls", [])
+    if tool_calls:
+        logger.info(f"Detected {len(tool_calls)} tool calls")
     
     return {
         "messages": [response],

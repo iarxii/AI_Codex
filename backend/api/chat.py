@@ -92,6 +92,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     kind = event["event"]
                     node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
                     
+                    log_debug(f"Event: {kind} | Node: {node_name}")
+                    
                     # Log tokens
                     if kind == "on_chat_model_stream":
                         content = event["data"]["chunk"].content
@@ -131,6 +133,10 @@ async def websocket_endpoint(websocket: WebSocket):
                             "tool_call_id": event["metadata"].get("tool_call_id", "unknown"),
                             "node": node_name
                         })
+                    
+                    elif kind == "on_error":
+                        log_error(f"Graph Error in {node_name}", event.get("data", {}).get("error"))
+                        await websocket.send_json({"type": "error", "message": f"Graph Error: {event.get('data', {}).get('error')}"})
 
                 # 5. Persist AI Response
                 if full_ai_response:
