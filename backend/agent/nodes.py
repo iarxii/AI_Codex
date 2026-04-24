@@ -1,13 +1,14 @@
 import logging
 from typing import Any, Dict, List
 from langchain_ollama import ChatOllama
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from .state import AgentState
 from .tools import get_agent_tools
 from backend.config import settings
 from backend.skills.registry import registry
 from backend.integrations.ollamaopt_bridge import get_context_builder, get_retriever
+from .profile import build_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,11 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     # If it's a HumanMessage, it's a new turn.
     if isinstance(messages[-1], HumanMessage):
         messages[-1] = HumanMessage(content=full_prompt)
+        
+    system_prompt = build_system_prompt()
+
+    if not any(isinstance(m, SystemMessage) for m in messages):
+        messages.insert(0, SystemMessage(content=system_prompt))
     
     logger.info(f"Invoking LLM for reasoning turn...")
     try:
