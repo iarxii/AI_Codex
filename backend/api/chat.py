@@ -27,7 +27,9 @@ agent_graph = create_agent_graph()
 
 @router.websocket("/ws/agent")
 async def websocket_endpoint(websocket: WebSocket):
+    print(f"DEBUG: WebSocket connection attempt on /ws/agent")
     await manager.connect(websocket)
+    print(f"DEBUG: WebSocket connected on /ws/agent")
     try:
         while True:
             data = await websocket.receive_text()
