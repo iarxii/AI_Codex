@@ -315,10 +315,9 @@ const Chat: React.FC = () => {
         </main>
 
         {/* Input Area */}
-        <footer className="p-6 bg-gradient-to-t from-[#0F172A] to-transparent z-20">
+        <footer className="p-6 bg-[#0F172A] border-t border-white/5 z-20">
           <form onSubmit={handleSend} className="max-w-4xl mx-auto relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 to-cyan-500/20 rounded-2xl blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"></div>
-            <div className="relative flex items-center bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="relative flex items-center bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-xl overflow-hidden shadow-sm transition-all focus-within:border-indigo-500/50 focus-within:bg-slate-900/80">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -336,10 +335,10 @@ const Chat: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading || !input.trim() || !currentConvId}
-                className={`mr-3 p-2.5 rounded-xl transition-all ${
+                className={`mr-3 p-2 rounded-lg transition-all ${
                   loading || !input.trim() || !currentConvId
                     ? 'text-slate-700' 
-                    : 'text-white bg-indigo-600 shadow-lg shadow-indigo-500/20 hover:scale-105 active:scale-95'
+                    : 'text-indigo-400 hover:text-white hover:bg-indigo-500/20'
                 }`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
