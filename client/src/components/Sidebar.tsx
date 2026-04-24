@@ -47,7 +47,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
     <aside className="w-72 h-full flex flex-col bg-white/5 backdrop-blur-xl border-r border-white/10 z-30 transition-all duration-300">
       <div className="p-4 border-b border-white/10">
         <button 
-          onClick={onNewChat}
+          onClick={async () => {
+            await onNewChat();
+            await fetchConversations();
+          }}
           className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-medium text-white transition-all active:scale-95 group"
         >
           <svg className="w-5 h-5 text-indigo-400 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
