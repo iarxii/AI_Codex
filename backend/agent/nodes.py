@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, List
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
 from .state import AgentState
 from .tools import get_agent_tools
 from backend.config import settings
@@ -19,7 +20,7 @@ llm = ChatOllama(
     streaming=True
 ).bind_tools(tools)
 
-async def reason_node(state: AgentState) -> Dict[str, Any]:
+async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
     LLM reasoning node. Grounds the query with RAG context before invoking the LLM.
     """
@@ -78,7 +79,7 @@ async def reason_node(state: AgentState) -> Dict[str, Any]:
     
     logger.info(f"Invoking LLM for reasoning turn...")
     try:
-        response = await llm.ainvoke(messages)
+        response = await llm.ainvoke(messages, config=config)
         logger.info(f"LLM Response received (length: {len(response.content)})")
     except Exception as e:
         err_msg = str(e)
