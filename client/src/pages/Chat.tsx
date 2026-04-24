@@ -18,6 +18,7 @@ const Chat: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [currentLatency, setCurrentLatency] = useState<number | null>(null);
   const [currentConvId, setCurrentConvId] = useState<number | null>(null);
   
   // UI State
@@ -56,8 +57,10 @@ const Chat: React.FC = () => {
           if (lastMsg && lastMsg.sender === 'bot') {
             const updated = [...prev];
             updated[updated.length - 1] = { ...lastMsg, content: data.content, status: 'typing' };
+            if (data.duration) setCurrentLatency(data.duration);
             return updated;
           } else {
+            if (data.duration) setCurrentLatency(data.duration);
             return [...prev, { id: Date.now().toString(), sender: 'bot', content: data.content, status: 'typing' }];
           }
         });
@@ -228,6 +231,13 @@ const Chat: React.FC = () => {
               <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
               <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">{connected ? 'Live' : 'Off'}</span>
             </div>
+            {currentLatency && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-indigo-500/10 rounded-full border border-indigo-500/20">
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">
+                  {currentLatency.toFixed(2)}s
+                </span>
+              </div>
+            )}
             <button 
               onClick={() => { localStorage.removeItem('token'); navigate('/login'); }}
               className="p-2 hover:bg-white/10 rounded-lg text-slate-500 hover:text-white transition-colors"
