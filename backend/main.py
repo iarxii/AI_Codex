@@ -1,8 +1,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .config import settings
-from .db.session import init_db
+from backend.config import settings
+from backend.db.session import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,15 +39,16 @@ async def root():
     return {"message": f"Welcome to {settings.PROJECT_NAME} API", "status": "running"}
 
 # Include routers
-from .api import auth, chat, metrics, rag, skills
+from backend.api import auth, chat, metrics, rag, skills, conversations
 app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
+app.include_router(conversations.router, prefix=settings.API_V1_STR + "/conversations", tags=["conversations"])
 app.include_router(chat.router, prefix=settings.API_V1_STR + "/chat", tags=["chat"])
 app.include_router(metrics.router, prefix=settings.API_V1_STR + "/metrics", tags=["metrics"])
 app.include_router(rag.router, prefix=settings.API_V1_STR + "/rag", tags=["rag"])
 app.include_router(skills.router, prefix=settings.API_V1_STR + "/skills", tags=["skills"])
 
 # Direct WebSocket registration for debugging
-from .api.chat import websocket_endpoint
-from .api.metrics import metrics_endpoint
+from backend.api.chat import websocket_endpoint
+from backend.api.metrics import metrics_endpoint
 app.add_api_websocket_route("/ws/agent", websocket_endpoint)
 app.add_api_websocket_route("/ws/metrics", metrics_endpoint)
