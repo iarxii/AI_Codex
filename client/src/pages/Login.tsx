@@ -15,13 +15,16 @@ const Login: React.FC = () => {
 
     try {
       // Use FormData because OAuth2PasswordRequestForm expects it
-      const formData = new FormData();
-      formData.append('username', username);
-      formData.append('password', password);
+      const params = new URLSearchParams();
+      params.append('username', username);
+      params.append('password', password);
 
       const response = await fetch('http://localhost:8000/api/auth/login', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params,
       });
 
       if (!response.ok) {
