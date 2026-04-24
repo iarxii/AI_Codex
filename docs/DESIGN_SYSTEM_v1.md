@@ -32,8 +32,17 @@ The AICodex UI is built on a "Cyber-Glass" aesthetic—a fusion of futuristic gl
 - **Micro-animations**: Use subtle scales (`0.98`) on clicks and gentle bounces for agent status indicators.
 - **Transitions**: 300ms cubic-bezier for panel expansion/collapse.
 
-## 4. Layout Architecture (3-Pane Workspace)
+## 5. Agentic Visibility Components
 
-1.  **Sidebar (The Shelf)**: Fixed left, glass-frosted, minimal icons.
-2.  **Main (The Reasoning Core)**: Center, clean typography, fluid scrolling.
-3.  **Inspector (The Grounding Panel)**: Right, monospace logs, RAG metadata, collapsible.
+### A. Thinking Process Block (Inline)
+- **Container**: `bg-white/5`, `border-white/10`, `rounded-2xl`.
+- **Indicator**: Pulsing `indigo-500` dot with `animate-ping` for active states.
+- **Typography**: Monospace `text-[11px]` for internal logs, `uppercase` tracking for headers.
+- **Behavior**: Collapsible via `<details>` to maintain clean chat history.
+
+### B. Live Tool Status (Context Inspector)
+- **Execution States**:
+    - `EXECUTING`: Pulsing amber text (`text-amber-400`).
+    - `SUCCESS`: Steady emerald text (`text-emerald-400`).
+    - `FAILURE`: Warning red text (`text-rose-500`).
+- **Provenance**: Direct links to grounding sources with `source_path` tooltips.
