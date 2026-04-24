@@ -551,22 +551,22 @@ AI_Codex/
 ## Execution Phases
 
 ### Phase 1 — Foundation (Backend + Agent Core)
-- [ ] Restructure directories (archive/delete old code)
-- [ ] Create FastAPI backend skeleton with config + auth + seeded admin
-- [ ] Set up OllamaOpt sibling path import bridge
-- [ ] Build LangGraph agent with basic tool-calling loop
-- [ ] Implement chat API + WebSocket streaming
-- [ ] Wire ContextBuilder + Retriever + Memory from OllamaOpt
-- [ ] Validate OllamaOpt modules actually work at runtime
+- [x] Restructure directories (archive/delete old code)
+- [x] Create FastAPI backend skeleton with config + auth + seeded admin
+- [x] Set up OllamaOpt sibling path import bridge
+- [x] Build LangGraph agent with basic tool-calling loop
+- [x] Implement chat API + WebSocket streaming
+- [x] Wire ContextBuilder + Retriever + Memory from OllamaOpt
+- [x] Validate OllamaOpt modules actually work at runtime
 
 ### Phase 2 — Skills Layer + RAG
-- [ ] Define BaseSkill interface + sandbox
-- [ ] Implement built-in skills (workspace_reader, shell_exec, rag_query)
-- [ ] GitHub GraphQL API skill with auto-caching to VectorDB
-- [ ] SkillRegistry with auto-discovery
-- [ ] Bridge skills to LangGraph tools
-- [ ] RAG ingest/query API endpoints
-- [ ] Skills CRUD API
+- [x] Define BaseSkill interface + sandbox
+- [x] Implement built-in skills (workspace_reader, shell_exec, rag_query)
+- [x] GitHub GraphQL API skill with auto-caching to VectorDB
+- [x] SkillRegistry with auto-discovery
+- [x] Bridge skills to LangGraph tools
+- [x] RAG ingest/query API endpoints
+- [x] Skills CRUD API
 
 ### Phase 3 — MCP Integration
 - [ ] Python MCP server exposing skills as tools
