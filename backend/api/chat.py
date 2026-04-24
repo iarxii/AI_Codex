@@ -2,7 +2,8 @@ import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from typing import List, Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from backend.utils.logger import log_debug, log_error
 
 from datetime import datetime
 from backend.db.session import get_db, AsyncSessionLocal
@@ -84,28 +85,52 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 full_ai_response = ""
                 
-                # 4. Execute graph
-                async for event in agent_graph.astream(initial_state):
-                    for node_name, state_update in event.items():
-                        if "messages" in state_update:
-                            new_msg = state_update["messages"][-1]
-                            if isinstance(new_msg, AIMessage):
-                                # Token-like streaming if content is new
-                                # Note: LangGraph often returns full message in state update
-                                # For simplicity, we'll send the latest message content
-                                full_ai_response = new_msg.content
-                                await websocket.send_json({
-                                    "type": "token",
-                                    "content": new_msg.content,
-                                    "node": node_name
-                                })
-                        
-                        if "current_tool_calls" in state_update and state_update["current_tool_calls"]:
+                # 4. Execute graph with event streaming
+                log_debug(f"Starting graph execution for conv {conversation_id}")
+                
+                async for event in agent_graph.astream_events(initial_state, version="v2"):
+                    kind = event["event"]
+                    node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
+                    
+                    # Log tokens
+                    if kind == "on_chat_model_stream":
+                        content = event["data"]["chunk"].content
+                        if content:
+                            full_ai_response += content
                             await websocket.send_json({
-                                "type": "tool_call",
-                                "tool_calls": state_update["current_tool_calls"],
+                                "type": "token",
+                                "content": full_ai_response,
                                 "node": node_name
                             })
+                    
+                    # Log node transitions for "Working" indicator
+                    elif kind == "on_chain_start" and "metadata" in event and "langgraph_node" in event["metadata"]:
+                        await websocket.send_json({
+                            "type": "status",
+                            "status": f"Agent working in node: {event['metadata']['langgraph_node']}",
+                            "node": event['metadata']['langgraph_node']
+                        })
+                    
+                    # Tool Calls
+                    elif kind == "on_chat_model_end":
+                        msg = event["data"]["output"]
+                        if hasattr(msg, "tool_calls") and msg.tool_calls:
+                            log_debug(f"Tool Call detected: {msg.tool_calls}")
+                            await websocket.send_json({
+                                "type": "tool_call",
+                                "tool_calls": msg.tool_calls,
+                                "node": node_name
+                            })
+                            
+                    # Tool Results
+                    elif kind == "on_tool_end":
+                        log_debug(f"Tool Result detected: {event['data']['output'][:100]}...")
+                        await websocket.send_json({
+                            "type": "tool_result",
+                            "content": str(event["data"]["output"]),
+                            "tool_call_id": event["metadata"].get("tool_call_id", "unknown"),
+                            "node": node_name
+                        })
 
                 # 5. Persist AI Response
                 if full_ai_response:
@@ -116,6 +141,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     )
                     db.add(new_ai_msg)
                     await db.commit()
+                    log_debug(f"Persisted AI response for conv {conversation_id}")
 
                 await websocket.send_json({"type": "done"})
             

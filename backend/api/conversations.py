@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
+from sqlalchemy.orm import selectinload
 from typing import List
 from pydantic import BaseModel
 from datetime import datetime
@@ -71,19 +72,12 @@ async def get_conversation(
 ):
     result = await db.execute(
         select(Conversation)
+        .options(selectinload(Conversation.messages))
         .filter_by(id=conversation_id, user_id=current_user.id)
     )
     conv = result.scalar_one_or_none()
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    # Load messages
-    msg_result = await db.execute(
-        select(Message)
-        .filter_by(conversation_id=conversation_id)
-        .order_by(Message.created_at)
-    )
-    conv.messages = msg_result.scalars().all()
     
     return conv
 

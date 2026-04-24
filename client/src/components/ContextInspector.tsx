@@ -40,6 +40,18 @@ const ContextInspector: React.FC<ContextInspectorProps> = ({ isOpen, onClose, co
                 <div className="text-slate-400 overflow-x-auto">
                   <pre>{JSON.stringify(tool.args, null, 2)}</pre>
                 </div>
+                {tool.result && (
+                  <div className="mt-2 p-2 bg-emerald-500/10 border border-emerald-500/20 rounded text-emerald-400 overflow-x-auto max-h-40">
+                    <div className="text-[9px] uppercase font-bold text-emerald-600 mb-1">Result</div>
+                    <pre className="whitespace-pre-wrap">{tool.result}</pre>
+                  </div>
+                )}
+                {!tool.result && (
+                  <div className="mt-2 flex items-center gap-2 text-slate-500 italic">
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></div>
+                    <span>Executing...</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
