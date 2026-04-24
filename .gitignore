@@ -20,6 +20,7 @@ backend/__pycache__/
 .idea/
 
 # Database
+data/*.db
 backend/data/*.db
 
 # Logs
