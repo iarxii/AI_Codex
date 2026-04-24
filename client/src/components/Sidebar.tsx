@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import SettingsModal from './SettingsModal';
+import { Cog6ToothIcon } from '@heroicons/react/24/outline';
 
 type Conversation = {
   id: number;
@@ -16,6 +18,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConversation, onNewChat }) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     fetchConversations();
@@ -97,8 +100,16 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
             <p className="text-xs font-bold text-white truncate">Administrator</p>
             <p className="text-[10px] text-emerald-500 font-mono">System.Active</p>
           </div>
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <Cog6ToothIcon className="w-5 h-5" />
+          </button>
         </div>
       </div>
+      
+      <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
     </aside>
   );
 };
