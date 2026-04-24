@@ -4,12 +4,14 @@
 # Dependencies
 node_modules/
 .venv/
+backend/.venv
 env/
 venv/
 ENV/
 
 # Python cache
 __pycache__/
+backend/__pycache__/
 *.py[cod]
 *$py.class
 
