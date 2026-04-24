@@ -61,3 +61,9 @@ def get_model_router():
     if module:
         return getattr(module, "ModelRouter", None)
     return None
+
+def get_metrics_collector():
+    module = get_ollamaopt_module("metrics_collector")
+    if module:
+        return getattr(module, "MetricsCollector", None)
+    return None

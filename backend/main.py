@@ -32,7 +32,13 @@ async def root():
     return {"message": f"Welcome to {settings.PROJECT_NAME} API", "status": "running"}
 
 # Include routers
-from .api import auth, chat
+from .api import auth, chat, metrics
 app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
 app.include_router(chat.router, prefix=settings.API_V1_STR + "/chat", tags=["chat"])
-app.add_api_websocket_route("/ws/agent", chat.websocket_endpoint)
+app.include_router(metrics.router, prefix=settings.API_V1_STR + "/metrics", tags=["metrics"])
+
+# Direct WebSocket registration for debugging
+from .api.chat import websocket_endpoint
+from .api.metrics import metrics_endpoint
+app.add_api_websocket_route("/ws/agent", websocket_endpoint)
+app.add_api_websocket_route("/ws/metrics", metrics_endpoint)
