@@ -151,8 +151,8 @@ const Chat: React.FC = () => {
         const data = await response.json();
         setCurrentConvId(data.id);
         setMessages([]);
-        // Force sidebar refresh would be better via state lift, 
-        // but for now we'll just let the user see the new active ID
+        setCurrentLatency(null);
+        // Force sidebar refresh is now handled by Sidebar awaiting this call
       }
     } catch (error) {
       console.error('Failed to create chat:', error);
