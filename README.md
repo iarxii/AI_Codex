@@ -1,7 +1,6 @@
-
 # AdaptivIntelligenceCodex (AICodex)
 
-**AdaptivIntelligenceCodex (AICodex)** is a comprehensive knowledge base and code generation pipeline for Senior AI Engineers, designed for rapid prototyping and architecture mapping. It features an AI-powered Health and Oversight Data Analysis engine supporting both OpenAI (gpt-4o) and Google Gemini (2.5 Flash) models.
+**AdaptivIntelligenceCodex (AICodex)** is a comprehensive knowledge base and code generation pipeline for Senior Agentic AI Engineers, designed for rapid prototyping and architecture mapping. It features an AI-powered Health and Oversight Data Analysis engine supporting both OpenAI (gpt-4o) and Google Gemini (2.5 Flash) models.
 
 ## Setup
 
@@ -14,37 +13,38 @@ Run the provided setup script to install dependencies and create starter `.env` 
 Or manually:
 
 1. Install dependencies in both `client` and `server` folders:
-	```sh
-	cd client && npm install
-	cd ../server && npm install
-	```
+   ```sh
+   cd client && npm install
+   cd ../server && npm install
+   ```
 2. Create a `.env` file in the `server` folder with your API keys and config (see `.env.example` if available).
 
 ## Running the App
 
 1. Start the server:
-	```sh
-	cd server
-	npm run server
-	```
+   ```sh
+   cd server
+   npm run server
+   ```
 2. Start the client (if applicable):
-	```sh
-	cd client
-	# e.g. use live-server or your preferred static server
-	npx live-server
-	```
+   ```sh
+   cd client
+   # e.g. use live-server or your preferred static server
+   npx live-server
+   ```
 
 ### Features
+
 - Modern OpenAI and Gemini integration
 - Provider selection per request
 - Designed for health data analysis, oversight, and feedback
 
 ---
 
-
 ## License
+
 This project is distributed under the MIT License. See `LICENSE` for more information.
 
-
 ## Contributing
+
 Please see the [CONTRIBUTING.md](CONTRIBUTING.md) file for details on how to contribute to this project.
