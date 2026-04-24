@@ -175,9 +175,20 @@ const Chat: React.FC = () => {
     setLoading(true);
     setCurrentToolCalls([]);
     
+    const activeProvider = localStorage.getItem('ai_provider') || 'local';
+    const activeModel = localStorage.getItem('ai_model') || '';
+    let apiKey = '';
+    
+    if (activeProvider === 'groq') apiKey = localStorage.getItem('groq_api_key') || '';
+    else if (activeProvider === 'openrouter') apiKey = localStorage.getItem('openrouter_api_key') || '';
+    else if (activeProvider === 'gemini') apiKey = localStorage.getItem('gemini_api_key') || '';
+
     ws.current?.send(JSON.stringify({
       message: input,
-      conversation_id: currentConvId
+      conversation_id: currentConvId,
+      provider: activeProvider,
+      model: activeModel,
+      api_key: apiKey
     }));
     
     setInput('');

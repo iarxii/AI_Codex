@@ -10,6 +10,9 @@ langgraph
 langchain-ollama
 langchain-core
 langchain-community
+langchain-groq
+langchain-openai
+langchain-google-genai
 mcp
 httpx
 qdrant-client

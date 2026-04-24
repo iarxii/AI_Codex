@@ -11,14 +11,28 @@ from backend.integrations.ollamaopt_bridge import get_context_builder, get_retri
 
 logger = logging.getLogger(__name__)
 
-# Initialize tools and bound LLM
-tools = get_agent_tools()
-llm = ChatOllama(
-    model=settings.DEFAULT_MODEL,
-    base_url=settings.OLLAMA_BASE_URL,
-    temperature=0,
-    streaming=True
-).bind_tools(tools)
+def get_dynamic_llm(config: RunnableConfig):
+    provider = config.get("configurable", {}).get("provider", "local")
+    model = config.get("configurable", {}).get("model")
+    api_key = config.get("configurable", {}).get("api_key")
+    
+    tools = get_agent_tools()
+    
+    if provider == "groq":
+        from langchain_groq import ChatGroq
+        llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=0, streaming=True)
+    elif provider == "openrouter":
+        from langchain_openai import ChatOpenAI
+        llm = ChatOpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key, model=model or "meta-llama/llama-3.2-3b-instruct", temperature=0, streaming=True)
+    elif provider == "gemini":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        llm = ChatGoogleGenerativeAI(model=model or "gemini-1.5-flash", api_key=api_key, temperature=0, streaming=True)
+    else:
+        # local
+        from langchain_ollama import ChatOllama
+        llm = ChatOllama(model=settings.DEFAULT_MODEL, base_url=settings.OLLAMA_BASE_URL, temperature=0, streaming=True)
+        
+    return llm.bind_tools(tools)
 
 async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
@@ -79,7 +93,8 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     
     logger.info(f"Invoking LLM for reasoning turn...")
     try:
-        response = await llm.ainvoke(messages, config=config)
+        dynamic_llm = get_dynamic_llm(config)
+        response = await dynamic_llm.ainvoke(messages, config=config)
         logger.info(f"LLM Response received (length: {len(response.content)})")
     except Exception as e:
         err_msg = str(e)

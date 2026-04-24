@@ -37,6 +37,9 @@ async def websocket_endpoint(websocket: WebSocket):
             payload = json.loads(data)
             user_message = payload.get("message")
             conversation_id = payload.get("conversation_id")
+            provider = payload.get("provider", "local")
+            model = payload.get("model")
+            api_key = payload.get("api_key")
             
             if not conversation_id:
                 await websocket.send_json({"type": "error", "message": "conversation_id is required"})
@@ -88,7 +91,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 # 4. Execute graph with event streaming
                 log_debug(f"Starting graph execution for conv {conversation_id}")
                 
-                async for event in agent_graph.astream_events(initial_state, version="v2"):
+                config = {"configurable": {"provider": provider, "model": model, "api_key": api_key}}
+                
+                async for event in agent_graph.astream_events(initial_state, config=config, version="v2"):
                     kind = event["event"]
                     node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
                     
