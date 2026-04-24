@@ -50,13 +50,13 @@ def get_vector_store():
         return getattr(module, "QdrantVectorStore", None)
     return None
 
-def get_context_builder():
+def get_context_builder_class():
     module = get_ollamaopt_module("context.builder")
     if module:
         return getattr(module, "ContextBuilder", None)
     return None
 
-def get_model_router():
+def get_model_router_class():
     module = get_ollamaopt_module("routing.router")
     if module:
         return getattr(module, "ModelRouter", None)
@@ -67,3 +67,67 @@ def get_metrics_collector():
     if module:
         return getattr(module, "MetricsCollector", None)
     return None
+
+# Singleton-style initialized instances
+_initialized_retriever = None
+_initialized_context_builder = None
+
+def get_retriever():
+    """Returns an initialized Retriever instance."""
+    global _initialized_retriever
+    if _initialized_retriever:
+        return _initialized_retriever
+    
+    try:
+        rag_module = get_ollamaopt_module("rag")
+        if not rag_module: return None
+        
+        QdrantVectorStore = getattr(rag_module, "QdrantVectorStore")
+        OllamaEmbedder = getattr(rag_module, "OllamaEmbedder")
+        Retriever = getattr(rag_module, "Retriever")
+        
+        store = QdrantVectorStore(
+            collection_name="ollamaopt_docs",
+            persist_dir="data/qdrant",
+            embedding_dim=768,
+        )
+        embedder = OllamaEmbedder(
+            api_base=settings.OLLAMA_BASE_URL,
+            model="nomic-embed-text",
+        )
+        _initialized_retriever = Retriever(
+            store=store,
+            embedder=embedder,
+            top_k=5,
+            score_threshold=0.3,
+        )
+        return _initialized_retriever
+    except Exception as e:
+        logger.error(f"Failed to initialize Retriever: {e}")
+        return None
+
+def get_context_builder():
+    """Returns an initialized ContextBuilder instance."""
+    global _initialized_context_builder
+    if _initialized_context_builder:
+        return _initialized_context_builder
+    
+    try:
+        context_module = get_ollamaopt_module("context.builder")
+        policy_module = get_ollamaopt_module("context.model") # Fixed: was context.policy
+        if not context_module or not policy_module: return None
+        
+        ContextBuilder = getattr(context_module, "ContextBuilder")
+        ContextPolicy = getattr(policy_module, "ContextPolicy")
+        
+        policy = ContextPolicy()
+        _initialized_context_builder = ContextBuilder(policy=policy)
+        _initialized_context_builder.set_system_prompt(
+            "You are AICodex, an intelligent coding agent. "
+            "Use the provided context to ground your answers. "
+            "If the context is insufficient, use your tools."
+        )
+        return _initialized_context_builder
+    except Exception as e:
+        logger.error(f"Failed to initialize ContextBuilder: {e}")
+        return None

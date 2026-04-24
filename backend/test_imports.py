@@ -14,11 +14,11 @@ def test_imports():
     vs = bridge.get_vector_store()
     print(f"QdrantVectorStore: {'FOUND' if vs else 'MISSING'}")
     
-    cb = bridge.get_context_builder()
-    print(f"ContextBuilder: {'FOUND' if cb else 'MISSING'}")
+    cb = bridge.get_context_builder_class()
+    print(f"ContextBuilder Class: {'FOUND' if cb else 'MISSING'}")
     
-    mr = bridge.get_model_router()
-    print(f"ModelRouter: {'FOUND' if mr else 'MISSING'}")
+    mr = bridge.get_model_router_class()
+    print(f"ModelRouter Class: {'FOUND' if mr else 'MISSING'}")
     
     try:
         graph = create_agent_graph()
