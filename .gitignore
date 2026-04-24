@@ -1,3 +1,29 @@
+# Environment variables
 .env
-node_modules
-```
+
+# Dependencies
+node_modules/
+.venv/
+env/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDEs
+.vscode/
+.idea/
+
+# Database
+backend/data/*.db
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
