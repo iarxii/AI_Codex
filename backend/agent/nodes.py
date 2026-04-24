@@ -1,4 +1,7 @@
 import logging
+import time
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
@@ -11,6 +14,17 @@ from backend.integrations.ollamaopt_bridge import get_context_builder, get_retri
 from .profile import build_system_prompt
 
 logger = logging.getLogger(__name__)
+
+def log_performance(event: str, duration: float, metadata: dict = None):
+    """
+    Appends performance metrics to logs/performance_benchmark.log
+    """
+    log_file = Path("./logs/performance_benchmark.log")
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    meta_str = f" | {metadata}" if metadata else ""
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(f"[{timestamp}] {event}: {duration:.4f}s{meta_str}\n")
 
 def get_dynamic_llm(config: RunnableConfig):
     provider = config.get("configurable", {}).get("provider", "local")
@@ -98,10 +112,17 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         messages.insert(0, SystemMessage(content=system_prompt))
     
     logger.info(f"Invoking LLM for reasoning turn...")
+    start_time = time.perf_counter()
     try:
         dynamic_llm = get_dynamic_llm(config)
         response = await dynamic_llm.ainvoke(messages, config=config)
-        logger.info(f"LLM Response received (length: {len(response.content)})")
+        duration = time.perf_counter() - start_time
+        
+        provider = config.get("configurable", {}).get("provider", "local")
+        model = config.get("configurable", {}).get("model", "default")
+        log_performance("LLM_REASONING", duration, {"provider": provider, "model": model})
+        
+        logger.info(f"LLM Response received (length: {len(response.content)}) in {duration:.2f}s")
     except Exception as e:
         err_msg = str(e)
         logger.error(f"LLM Invocation failed: {err_msg}")
@@ -137,10 +158,14 @@ async def execute_tool_node(state: AgentState) -> Dict[str, Any]:
         
         logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
         
+        start_time = time.perf_counter()
         skill = registry.get_skill(tool_name)
         if skill:
             try:
                 result = await skill.execute(**tool_args)
+                duration = time.perf_counter() - start_time
+                log_performance("TOOL_CALL", duration, {"tool": tool_name})
+                
                 tool_result = result.output or result.error or "Success (no output)"
                 if not result.success and not result.error:
                     tool_result = f"Error: {tool_result}"

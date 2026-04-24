@@ -1,4 +1,6 @@
 import json
+import time
+import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from typing import List, Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -92,6 +94,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 log_debug(f"Starting graph execution for conv {conversation_id}")
                 
                 config = {"configurable": {"provider": provider, "model": model, "api_key": api_key}}
+                request_start = time.perf_counter()
                 
                 async for event in agent_graph.astream_events(initial_state, config=config, version="v2"):
                     kind = event["event"]
@@ -107,7 +110,8 @@ async def websocket_endpoint(websocket: WebSocket):
                             await websocket.send_json({
                                 "type": "token",
                                 "content": full_ai_response,
-                                "node": node_name
+                                "node": node_name,
+                                "duration": time.perf_counter() - request_start
                             })
                     
                     # Log node transitions for "Working" indicator
@@ -126,7 +130,8 @@ async def websocket_endpoint(websocket: WebSocket):
                             await websocket.send_json({
                                 "type": "tool_call",
                                 "tool_calls": msg.tool_calls,
-                                "node": node_name
+                                "node": node_name,
+                                "duration": time.perf_counter() - request_start
                             })
                             
                     # Tool Results
