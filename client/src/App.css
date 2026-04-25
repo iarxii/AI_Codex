@@ -5,20 +5,20 @@
 
 :root {
   /* Backgrounds — Light Gray Palette */
-  --bg-primary: #C8CDD5;         /* Main app shell — silvery cool gray */
-  --bg-surface: #D8DCE4;         /* Elevated cards, sidebar, panels */
-  --bg-surface-hover: #E2E6EC;   /* Hover on surfaces */
-  --bg-input: #BFC4CC;           /* Input field backgrounds — slightly inset */
-  --bg-elevated: #E8ECF2;        /* Modals, dropdowns — lightest */
+  --bg-primary: #D8DCE4;         /* Main app shell — silvery cool gray */
+  --bg-surface: #E2E6EC;         /* Elevated cards, sidebar, panels */
+  --bg-surface-hover: #ECF0F4;   /* Hover on surfaces */
+  --bg-input: #FFFFFF;           /* Input field backgrounds — clean white */
+  --bg-elevated: #FFFFFF;        /* Modals, dropdowns — clean white */
   --bg-chat-bot: #E2E6EC;        /* Bot message bubbles */
   --bg-chat-user: #FF6600;       /* User message bubbles — AdaptivOrange */
 
   /* Accent — AdaptivOrange */
   --accent: #FF6600;
   --accent-hover: #E65C00;
-  --accent-glow: rgba(255, 102, 0, 0.15);
+  --accent-glow: rgba(255, 102, 0, 0.12);
   --accent-border: rgba(255, 102, 0, 0.35);
-  --accent-light: rgba(255, 102, 0, 0.08);
+  --accent-light: rgba(255, 102, 0, 0.06);
 
   /* Status */
   --status-online: #16A34A;

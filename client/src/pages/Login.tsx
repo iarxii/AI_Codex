@@ -14,7 +14,6 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      // Use FormData because OAuth2PasswordRequestForm expects it
       const params = new URLSearchParams();
       params.append('username', username);
       params.append('password', password);
@@ -44,43 +43,57 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[#0F172A] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(99,102,241,0.1),transparent_50%)]"></div>
+    <div className="flex items-center justify-center min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-[Poppins] relative overflow-hidden">
+      {/* Subtle tech-grid background */}
+      <div className="absolute inset-0 opacity-[0.4] pointer-events-none" 
+           style={{ 
+             backgroundImage: 'linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)', 
+             backgroundSize: '40px 40px' 
+           }}>
+      </div>
       
-      <div className="relative z-10 w-full max-w-md p-8 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+      <div className="relative z-10 w-full max-w-md p-10 bg-[var(--bg-surface)]/90 backdrop-blur-xl rounded-3xl border border-white/40 shadow-2xl">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-[var(--accent)] rounded-2xl mb-6 shadow-lg shadow-[var(--accent)]/30 rotate-3">
+            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <h1 className="text-4xl font-black tracking-tight text-[var(--text-primary)] mb-2">
             AICodex
           </h1>
-          <p className="text-slate-400 mt-2">Welcome back, Architect.</p>
+          <p className="text-[var(--text-secondary)] font-medium">Welcome back, Architect.</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 text-red-200 text-sm rounded-lg">
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 text-xs font-semibold rounded-xl flex items-center gap-3 animate-in fade-in zoom-in-95">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Username</label>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)] ml-1">Username</label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
-              placeholder="Enter your username"
+              className="w-full px-5 py-4 bg-white border border-black/[0.05] rounded-2xl focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all placeholder:text-[var(--text-muted)] text-sm shadow-sm"
+              placeholder="e.g. admin"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Password</label>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)] ml-1">Password</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
+              className="w-full px-5 py-4 bg-white border border-black/[0.05] rounded-2xl focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all placeholder:text-[var(--text-muted)] text-sm shadow-sm"
               placeholder="••••••••"
               required
             />
@@ -89,13 +102,18 @@ const Login: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-xl font-semibold shadow-lg shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`w-full py-4 bg-[var(--accent)] text-white rounded-2xl font-bold shadow-xl shadow-[var(--accent)]/20 hover:bg-[var(--accent-hover)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3`}
           >
-            {loading ? 'Authenticating...' : 'Sign In'}
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                Authenticating...
+              </>
+            ) : 'Sign In'}
           </button>
 
-          <div className="text-center text-sm text-slate-400">
-            Don't have an account? <Link to="/register" className="text-indigo-400 hover:underline">Register</Link>
+          <div className="text-center text-xs font-medium text-[var(--text-secondary)]">
+            Don't have an account? <Link to="/register" className="text-[var(--accent)] hover:underline font-bold">Register</Link>
           </div>
         </form>
       </div>

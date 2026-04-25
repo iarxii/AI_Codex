@@ -310,59 +310,38 @@ const Chat: React.FC = () => {
         </header>
 
         {/* Chat Area */}
-        <main className="flex-1 overflow-y-auto p-6 space-y-5 scrollbar-hide relative z-10">
+        <main className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide relative z-10">
           {!currentConvId && (
             <div className="h-full flex flex-col items-center justify-center text-center">
-              <div className="w-20 h-20 bg-[#FF6600]/10 rounded-2xl flex items-center justify-center mb-6 border border-[#FF6600]/20 rotate-6 hover:rotate-0 transition-transform duration-500 shadow-lg">
-                <svg className="w-10 h-10 text-[#FF6600]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-20 h-20 bg-[var(--accent-light)] rounded-2xl flex items-center justify-center mb-6 border border-[var(--border-accent)] rotate-6 hover:rotate-0 transition-transform duration-500 shadow-lg">
+                <svg className="w-10 h-10 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-[#1A1D2E] mb-3 tracking-tight">Initialize Neural Link</h2>
-              <p className="max-w-sm text-[#4A4D5E] text-sm leading-relaxed">Select a session from the shelf or create a new workspace to begin agentic execution.</p>
+              <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-3 tracking-tight">Initialize Neural Link</h2>
+              <p className="max-w-sm text-[var(--text-secondary)] text-sm leading-relaxed">Select a session from the shelf or create a new workspace to begin agentic execution.</p>
             </div>
           )}
 
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-              <div className={`max-w-[80%] px-5 py-3.5 rounded-2xl ${
-                msg.sender === 'user' 
-                  ? 'bg-[#FF6600] text-white rounded-tr-sm shadow-lg shadow-[#FF6600]/20' 
-                  : 'bg-[#E2E6EC] border border-black/[0.05] text-[#1A1D2E] rounded-tl-sm shadow-sm'
-              }`}>
-                <div className={`prose prose-sm max-w-none ${msg.sender === 'user' ? 'prose-invert' : ''}`}>
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
-                </div>
-                {msg.status === 'typing' && (
-                  <div className="mt-2 flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce"></div>
-                    <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                    <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-
+          {/* Thinking Process — Collaborative Reasoning */}
           {thoughtLog.length > 0 && (
-            <div className="flex justify-start animate-in fade-in slide-in-from-left-4 duration-500">
-              <div className="bg-[#E2E6EC] border border-black/[0.05] rounded-2xl rounded-tl-sm p-4 w-full max-w-2xl shadow-sm">
+            <div className="flex justify-start animate-in fade-in slide-in-from-left-4 duration-500 mb-6">
+              <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl rounded-tl-sm p-4 w-full max-w-2xl shadow-sm">
                 <details open className="group">
-                  <summary className="flex items-center gap-3 cursor-pointer list-none text-[10px] font-bold uppercase tracking-[0.15em] text-[#FF6600] select-none">
-                    <div className="relative">
-                      <div className="w-2 h-2 bg-[#FF6600] rounded-full animate-ping absolute inset-0"></div>
-                      <div className="w-2 h-2 bg-[#FF6600] rounded-full relative"></div>
+                  <summary className="flex items-center justify-between cursor-pointer list-none select-none">
+                    <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--accent)]">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]"></div>
+                      Thinking Process
                     </div>
-                    Thinking Process
-                    <svg className="w-3 h-3 ml-auto transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <div className="text-[var(--text-muted)] group-open:rotate-180 transition-transform">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+                    </div>
                   </summary>
-                  <div className="mt-4 space-y-2 pl-5 border-l-2 border-[#FF6600]/20">
-                    {thoughtLog.map((thought, i) => (
-                      <div key={i} className="text-[11px] text-[#4A4D5E] font-mono flex items-center gap-2">
-                        <span className="text-[#FF6600]/50">[{i+1}]</span>
-                        {thought}
+                  <div className="mt-4 space-y-2 pl-5 border-l-2 border-[var(--accent-border)]">
+                    {thoughtLog.map((log, i) => (
+                      <div key={i} className="text-[11px] font-mono text-[var(--text-secondary)] flex gap-3 group/item">
+                        <span className="text-[var(--accent)] opacity-40 font-bold">[{i + 1}]</span>
+                        <span className="group-hover/item:text-[var(--text-primary)] transition-colors">{log}</span>
                       </div>
                     ))}
                   </div>
@@ -370,6 +349,55 @@ const Chat: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Message List */}
+          <div className="space-y-6">
+            {messages.map((msg) => {
+              const isUser = msg.sender === 'user';
+              const isError = msg.content.startsWith('❌ Error:');
+              
+              if (isError) {
+                return (
+                  <div key={msg.id} className="flex justify-start animate-in fade-in slide-in-from-bottom-2">
+                    <div className="bg-[var(--bg-surface)] border-l-4 border-red-500 p-4 rounded-xl rounded-tl-none shadow-sm max-w-3xl flex gap-4">
+                      <div className="text-red-500 shrink-0 mt-0.5">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="text-xs text-[var(--text-primary)] leading-relaxed font-medium">
+                        {msg.content.replace('❌ Error: ', '')}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div 
+                  key={msg.id} 
+                  className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-in fade-in ${isUser ? 'slide-in-from-right-4' : 'slide-in-from-left-4'} duration-300`}
+                >
+                  <div className={`max-w-[80%] px-5 py-3.5 rounded-2xl ${
+                    isUser 
+                      ? 'bg-[var(--accent)] text-white rounded-tr-sm shadow-lg shadow-[var(--accent)]/20' 
+                      : 'bg-[var(--bg-chat-bot)] border border-[var(--border)] text-[var(--text-primary)] rounded-tl-sm shadow-sm'
+                  }`}>
+                    <div className={`prose prose-sm max-w-none ${isUser ? 'prose-invert' : ''}`}>
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                    {msg.status === 'typing' && (
+                      <div className="mt-2 flex gap-1">
+                        <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce"></div>
+                        <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                        <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
           <div ref={scrollRef} />
         </main>
 

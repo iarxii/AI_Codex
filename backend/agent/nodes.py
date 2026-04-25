@@ -38,7 +38,17 @@ def get_dynamic_llm(config: RunnableConfig):
         llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=0, streaming=True)
     elif provider == "openrouter":
         from langchain_openai import ChatOpenAI
-        llm = ChatOpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key, model=model or "meta-llama/llama-3.2-3b-instruct", temperature=0, streaming=True)
+        llm = ChatOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+            model=model or "meta-llama/llama-3.2-3b-instruct",
+            temperature=0,
+            streaming=True,
+            default_headers={
+                "HTTP-Referer": "https://aicodex.ai",
+                "X-Title": "AICodex Agentic IDE"
+            }
+        )
     elif provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
         llm = ChatGoogleGenerativeAI(model=model or "gemini-1.5-flash", api_key=api_key, temperature=0, streaming=True)

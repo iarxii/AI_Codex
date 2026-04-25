@@ -44,14 +44,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
   };
 
   return (
-    <aside className="w-72 h-full flex flex-col bg-[#BFC4CC]/80 backdrop-blur-xl border-r border-black/[0.06] z-30 transition-all duration-300">
+    <aside className="w-72 h-full flex flex-col bg-[var(--bg-surface)]/80 backdrop-blur-xl border-r border-black/[0.06] z-30 transition-all duration-300">
       <div className="p-4 border-b border-black/[0.06]">
         <button 
           onClick={async () => {
             await onNewChat();
             await fetchConversations();
           }}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[#FF6600] hover:bg-[#E65C00] rounded-xl text-sm font-semibold text-white transition-all active:scale-95 shadow-md shadow-[#FF6600]/20 group"
+          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-xl text-sm font-semibold text-white transition-all active:scale-95 shadow-md shadow-[var(--accent)]/20 group"
         >
           <svg className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -61,11 +61,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-1.5 scrollbar-hide">
-        {loading && <div className="text-center py-4 text-[#4A4D5E] text-xs uppercase tracking-widest font-semibold animate-pulse">Syncing History...</div>}
+        {loading && <div className="text-center py-4 text-[var(--text-secondary)] text-xs uppercase tracking-widest font-semibold animate-pulse">Syncing History...</div>}
         
         {!loading && conversations.length === 0 && (
           <div className="text-center py-10 px-4">
-            <p className="text-xs text-[#7A7D8E] font-medium">No active sessions.</p>
+            <p className="text-xs text-[var(--text-muted)] font-medium">No active sessions.</p>
           </div>
         )}
 
@@ -75,17 +75,17 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
             onClick={() => onSelectConversation(conv.id)}
             className={`w-full text-left p-3 rounded-xl transition-all group relative overflow-hidden ${
               currentConversationId === conv.id 
-                ? 'bg-[#FF6600]/12 border border-[#FF6600]/25 shadow-sm' 
+                ? 'bg-[var(--accent)]/12 border border-[var(--accent)]/25 shadow-sm' 
                 : 'hover:bg-black/[0.04] border border-transparent'
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className={`w-2 h-2 rounded-full transition-all ${currentConversationId === conv.id ? 'bg-[#FF6600] shadow-[0_0_8px_rgba(255,102,0,0.5)]' : 'bg-[#7A7D8E]'}`}></div>
+              <div className={`w-2 h-2 rounded-full transition-all ${currentConversationId === conv.id ? 'bg-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)]' : 'bg-[var(--text-muted)]'}`}></div>
               <div className="flex-1 min-w-0">
-                <p className={`text-sm truncate font-medium ${currentConversationId === conv.id ? 'text-[#1A1D2E]' : 'text-[#4A4D5E] group-hover:text-[#1A1D2E]'}`}>
+                <p className={`text-sm truncate font-medium ${currentConversationId === conv.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}>
                   {conv.title}
                 </p>
-                <p className="text-[10px] text-[#7A7D8E] font-mono uppercase tracking-tighter mt-0.5">
+                <p className="text-[10px] text-[var(--text-muted)] font-mono uppercase tracking-tighter mt-0.5">
                   {new Date(conv.updated_at).toLocaleDateString()}
                 </p>
               </div>
@@ -94,18 +94,18 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
         ))}
       </div>
 
-      <div className="p-4 border-t border-black/[0.06] bg-[#B5BAC2]/50">
+      <div className="p-4 border-t border-black/[0.06] bg-[var(--bg-primary)]/50">
         <div className="flex items-center gap-3 px-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#FF6600] to-[#FF8533] flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-hover)] flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
             ADM
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-[#1A1D2E] truncate">Administrator</p>
+            <p className="text-xs font-semibold text-[var(--text-primary)] truncate">Administrator</p>
             <p className="text-[10px] text-green-600 font-mono">System.Active</p>
           </div>
           <button 
             onClick={() => setIsSettingsOpen(true)}
-            className="p-1.5 text-[#7A7D8E] hover:text-[#FF6600] hover:bg-[#FF6600]/10 rounded-lg transition-colors"
+            className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors"
           >
             <Cog6ToothIcon className="w-5 h-5" />
           </button>
