@@ -1,17 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Inter', 'Outfit', system-ui, sans-serif;
+  --font-sans: 'Poppins', system-ui, sans-serif;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
   margin: 0;
-  background-color: #0F172A;
-  color: #F8FAFC;
+  background-color: #C8CDD5;
+  color: #1A1D2E;
+  font-family: 'Poppins', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -26,23 +27,21 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.12);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 102, 0, 0.35);
 }
 
-/* Hide scrollbar for chrome, safari and opera */
+/* Hide scrollbar utilities */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
-
-/* Hide scrollbar for ie, edge and firefox */
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Animation utilities */
@@ -53,4 +52,13 @@ body {
 
 .animate-glow {
   animation: glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-orange {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 102, 0, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 102, 0, 0); }
+}
+
+.animate-pulse-orange {
+  animation: pulse-orange 2s ease-in-out infinite;
 }
