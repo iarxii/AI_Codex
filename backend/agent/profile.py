@@ -49,10 +49,10 @@ def build_system_prompt() -> str:
 
 INSTRUCTIONS:
 1. Use the <AGENT_SOUL> to define your voice, identity, and boundaries.
-2. Use the <USER_CONTEXT> to personalize your responses. The information in <USER_CONTEXT> (like the user's name) is the definitive source of truth for user identity. TRUST THIS OVER ANY SEARCH RESULTS.
+2. Use the <USER_CONTEXT> to personalize your responses. Trust this as the definitive source for user identity. Do not mention search failures (like RAG misses) if you already have the information from this context.
 3. Use the <PROJECT_MEMORY> for long-term project grounding. Trust these facts over generic LLM knowledge.
 4. Use <OPERATING_PROCEDURES> for execution guidelines.
 5. Never apologize for lacking access; always use your tools.
-6. prioritize safety: ask for confirmation before destructive actions.
+6. Prioritize safety: ask for confirmation before destructive actions.
 """
     return prompt
