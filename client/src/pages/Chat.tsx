@@ -1,8 +1,13 @@
+// Chat.tsx — AICodex Agentic Chat Interface (v2 - Light Gray + AdaptivOrange)
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import ContextInspector from '../components/ContextInspector';
+import SettingsModal from '../components/SettingsModal';
+import { PROVIDER_MAP, getActiveProvider, getActiveProviderInfo } from '../components/providerMeta';
+import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
+import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 
 type Message = {
   id: string;
@@ -11,6 +16,31 @@ type Message = {
   status?: 'typing' | 'done';
   tool_calls?: any[];
   metadata?: any;
+};
+
+/** Inline provider icons for the header badge */
+const ProviderBadgeIcon: React.FC<{ providerId: string }> = ({ providerId }) => {
+  switch (providerId) {
+    case 'local':
+      return <img src={OllamaLogo} alt="Ollama" className="w-4 h-4" />;
+    case 'groq':
+      return (
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#FF6600" />
+        </svg>
+      );
+    case 'openrouter':
+      return (
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9" stroke="#06B6D4" strokeWidth="1.5"/>
+          <path d="M2 12h20M12 2c-3 3-4.5 6-4.5 10s1.5 7 4.5 10c3-3 4.5-6 4.5-10S15 5 12 2z" stroke="#06B6D4" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      );
+    case 'gemini':
+      return <img src={GeminiLogo} alt="Gemini" className="w-4 h-4" />;
+    default:
+      return <span className="text-xs">🤖</span>;
+  }
 };
 
 const Chat: React.FC = () => {
@@ -26,12 +56,26 @@ const Chat: React.FC = () => {
   const [currentContext, setCurrentContext] = useState<any[]>([]);
   const [thoughtLog, setThoughtLog] = useState<string[]>([]);
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 15, latency: '0ms' });
+  
+  // Provider state
+  const [activeProvider, setActiveProvider] = useState(getActiveProvider());
+  const activeProviderInfo = PROVIDER_MAP[activeProvider] || PROVIDER_MAP['local'];
 
   const ws = useRef<WebSocket | null>(null);
   const metricsWs = useRef<WebSocket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  // Listen for provider changes (from SettingsModal)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setActiveProvider(getActiveProvider());
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // 1. Initial Auth Check
   useEffect(() => {
@@ -44,7 +88,6 @@ const Chat: React.FC = () => {
 
   // 2. WebSockets management
   useEffect(() => {
-    // Main Agent WS
     const socket = new WebSocket('ws://127.0.0.1:8000/api/chat/ws/agent');
     ws.current = socket;
     socket.onopen = () => setConnected(true);
@@ -89,7 +132,6 @@ const Chat: React.FC = () => {
       }
     };
 
-    // Metrics WS
     const mSocket = new WebSocket('ws://127.0.0.1:8000/api/metrics/ws/metrics');
     metricsWs.current = mSocket;
     mSocket.onmessage = (event) => {
@@ -152,7 +194,6 @@ const Chat: React.FC = () => {
         setCurrentConvId(data.id);
         setMessages([]);
         setCurrentLatency(null);
-        // Force sidebar refresh is now handled by Sidebar awaiting this call
       }
     } catch (error) {
       console.error('Failed to create chat:', error);
@@ -164,11 +205,7 @@ const Chat: React.FC = () => {
     if (!input.trim() || !connected || loading) return;
 
     if (!currentConvId) {
-      // Auto-create conversation if none active
-      handleNewChat().then(() => {
-         // This is a bit racey, in real app we'd wait or buffer
-      });
-      // For now, alert or just return
+      handleNewChat().then(() => {});
       alert("Please select or create a workspace first.");
       return;
     }
@@ -178,18 +215,18 @@ const Chat: React.FC = () => {
     setLoading(true);
     setCurrentToolCalls([]);
     
-    const activeProvider = localStorage.getItem('ai_provider') || 'local';
+    const currentProvider = localStorage.getItem('ai_provider') || 'local';
     const activeModel = localStorage.getItem('ai_model') || '';
     let apiKey = '';
     
-    if (activeProvider === 'groq') apiKey = localStorage.getItem('groq_api_key') || '';
-    else if (activeProvider === 'openrouter') apiKey = localStorage.getItem('openrouter_api_key') || '';
-    else if (activeProvider === 'gemini') apiKey = localStorage.getItem('gemini_api_key') || '';
+    if (currentProvider === 'groq') apiKey = localStorage.getItem('groq_api_key') || '';
+    else if (currentProvider === 'openrouter') apiKey = localStorage.getItem('openrouter_api_key') || '';
+    else if (currentProvider === 'gemini') apiKey = localStorage.getItem('gemini_api_key') || '';
 
     ws.current?.send(JSON.stringify({
       message: input,
       conversation_id: currentConvId,
-      provider: activeProvider,
+      provider: currentProvider,
       model: activeModel,
       api_key: apiKey
     }));
@@ -198,8 +235,8 @@ const Chat: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#0F172A] text-slate-200 font-sans overflow-hidden">
-      {/* Sidebar - The Shelf */}
+    <div className="flex h-screen bg-[#C8CDD5] text-[#1A1D2E] font-[Poppins] overflow-hidden">
+      {/* Sidebar */}
       <Sidebar 
         currentConversationId={currentConvId} 
         onSelectConversation={loadConversation} 
@@ -208,39 +245,61 @@ const Chat: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 relative">
-        {/* Circuit Pattern Overlay */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/circuit-board.png')]"></div>
+        {/* Subtle circuit-trace overlay */}
+        <div className="absolute inset-0 opacity-[0.04] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/circuit-board.png')]"></div>
         
         {/* Header */}
-        <header className="h-16 flex items-center justify-between px-6 bg-white/5 backdrop-blur-md border-b border-white/10 z-20">
-          <div className="flex items-center gap-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-white">
-              {currentConvId ? `Workspace_ID: ${currentConvId}` : 'No Workspace Selected'}
+        <header className="h-14 flex items-center justify-between px-5 bg-[#D8DCE4]/80 backdrop-blur-md border-b border-black/[0.06] z-20 shadow-sm">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-[#4A4D5E]">
+              {currentConvId ? `Workspace #${currentConvId}` : 'No Workspace'}
             </h2>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* Inspector Toggle */}
             <button 
               onClick={() => setIsInspectorOpen(!isInspectorOpen)}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                isInspectorOpen ? 'bg-indigo-500/20 border-indigo-500 text-indigo-400' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
+              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                isInspectorOpen 
+                  ? 'bg-[#FF6600]/10 border-[#FF6600]/30 text-[#FF6600]' 
+                  : 'bg-black/[0.04] border-black/[0.08] text-[#4A4D5E] hover:text-[#1A1D2E] hover:border-black/[0.15]'
               }`}
             >
               Inspector
             </button>
-            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
-              <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">{connected ? 'Live' : 'Off'}</span>
-            </div>
+
+            {/* Provider Badge — clickable, opens SettingsModal */}
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+                connected
+                  ? 'bg-[#FF6600]/10 border-[#FF6600]/25 hover:bg-[#FF6600]/20 hover:border-[#FF6600]/40'
+                  : 'bg-red-100 border-red-300'
+              }`}
+              title={`Provider: ${activeProviderInfo.label} — Click to change`}
+            >
+              <ProviderBadgeIcon providerId={activeProvider} />
+              <span className={`text-[10px] font-bold uppercase tracking-tight ${
+                connected ? 'text-[#FF6600]' : 'text-red-600'
+              }`}>
+                {activeProviderInfo.label}
+              </span>
+              <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+            </button>
+
+            {/* Latency */}
             {currentLatency && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-indigo-500/10 rounded-full border border-indigo-500/20">
-                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">
+              <div className="flex items-center gap-2 px-3 py-1 bg-black/[0.04] rounded-full border border-black/[0.06]">
+                <span className="text-[10px] font-semibold text-[#4A4D5E] uppercase tracking-tight">
                   {currentLatency.toFixed(2)}s
                 </span>
               </div>
             )}
+
+            {/* Logout */}
             <button 
               onClick={() => { localStorage.removeItem('token'); navigate('/login'); }}
-              className="p-2 hover:bg-white/10 rounded-lg text-slate-500 hover:text-white transition-colors"
+              className="p-2 hover:bg-black/[0.06] rounded-lg text-[#7A7D8E] hover:text-[#1A1D2E] transition-colors"
               title="Logout"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,34 +310,34 @@ const Chat: React.FC = () => {
         </header>
 
         {/* Chat Area */}
-        <main className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide relative z-10">
+        <main className="flex-1 overflow-y-auto p-6 space-y-5 scrollbar-hide relative z-10">
           {!currentConvId && (
             <div className="h-full flex flex-col items-center justify-center text-center">
-              <div className="w-24 h-24 bg-white/5 rounded-[2rem] flex items-center justify-center mb-8 border border-white/10 rotate-12 hover:rotate-0 transition-transform duration-500 shadow-2xl">
-                <svg className="w-12 h-12 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <div className="w-20 h-20 bg-[#FF6600]/10 rounded-2xl flex items-center justify-center mb-6 border border-[#FF6600]/20 rotate-6 hover:rotate-0 transition-transform duration-500 shadow-lg">
+                <svg className="w-10 h-10 text-[#FF6600]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <h2 className="text-3xl font-black text-white mb-4 tracking-tighter">INITIALIZE_NEURAL_LINK</h2>
-              <p className="max-w-sm text-slate-500 text-sm leading-relaxed">Select a previous session from the shelf or create a new workspace to begin agentic execution.</p>
+              <h2 className="text-2xl font-bold text-[#1A1D2E] mb-3 tracking-tight">Initialize Neural Link</h2>
+              <p className="max-w-sm text-[#4A4D5E] text-sm leading-relaxed">Select a session from the shelf or create a new workspace to begin agentic execution.</p>
             </div>
           )}
 
           {messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-              <div className={`max-w-[85%] px-5 py-3 rounded-2xl shadow-2xl ${
+              <div className={`max-w-[80%] px-5 py-3.5 rounded-2xl ${
                 msg.sender === 'user' 
-                  ? 'bg-indigo-600 text-white rounded-tr-none' 
-                  : 'bg-white/5 border border-white/10 text-slate-200 rounded-tl-none backdrop-blur-sm'
+                  ? 'bg-[#FF6600] text-white rounded-tr-sm shadow-lg shadow-[#FF6600]/20' 
+                  : 'bg-[#E2E6EC] border border-black/[0.05] text-[#1A1D2E] rounded-tl-sm shadow-sm'
               }`}>
-                <div className="prose prose-invert prose-sm max-w-none">
+                <div className={`prose prose-sm max-w-none ${msg.sender === 'user' ? 'prose-invert' : ''}`}>
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
                 {msg.status === 'typing' && (
                   <div className="mt-2 flex gap-1">
-                    <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
-                    <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                    <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                    <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce"></div>
+                    <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                    <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce [animation-delay:0.4s]"></div>
                   </div>
                 )}
               </div>
@@ -287,22 +346,22 @@ const Chat: React.FC = () => {
 
           {thoughtLog.length > 0 && (
             <div className="flex justify-start animate-in fade-in slide-in-from-left-4 duration-500">
-              <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-none p-4 w-full max-w-2xl backdrop-blur-sm">
+              <div className="bg-[#E2E6EC] border border-black/[0.05] rounded-2xl rounded-tl-sm p-4 w-full max-w-2xl shadow-sm">
                 <details open className="group">
-                  <summary className="flex items-center gap-3 cursor-pointer list-none text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 select-none">
+                  <summary className="flex items-center gap-3 cursor-pointer list-none text-[10px] font-bold uppercase tracking-[0.15em] text-[#FF6600] select-none">
                     <div className="relative">
-                      <div className="w-2 h-2 bg-indigo-500 rounded-full animate-ping absolute inset-0"></div>
-                      <div className="w-2 h-2 bg-indigo-500 rounded-full relative"></div>
+                      <div className="w-2 h-2 bg-[#FF6600] rounded-full animate-ping absolute inset-0"></div>
+                      <div className="w-2 h-2 bg-[#FF6600] rounded-full relative"></div>
                     </div>
                     Thinking Process
                     <svg className="w-3 h-3 ml-auto transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
                     </svg>
                   </summary>
-                  <div className="mt-4 space-y-2 pl-5 border-l border-white/10">
+                  <div className="mt-4 space-y-2 pl-5 border-l-2 border-[#FF6600]/20">
                     {thoughtLog.map((thought, i) => (
-                      <div key={i} className="text-[11px] text-slate-500 font-mono flex items-center gap-2">
-                        <span className="text-indigo-500/50">[{i+1}]</span>
+                      <div key={i} className="text-[11px] text-[#4A4D5E] font-mono flex items-center gap-2">
+                        <span className="text-[#FF6600]/50">[{i+1}]</span>
                         {thought}
                       </div>
                     ))}
@@ -314,58 +373,122 @@ const Chat: React.FC = () => {
           <div ref={scrollRef} />
         </main>
 
-        {/* Input Area */}
-        <footer className="p-6 bg-[#0F172A] border-t border-white/5 z-20">
-          <form onSubmit={handleSend} className="max-w-4xl mx-auto relative group">
-            <div className="relative flex items-center bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-xl overflow-hidden shadow-sm transition-all focus-within:border-indigo-500/50 focus-within:bg-slate-900/80">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend(e);
-                  }
-                }}
-                placeholder={currentConvId ? "Input command or objective..." : "Select workspace to start..."}
-                disabled={!currentConvId}
-                className="flex-1 bg-transparent border-none focus:ring-0 px-6 py-4 text-sm text-slate-200 placeholder:text-slate-600 resize-none h-14 max-h-40"
-                rows={1}
-              />
-              <button
-                type="submit"
-                disabled={loading || !input.trim() || !currentConvId}
-                className={`mr-3 p-2 rounded-lg transition-all ${
-                  loading || !input.trim() || !currentConvId
-                    ? 'text-slate-700' 
-                    : 'text-indigo-400 hover:text-white hover:bg-indigo-500/20'
-                }`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                </svg>
-              </button>
+        {/* Input Area — Enriched */}
+        <footer className="px-6 pb-5 pt-3 bg-[#C8CDD5] border-t border-black/[0.04] z-20">
+          <form onSubmit={handleSend} className="max-w-4xl mx-auto">
+            {/* Main Input Container */}
+            <div className="relative bg-[#E2E6EC] border border-black/[0.08] rounded-2xl overflow-hidden shadow-md transition-all focus-within:border-[#FF6600]/40 focus-within:shadow-lg focus-within:shadow-[#FF6600]/5">
+              {/* Function Buttons Row */}
+              <div className="flex items-center gap-1 px-3 pt-2.5 pb-0">
+                {/* Attachments */}
+                <button
+                  type="button"
+                  onClick={() => alert('File attachments — coming soon!')}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[#4A4D5E] hover:text-[#1A1D2E] hover:bg-black/[0.05] transition-all"
+                  title="Attach files"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                  Attach
+                </button>
+
+                {/* Tools */}
+                <button
+                  type="button"
+                  onClick={() => alert('Tools selector — coming soon!')}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[#4A4D5E] hover:text-[#1A1D2E] hover:bg-black/[0.05] transition-all"
+                  title="Select tools"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Tools
+                  <svg className="w-2.5 h-2.5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Agent Mode */}
+                <button
+                  type="button"
+                  onClick={() => alert('Agent mode — coming soon!')}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[#4A4D5E] hover:text-[#FF6600] hover:bg-[#FF6600]/8 transition-all"
+                  title="Toggle agent mode"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Agent
+                </button>
+
+                <div className="flex-1" />
+
+                {/* Provider indicator mini */}
+                <div className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium text-[#7A7D8E]">
+                  <ProviderBadgeIcon providerId={activeProvider} />
+                  <span>{activeProviderInfo.label}</span>
+                </div>
+              </div>
+
+              {/* Textarea + Send Row */}
+              <div className="flex items-end gap-3 px-3 pb-3 pt-1">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend(e);
+                    }
+                  }}
+                  placeholder={currentConvId ? "What would you like to build today?" : "Select a workspace to begin..."}
+                  disabled={!currentConvId}
+                  className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-2 py-2 text-sm text-[#1A1D2E] placeholder:text-[#7A7D8E] resize-none min-h-[44px] max-h-[160px]"
+                  rows={1}
+                />
+                {/* Send Button — Prominent Round Orange */}
+                <button
+                  type="submit"
+                  disabled={loading || !input.trim() || !currentConvId}
+                  className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
+                    loading || !input.trim() || !currentConvId
+                      ? 'bg-[#BFC4CC] text-[#7A7D8E] cursor-not-allowed' 
+                      : 'bg-[#FF6600] text-white hover:bg-[#E65C00] shadow-lg shadow-[#FF6600]/30 hover:shadow-[#FF6600]/50 active:scale-95'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            <div className="mt-3 flex justify-center gap-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold">
-              <span className={metrics.cpu > 80 ? 'text-red-400' : ''}>CPU: {Math.round(metrics.cpu)}%</span>
-              <span>•</span>
-              <span className={metrics.ram > 80 ? 'text-red-400' : ''}>RAM: {Math.round(metrics.ram)}%</span>
-              <span>•</span>
-              <span className="text-indigo-400">LATENCY: {metrics.latency}</span>
-              <span>•</span>
+
+            {/* Metrics Strip */}
+            <div className="mt-2.5 flex justify-center gap-4 text-[10px] uppercase tracking-widest text-[#7A7D8E] font-medium">
+              <span className={metrics.cpu > 80 ? 'text-red-500' : ''}>CPU: {Math.round(metrics.cpu)}%</span>
+              <span className="text-[#BFC4CC]">•</span>
+              <span className={metrics.ram > 80 ? 'text-red-500' : ''}>RAM: {Math.round(metrics.ram)}%</span>
+              <span className="text-[#BFC4CC]">•</span>
+              <span className="text-[#FF6600]/70">LATENCY: {metrics.latency}</span>
+              <span className="text-[#BFC4CC]">•</span>
               <span>MOD: {metrics.model}</span>
             </div>
           </form>
         </footer>
       </div>
 
-      {/* Context Inspector - The Grounding Panel */}
+      {/* Context Inspector */}
       <ContextInspector 
         isOpen={isInspectorOpen} 
         onClose={() => setIsInspectorOpen(false)} 
         toolCalls={currentToolCalls}
         contextData={currentContext}
       />
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
     </div>
   );
 };
