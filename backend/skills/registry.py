@@ -12,6 +12,7 @@ class SkillRegistry:
     """
     _instance = None
     _skills: Dict[str, BaseSkill] = {}
+    _discovered = False
 
     def __new__(cls):
         if cls._instance is None:
@@ -43,7 +44,11 @@ class SkillRegistry:
         """
         Automatically discovers and registers skills from the builtin package.
         """
+        if self._discovered:
+            return
+            
         try:
+            self._discovered = True
             from . import builtin
             for loader, module_name, is_pkg in pkgutil.walk_packages(builtin.__path__, builtin.__name__ + "."):
                 try:
