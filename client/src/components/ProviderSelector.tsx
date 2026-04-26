@@ -1,7 +1,7 @@
 import React, { Fragment, useEffect, useState } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
-import OpenAILogo from '../assets/ai_online_services/openai-svgrepo-com.svg';
+import { useAI } from '../contexts/AIContext';
 import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 
 const providers = [
@@ -11,84 +11,95 @@ const providers = [
   { id: 'gemini', name: 'Gemini (Cloud)', icon: <img src={GeminiLogo} alt="Gemini Logo" className="w-6 h-6" /> },
 ];
 
-const modelsByProvider: Record<string, { id: string, name: string }[]> = {
-  local: [
-    { id: 'llama3.2:3b', name: 'Llama 3.2 3B' },
-    { id: 'mistral:latest', name: 'Mistral 7B' },
-  ],
-  groq: [
-    { id: 'llama3-8b-8192', name: 'Llama 3 8B (Groq)' },
-    { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B (Groq)' },
-    { id: 'gemma-7b-it', name: 'Gemma 7B (Groq)' },
-  ],
-  openrouter: [
-    { id: 'meta-llama/llama-3.2-3b-instruct', name: 'Llama 3.2 3B (Free)' },
-    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
-    { id: 'openai/gpt-4o', name: 'GPT-4o' },
-  ],
-  gemini: [
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-  ]
-};
-
 const ProviderSelector: React.FC = () => {
-  const [provider, setProvider] = useState(localStorage.getItem('ai_provider') || 'local');
-  const [model, setModel] = useState(localStorage.getItem('ai_model') || modelsByProvider['local'][0].id);
+  const { provider, setProvider, model, setModel } = useAI();
+  const [availableModels, setAvailableModels] = useState<{ id: string, name: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [modelSearch, setModelSearch] = useState('');
 
   useEffect(() => {
-    localStorage.setItem('ai_provider', provider);
-    // Reset model if switching providers
-    const validModels = modelsByProvider[provider];
-    if (!validModels.find(m => m.id === model)) {
-      const defaultModel = validModels[0].id;
-      setModel(defaultModel);
-      localStorage.setItem('ai_model', defaultModel);
-    }
+    fetchModels();
   }, [provider]);
 
-  useEffect(() => {
-    localStorage.setItem('ai_model', model);
-  }, [model]);
+  const fetchModels = async () => {
+    setLoading(true);
+    let apiKey = '';
+    if (provider === 'groq') apiKey = localStorage.getItem('groq_api_key') || '';
+    else if (provider === 'openrouter') apiKey = localStorage.getItem('openrouter_api_key') || '';
+    else if (provider === 'gemini') apiKey = localStorage.getItem('gemini_api_key') || '';
+
+    try {
+      const url = `http://localhost:8000/api/models?provider=${provider}${apiKey ? `&api_key=${apiKey}` : ''}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableModels(data);
+        
+        // If current model is empty or not in new list, pick the first one as default
+        if (data.length > 0 && (!model || !data.find((m: any) => m.id === model))) {
+          // Only auto-select if we don't have a persisted model for this provider yet
+          // or if the persisted model is no longer available
+          const persisted = localStorage.getItem(`ai_model_${provider}`);
+          if (persisted && data.find((m: any) => m.id === persisted)) {
+            setModel(persisted);
+          } else {
+            setModel(data[0].id);
+          }
+        }
+      } else {
+        setAvailableModels([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch models:', error);
+      setAvailableModels([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const selectedProvider = providers.find((p) => p.id === provider);
-  const availableModels = modelsByProvider[provider] || [];
+  
+  const filteredModels = availableModels.filter(m => 
+    m.name.toLowerCase().includes(modelSearch.toLowerCase()) || 
+    m.id.toLowerCase().includes(modelSearch.toLowerCase())
+  );
+
   const selectedModel = availableModels.find(m => m.id === model) || availableModels[0];
 
   return (
-    <div className="mb-4 flex gap-4">
+    <div className="mb-2 flex gap-3">
       <div className="flex-1">
         <Listbox value={provider} onChange={setProvider}>
           <div className="relative mt-1">
-            <Listbox.Label className="block text-sm font-medium text-white mb-1">
+            <Listbox.Label className="block text-[10px] font-bold uppercase tracking-widest text-[#4A4D5E] mb-1.5 ml-1">
               AI Provider
             </Listbox.Label>
-            <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white/10 backdrop-blur-md border border-white/20 py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-white/75 sm:text-sm">
+            <Listbox.Button className="relative w-full cursor-default rounded-xl bg-[#E2E6EC] border border-black/[0.08] py-2.5 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-[#FF6600]/20 sm:text-xs transition-all hover:bg-[#D8DCE4]">
               <span className="flex items-center">
                 {selectedProvider?.icon}
-                <span className="ml-3 block truncate text-gray-200">{selectedProvider?.name}</span>
+                <span className="ml-3 block truncate font-semibold text-[#1A1D2E]">{selectedProvider?.name}</span>
               </span>
               <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                <ChevronUpDownIcon className="h-4 w-4 text-[#7A7D8E]" aria-hidden="true" />
               </span>
             </Listbox.Button>
             <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
-              <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-slate-800 py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm border border-white/10">
+              <Listbox.Options className="absolute z-50 bottom-full mb-2 max-h-60 w-full overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide">
                 {providers.map((p) => (
                   <Listbox.Option
                     key={p.id}
-                    className={({ active }) => `relative cursor-default select-none py-2 pl-10 pr-4 ${active ? 'bg-indigo-600 text-white' : 'text-gray-300'}`}
+                    className={({ active }) => `relative cursor-pointer select-none py-2.5 pl-10 pr-4 transition-colors ${active ? 'bg-[#FF6600]/10 text-[#FF6600]' : 'text-[#4A4D5E]'}`}
                     value={p.id}
                   >
                     {({ selected }) => (
                       <>
-                        <span className={`flex items-center truncate ${selected ? 'font-medium text-white' : 'font-normal'}`}>
+                        <span className={`flex items-center truncate ${selected ? 'font-bold' : 'font-medium'}`}>
                           {p.icon}
                           <span className="ml-3">{p.name}</span>
                         </span>
                         {selected ? (
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-400">
-                            <CheckIcon className="h-5 w-5" aria-hidden="true" />
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-[#FF6600]">
+                            <CheckIcon className="h-4 w-4" aria-hidden="true" />
                           </span>
                         ) : null}
                       </>
@@ -104,37 +115,59 @@ const ProviderSelector: React.FC = () => {
       <div className="flex-1">
         <Listbox value={model} onChange={setModel}>
           <div className="relative mt-1">
-            <Listbox.Label className="block text-sm font-medium text-white mb-1">
-              Model
+            <Listbox.Label className="block text-[10px] font-bold uppercase tracking-widest text-[#4A4D5E] mb-1.5 ml-1">
+              Model Configuration
             </Listbox.Label>
-            <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white/10 backdrop-blur-md border border-white/20 py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-white/75 sm:text-sm">
-              <span className="block truncate text-gray-200">{selectedModel?.name}</span>
+            <Listbox.Button className="relative w-full cursor-default rounded-xl bg-[#E2E6EC] border border-black/[0.08] py-2.5 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-[#FF6600]/20 sm:text-xs transition-all hover:bg-[#D8DCE4]">
+              <span className="block truncate font-semibold text-[#1A1D2E]">{loading ? 'Loading models...' : (selectedModel?.name || 'Select Model')}</span>
               <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                <ChevronUpDownIcon className="h-4 w-4 text-[#7A7D8E]" aria-hidden="true" />
               </span>
             </Listbox.Button>
-            <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
-              <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-slate-800 py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm border border-white/10">
-                {availableModels.map((m) => (
-                  <Listbox.Option
-                    key={m.id}
-                    className={({ active }) => `relative cursor-default select-none py-2 pl-10 pr-4 ${active ? 'bg-indigo-600 text-white' : 'text-gray-300'}`}
-                    value={m.id}
-                  >
-                    {({ selected }) => (
-                      <>
-                        <span className={`block truncate ${selected ? 'font-medium text-white' : 'font-normal'}`}>
-                          {m.name}
-                        </span>
-                        {selected ? (
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-400">
-                            <CheckIcon className="h-5 w-5" aria-hidden="true" />
+            <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0" afterLeave={() => setModelSearch('')}>
+              <Listbox.Options className="absolute z-50 bottom-full mb-2 max-h-72 w-full overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide">
+                <div className="sticky top-0 z-20 px-2 py-2 bg-[#E2E6EC] border-b border-black/[0.05]">
+                  <input
+                    type="text"
+                    className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-lg px-3 py-1.5 text-xs text-[#1A1D2E] placeholder:text-[#7A7D8E] focus:outline-none focus:ring-1 focus:ring-[#FF6600]/40"
+                    placeholder="Search models..."
+                    value={modelSearch}
+                    onChange={(e) => setModelSearch(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                </div>
+                {loading ? (
+                  <div className="py-4 px-4 text-center text-xs text-[#7A7D8E] animate-pulse">
+                    Fetching available models...
+                  </div>
+                ) : filteredModels.length === 0 ? (
+                  <div className="py-4 px-4 text-center text-xs text-[#7A7D8E]">
+                    No models found matching "{modelSearch}"
+                  </div>
+                ) : (
+                  filteredModels.map((m) => (
+                    <Listbox.Option
+                      key={m.id}
+                      className={({ active }) => `relative cursor-pointer select-none py-2.5 pl-10 pr-4 transition-colors ${active ? 'bg-[#FF6600]/10 text-[#FF6600]' : 'text-[#4A4D5E]'}`}
+                      value={m.id}
+                    >
+                      {({ selected }) => (
+                        <>
+                          <span className={`block truncate ${selected ? 'font-bold' : 'font-medium'}`}>
+                            {m.name}
+                            <span className="ml-2 text-[10px] opacity-40 block font-mono">{m.id}</span>
                           </span>
-                        ) : null}
-                      </>
-                    )}
-                  </Listbox.Option>
-                ))}
+                          {selected ? (
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-[#FF6600]">
+                              <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                            </span>
+                          ) : null}
+                        </>
+                      )}
+                    </Listbox.Option>
+                  ))
+                )}
               </Listbox.Options>
             </Transition>
           </div>

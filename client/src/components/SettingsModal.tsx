@@ -1,7 +1,8 @@
 import React, { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { PROVIDERS, getActiveProvider, type ProviderId } from './providerMeta';
+import { PROVIDERS, type ProviderId } from './providerMeta';
+import { useAI } from '../contexts/AIContext';
 import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
 import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 
@@ -41,26 +42,29 @@ const ProviderIcon: React.FC<{ providerId: string; size?: number }> = ({ provide
 };
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
-  const [activeProvider, setActiveProvider] = useState<ProviderId>(getActiveProvider());
+  const { provider, setProvider } = useAI();
+  const [activeProvider, setActiveProvider] = useState<ProviderId>(provider);
   const [groqKey, setGroqKey] = useState('');
   const [openRouterKey, setOpenRouterKey] = useState('');
   const [geminiKey, setGeminiKey] = useState('');
 
   useEffect(() => {
     if (isOpen) {
-      setActiveProvider(getActiveProvider());
+      setActiveProvider(provider);
       setGroqKey(localStorage.getItem('groq_api_key') || '');
       setOpenRouterKey(localStorage.getItem('openrouter_api_key') || '');
       setGeminiKey(localStorage.getItem('gemini_api_key') || '');
     }
-  }, [isOpen]);
+  }, [isOpen, provider]);
 
   const handleSave = () => {
-    localStorage.setItem('ai_provider', activeProvider);
+    setProvider(activeProvider);
     localStorage.setItem('groq_api_key', groqKey);
     localStorage.setItem('openrouter_api_key', openRouterKey);
     localStorage.setItem('gemini_api_key', geminiKey);
-    window.dispatchEvent(new Event('storage'));
+    
+    // Dispatch custom event for parts of the app not yet using Context
+    window.dispatchEvent(new Event('ai-settings-changed'));
     setIsOpen(false);
   };
 

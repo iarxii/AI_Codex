@@ -8,6 +8,8 @@ import SettingsModal from '../components/SettingsModal';
 import { PROVIDER_MAP, getActiveProvider, getActiveProviderInfo } from '../components/providerMeta';
 import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
 import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
+import ProviderSelector from '../components/ProviderSelector';
+import { useAI } from '../contexts/AIContext';
 
 type Message = {
   id: string;
@@ -59,8 +61,8 @@ const Chat: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 15, latency: '0ms' });
   
-  // Provider state
-  const [activeProvider, setActiveProvider] = useState(getActiveProvider());
+  // Global AI State
+  const { provider: activeProvider, model: activeModel } = useAI();
   const activeProviderInfo = PROVIDER_MAP[activeProvider] || PROVIDER_MAP['local'];
 
   const ws = useRef<WebSocket | null>(null);
@@ -68,14 +70,6 @@ const Chat: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // Listen for provider changes (from SettingsModal)
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setActiveProvider(getActiveProvider());
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
 
   // 1. Initial Auth Check
   useEffect(() => {
@@ -214,19 +208,13 @@ const Chat: React.FC = () => {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
     setCurrentToolCalls([]);
-    
-    const currentProvider = localStorage.getItem('ai_provider') || 'local';
-    const activeModel = localStorage.getItem('ai_model') || '';
-    let apiKey = '';
-    
-    if (currentProvider === 'groq') apiKey = localStorage.getItem('groq_api_key') || '';
-    else if (currentProvider === 'openrouter') apiKey = localStorage.getItem('openrouter_api_key') || '';
-    else if (currentProvider === 'gemini') apiKey = localStorage.getItem('gemini_api_key') || '';
+    const { getApiKey } = useAI();
+    const apiKey = getApiKey(activeProvider) || '';
 
     ws.current?.send(JSON.stringify({
       message: input,
       conversation_id: currentConvId,
-      provider: currentProvider,
+      provider: activeProvider,
       model: activeModel,
       api_key: apiKey
     }));
@@ -323,77 +311,80 @@ const Chat: React.FC = () => {
             </div>
           )}
 
-          {/* Thinking Process — Collaborative Reasoning */}
-          {thoughtLog.length > 0 && (
-            <div className="flex justify-start animate-in fade-in slide-in-from-left-4 duration-500 mb-6">
-              <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl rounded-tl-sm p-4 w-full max-w-2xl shadow-sm">
-                <details open className="group">
-                  <summary className="flex items-center justify-between cursor-pointer list-none select-none">
-                    <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--accent)]">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]"></div>
-                      Thinking Process
-                    </div>
-                    <div className="text-[var(--text-muted)] group-open:rotate-180 transition-transform">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
-                    </div>
-                  </summary>
-                  <div className="mt-4 space-y-2 pl-5 border-l-2 border-[var(--accent-border)]">
-                    {thoughtLog.map((log, i) => (
-                      <div key={i} className="text-[11px] font-mono text-[var(--text-secondary)] flex gap-3 group/item">
-                        <span className="text-[var(--accent)] opacity-40 font-bold">[{i + 1}]</span>
-                        <span className="group-hover/item:text-[var(--text-primary)] transition-colors">{log}</span>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              </div>
-            </div>
-          )}
-
           {/* Message List */}
           <div className="space-y-6">
-            {messages.map((msg) => {
+            {messages.map((msg, index) => {
               const isUser = msg.sender === 'user';
               const isError = msg.content.startsWith('❌ Error:');
               
-              if (isError) {
-                return (
-                  <div key={msg.id} className="flex justify-start animate-in fade-in slide-in-from-bottom-2">
-                    <div className="bg-[var(--bg-surface)] border-l-4 border-red-500 p-4 rounded-xl rounded-tl-none shadow-sm max-w-3xl flex gap-4">
-                      <div className="text-red-500 shrink-0 mt-0.5">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <div className="text-xs text-[var(--text-primary)] leading-relaxed font-medium">
-                        {msg.content.replace('❌ Error: ', '')}
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
+              // Find if this is the last user message to anchor the thinking process
+              const lastUserIndex = [...messages].reverse().findIndex(m => m.sender === 'user');
+              const isLastUserMsg = lastUserIndex !== -1 && index === (messages.length - 1 - lastUserIndex);
 
               return (
-                <div 
-                  key={msg.id} 
-                  className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-in fade-in ${isUser ? 'slide-in-from-right-4' : 'slide-in-from-left-4'} duration-300`}
-                >
-                  <div className={`max-w-[80%] px-5 py-3.5 rounded-2xl ${
-                    isUser 
-                      ? 'bg-[var(--accent)] text-white rounded-tr-sm shadow-lg shadow-[var(--accent)]/20' 
-                      : 'bg-[var(--bg-chat-bot)] border border-[var(--border)] text-[var(--text-primary)] rounded-tl-sm shadow-sm'
-                  }`}>
-                    <div className={`prose prose-sm max-w-none ${isUser ? 'prose-invert' : ''}`}>
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
-                    </div>
-                    {msg.status === 'typing' && (
-                      <div className="mt-2 flex gap-1">
-                        <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                        <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                <div key={msg.id} className="space-y-4">
+                  {isError ? (
+                    <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2">
+                      <div className="bg-[var(--bg-surface)] border-l-4 border-red-500 p-4 rounded-xl rounded-tl-none shadow-sm max-w-3xl flex gap-4">
+                        <div className="text-red-500 shrink-0 mt-0.5">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="text-xs text-[var(--text-primary)] leading-relaxed font-medium">
+                          {msg.content.replace('❌ Error: ', '')}
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div 
+                      className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-in fade-in ${isUser ? 'slide-in-from-right-4' : 'slide-in-from-left-4'} duration-300`}
+                    >
+                      <div className={`max-w-[80%] px-5 py-3.5 rounded-2xl ${
+                        isUser 
+                          ? 'bg-[var(--accent)] text-white rounded-tr-sm shadow-lg shadow-[var(--accent)]/20' 
+                          : 'bg-[var(--bg-chat-bot)] border border-[var(--border)] text-[var(--text-primary)] rounded-tl-sm shadow-sm'
+                      }`}>
+                        <div className={`prose prose-sm max-w-none ${isUser ? 'prose-invert' : ''}`}>
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                        {msg.status === 'typing' && (
+                          <div className="mt-2 flex gap-1">
+                            <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce"></div>
+                            <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                            <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Thinking Process — Collaborative Reasoning (Appears after the last user message) */}
+                  {isUser && isLastUserMsg && thoughtLog.length > 0 && (
+                    <div className="flex justify-start animate-in fade-in slide-in-from-left-4 duration-500 my-4">
+                      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl rounded-tl-sm p-4 w-full max-w-2xl shadow-sm">
+                        <details open className="group">
+                          <summary className="flex items-center justify-between cursor-pointer list-none select-none">
+                            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--accent)]">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]"></div>
+                              Thinking Process
+                            </div>
+                            <div className="text-[var(--text-muted)] group-open:rotate-180 transition-transform">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                          </summary>
+                          <div className="mt-4 space-y-2 pl-5 border-l-2 border-[var(--accent-border)]">
+                            {thoughtLog.map((log, i) => (
+                              <div key={i} className="text-[11px] font-mono text-[var(--text-secondary)] flex gap-3 group/item">
+                                <span className="text-[var(--accent)] opacity-40 font-bold">[{i + 1}]</span>
+                                <span className="group-hover/item:text-[var(--text-primary)] transition-colors">{log}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -403,6 +394,9 @@ const Chat: React.FC = () => {
 
         {/* Input Area — Enriched */}
         <footer className="px-6 pb-5 pt-3 bg-[#C8CDD5] border-t border-black/[0.04] z-20">
+          <div className="max-w-4xl mx-auto mb-3">
+            <ProviderSelector />
+          </div>
           <form onSubmit={handleSend} className="max-w-4xl mx-auto">
             {/* Main Input Container */}
             <div className="relative bg-[#E2E6EC] border border-black/[0.08] rounded-2xl overflow-hidden shadow-md transition-all focus-within:border-[#FF6600]/40 focus-within:shadow-lg focus-within:shadow-[#FF6600]/5">
@@ -452,12 +446,6 @@ const Chat: React.FC = () => {
                 </button>
 
                 <div className="flex-1" />
-
-                {/* Provider indicator mini */}
-                <div className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium text-[#7A7D8E]">
-                  <ProviderBadgeIcon providerId={activeProvider} />
-                  <span>{activeProviderInfo.label}</span>
-                </div>
               </div>
 
               {/* Textarea + Send Row */}
