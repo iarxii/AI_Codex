@@ -2,7 +2,7 @@ import React, { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { PROVIDERS, type ProviderId } from './providerMeta';
-import { useAI } from '../contexts/AIContext';
+import { useAI, type VisualSettings } from '../contexts/AIContext';
 import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
 import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 
@@ -42,7 +42,7 @@ const ProviderIcon: React.FC<{ providerId: string; size?: number }> = ({ provide
 };
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
-  const { provider, setProvider } = useAI();
+  const { provider, setProvider, visualSettings, updateVisualSetting } = useAI();
   const [activeProvider, setActiveProvider] = useState<ProviderId>(provider);
   const [groqKey, setGroqKey] = useState('');
   const [openRouterKey, setOpenRouterKey] = useState('');
@@ -193,6 +193,63 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                       />
                     </div>
                   )}
+                </div>
+
+                {/* Visual Identity Toggles */}
+                <div className="mt-8 pt-6 border-t border-black/[0.06]">
+                  <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-4">
+                    Neural Identity & Effects
+                  </label>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                    {[
+                      { key: 'isDynamic', label: 'Motion & Animations' },
+                      { key: 'showTraces', label: 'Neural Energy Traces' },
+                      { key: 'showNeuralStrings', label: 'Neural Drifting Strings' },
+                      { key: 'showScanlines', label: 'CRT Scanlines' },
+                      { key: 'showWaves', label: 'Great Neural Waves' },
+                      { key: 'showGrain', label: 'Cinematic Film Grain' },
+                      { key: 'showGlitches', label: 'Digital Glitch Artifacts' },
+                      { key: 'showVideo', label: 'High-Fi Video Layer' },
+                    ].map((item) => (
+                      <div key={item.key} className="flex items-center justify-between group">
+                        <span className="text-sm text-[#1A1D2E] font-medium group-hover:text-[#FF6600] transition-colors">
+                          {item.label}
+                        </span>
+                        <button
+                          onClick={() => updateVisualSetting(item.key as keyof VisualSettings, !visualSettings[item.key as keyof VisualSettings])}
+                          className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            visualSettings[item.key as keyof VisualSettings] ? 'bg-[#FF6600]' : 'bg-[#D8DCE4]'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              visualSettings[item.key as keyof VisualSettings] ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* String Color Selector */}
+                  <div className="mt-6 flex items-center justify-between">
+                    <span className="text-sm text-[#1A1D2E] font-medium">Neural String Color</span>
+                    <div className="flex bg-[#D8DCE4] p-1 rounded-lg">
+                      {(['orange', 'white', 'dark'] as const).map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => updateVisualSetting('stringColor', color)}
+                          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                            visualSettings.stringColor === color 
+                              ? 'bg-[#FF6600] text-white shadow-sm' 
+                              : 'text-[#4A4D5E] hover:text-[#1A1D2E]'
+                          }`}
+                        >
+                          {color}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Footer */}

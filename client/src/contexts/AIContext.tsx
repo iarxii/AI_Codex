@@ -2,11 +2,25 @@ import React, { createContext, useContext, useState, useEffect, type ReactNode }
 
 export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini';
 
+export interface VisualSettings {
+  isDynamic: boolean;
+  showScanlines: boolean;
+  showGlitches: boolean;
+  showGrain: boolean;
+  showVideo: boolean;
+  showTraces: boolean;
+  showWaves: boolean;
+  showNeuralStrings: boolean;
+  stringColor: 'orange' | 'white' | 'dark';
+}
+
 interface AIContextType {
   provider: ProviderId;
   model: string;
+  visualSettings: VisualSettings;
   setProvider: (p: ProviderId) => void;
   setModel: (m: string) => void;
+  updateVisualSetting: <K extends keyof VisualSettings>(key: K, value: VisualSettings[K]) => void;
   getApiKey: (p: ProviderId) => string | null;
 }
 
@@ -25,6 +39,28 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     gemini: localStorage.getItem('ai_model_gemini') || '',
   });
 
+  const [visualSettings, setVisualSettings] = useState<VisualSettings>(() => {
+    const saved = localStorage.getItem('ai_visual_settings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse visual settings', e);
+      }
+    }
+    return {
+      isDynamic: true,
+      showScanlines: false,
+      showGlitches: true,
+      showGrain: true,
+      showVideo: false,
+      showTraces: true,
+      showWaves: true,
+      showNeuralStrings: true,
+      stringColor: 'orange',
+    };
+  });
+
   const activeModel = models[provider];
 
   const setProvider = (p: ProviderId) => {
@@ -37,6 +73,16 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     localStorage.setItem(`ai_model_${provider}`, m);
     // Backward compatibility for components still reading 'ai_model'
     localStorage.setItem('ai_model', m);
+  };
+
+  const updateVisualSetting = <K extends keyof VisualSettings>(key: K, value: VisualSettings[K]) => {
+    setVisualSettings(prev => {
+      const next = { ...prev, [key]: value };
+      localStorage.setItem('ai_visual_settings', JSON.stringify(next));
+      return next;
+    });
+    // Notify components not using context if necessary
+    window.dispatchEvent(new Event('ai-settings-changed'));
   };
 
   const getApiKey = (p: ProviderId) => {
@@ -59,6 +105,13 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         openrouter: localStorage.getItem('ai_model_openrouter') || '',
         gemini: localStorage.getItem('ai_model_gemini') || '',
       });
+
+      const savedVisuals = localStorage.getItem('ai_visual_settings');
+      if (savedVisuals) {
+        try {
+          setVisualSettings(JSON.parse(savedVisuals));
+        } catch (e) {}
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -72,7 +125,15 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   }, []);
 
   return (
-    <AIContext.Provider value={{ provider, model: activeModel, setProvider, setModel, getApiKey }}>
+    <AIContext.Provider value={{ 
+      provider, 
+      model: activeModel, 
+      visualSettings,
+      setProvider, 
+      setModel, 
+      updateVisualSetting,
+      getApiKey 
+    }}>
       {children}
     </AIContext.Provider>
   );

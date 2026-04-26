@@ -1,8 +1,25 @@
 import React, { useEffect, useRef } from 'react';
 import p5 from 'p5';
+import { useAI } from '../contexts/AIContext';
 
-const P5Background: React.FC = () => {
+interface P5BackgroundProps {
+  isDynamic?: boolean;
+}
+
+const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic }) => {
+  const { visualSettings } = useAI();
+  const isDynamic = propIsDynamic ?? visualSettings.isDynamic;
+  const { showTraces, showScanlines, showGlitches, showGrain, showVideo, showWaves, showNeuralStrings, stringColor } = visualSettings;
+  
+  // PENDING: isDynamic prop will eventually be wired to user preferences / low-power mode toggle.
   const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate =1.3; // Atmospheric slow-mo
+    }
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -10,6 +27,8 @@ const P5Background: React.FC = () => {
     const sketch = (p: p5) => {
       let traces: Trace[] = [];
       let curves: Curve[] = [];
+      let glitches: Glitch[] = [];
+      let grainTexture: p5.Graphics;
       const GRID_SIZE = 40;
       const MAX_TRACES = 30; // Increased density for dynamic activity
       const MAX_CURVES = 8;
@@ -25,24 +44,60 @@ const P5Background: React.FC = () => {
         for (let i = 0; i < MAX_CURVES; i++) {
           curves.push(new Curve(p));
         }
+        for (let i = 0; i < 3; i++) {
+          glitches.push(new Glitch(p));
+        }
+
+        // Pre-generate a high-density grain texture
+        grainTexture = p.createGraphics(400, 400);
+        grainTexture.loadPixels();
+        for (let i = 0; i < grainTexture.width * grainTexture.height; i++) {
+          const val = p.random(255);
+          const alpha = p.random(10, 30);
+          const index = i * 4;
+          grainTexture.pixels[index] = val;
+          grainTexture.pixels[index + 1] = val;
+          grainTexture.pixels[index + 2] = val;
+          grainTexture.pixels[index + 3] = alpha;
+        }
+        grainTexture.updatePixels();
       };
 
       p.draw = () => {
         // Clear with slight alpha for trails
-        p.clear(0, 0, 0, 0);
+        p.clear(0,0,0,0);
         
-        // We use a CSS background, so we only draw the lines here
-        p.noFill();
+        if (showTraces) {
+          traces.forEach(t => {
+            if (isDynamic) t.update();
+            t.display();
+          });
+        }
 
-        curves.forEach(curve => {
-          curve.update();
-          curve.display();
-        });
+        if (showNeuralStrings) {
+          curves.forEach(c => {
+            if (isDynamic) c.update();
+            c.display();
+          });
+        }
 
-        traces.forEach(trace => {
-          trace.update();
-          trace.display();
-        });
+        if (showGlitches && isDynamic) {
+          glitches.forEach(g => {
+            g.update();
+            g.display();
+          });
+        }
+
+        // Grain Overlay
+        if (showGrain && grainTexture) {
+          const xOff = isDynamic ? p.random(-100, 100) : 0;
+          const yOff = isDynamic ? p.random(-100, 100) : 0;
+          for (let x = -400; x < p.width; x += 400) {
+            for (let y = -400; y < p.height; y += 400) {
+              p.image(grainTexture, x + xOff, y + yOff);
+            }
+          }
+        }
       };
 
       p.windowResized = () => {
@@ -169,6 +224,64 @@ const P5Background: React.FC = () => {
         }
       }
 
+      class Glitch {
+        p: p5;
+        x: number = 0;
+        y: number = 0;
+        w: number = 0;
+        h: number = 0;
+        active: boolean = false;
+        timer: number = 0;
+        color: {r: number, g: number, b: number} = {r: 255, g: 255, b: 255};
+
+        constructor(p: p5) {
+          this.p = p;
+        }
+
+        update() {
+          if (!this.active) {
+            // Random chance to trigger a glitch slice
+            if (this.p.random() < 0.005) {
+              this.active = true;
+              this.timer = Math.floor(this.p.random(2, 8));
+              this.y = this.p.random(this.p.height);
+              this.x = 0;
+              this.w = this.p.width;
+              this.h = this.p.random(2, 40);
+              this.color = this.p.random() > 0.7 
+                ? { r: 255, g: 102, b: 0 } 
+                : { r: 255, g: 255, b: 255 };
+            }
+          } else {
+            this.timer--;
+            if (this.timer <= 0) this.active = false;
+          }
+        }
+
+        display() {
+          if (this.active && isDynamic) {
+            this.p.noStroke();
+            this.p.fill(this.color.r, this.color.g, this.color.b, this.p.random(20, 80));
+            
+            // Draw a main slice
+            this.p.rect(this.x, this.y, this.w, this.h);
+            
+            // Draw some tiny "digital noise" blocks nearby
+            if (this.p.random() > 0.5) {
+              for(let i=0; i<5; i++) {
+                this.p.fill(this.color.r, this.color.g, this.color.b, this.p.random(50, 150));
+                this.p.rect(
+                  this.p.random(this.p.width), 
+                  this.y + this.p.random(-50, 50), 
+                  this.p.random(5, 50), 
+                  this.p.random(1, 4)
+                );
+              }
+            }
+          }
+        }
+      }
+
       class Curve {
         p: p5;
         points: p5.Vector[];
@@ -192,8 +305,18 @@ const P5Background: React.FC = () => {
 
         display() {
           this.p.noFill();
-          this.p.stroke(100, 120, 255, 30); // Soft blue
-          this.p.strokeWeight(1);
+          
+          let strokeCol;
+          if (stringColor === 'orange') {
+            strokeCol = this.p.color(255, 102, 0, 100); // AdaptivOrange
+          } else if (stringColor === 'white') {
+            strokeCol = this.p.color(255, 255, 255, 150); // Sharp White
+          } else {
+            strokeCol = this.p.color(26, 29, 46, 120); // Dark/Coal
+          }
+
+          this.p.stroke(strokeCol);
+          this.p.strokeWeight(1.5);
           this.p.beginShape();
           this.points.forEach(pt => this.p.vertex(pt.x, pt.y));
           this.p.endShape();
@@ -206,12 +329,136 @@ const P5Background: React.FC = () => {
   }, []);
 
   return (
-    <div className="fixed inset-0 -z-10 pointer-events-none">
-      {/* Base Vector Wallpaper */}
+    <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden bg-[#E2E8F0]">
+      <style>{`
+        /* Hide video on mobile, show on desktop */
+        .desktop-video { display: none; }
+        @media (min-width: 1024px) {
+          .desktop-video { display: block; }
+          .mobile-bg { display: none; }
+        }
+        @keyframes wave-shift {
+          0% { transform: translateX(-10%) translateY(-10%) rotate(0deg); }
+          50% { transform: translateX(5%) translateY(5%) rotate(1deg); }
+          100% { transform: translateX(-10%) translateY(-10%) rotate(0deg); }
+        }
+        @keyframes neural-pulse {
+          0%, 100% { opacity: 0.6; filter: brightness(1) contrast(1); }
+          50% { opacity: 0.8; filter: brightness(1.1) contrast(1.05); }
+        }
+        @keyframes glitch-slice {
+          0% { clip-path: inset(0 0 0 0); transform: translate(0); }
+          2% { clip-path: inset(20% -6px 60% 0); transform: translate(-2px, 2px); }
+          4% { clip-path: inset(60% -6px 20% 0); transform: translate(2px, -2px); }
+          6% { clip-path: inset(0 0 0 0); transform: translate(0); }
+        }
+        @keyframes chromatic-flicker {
+          0%, 94%, 100% { opacity: 0; transform: scale(1); }
+          95% { opacity: 0.2; transform: scale(1.01); filter: hue-rotate(90deg); }
+          96% { opacity: 0; }
+          97% { opacity: 0.15; transform: scale(0.99); filter: hue-rotate(-90deg); }
+          98% { opacity: 0; }
+        }
+        @keyframes grain {
+          0%, 100% { transform:translate(0, 0); }
+          10% { transform:translate(-5%, -10%); }
+          20% { transform:translate(-15%, 5%); }
+          30% { transform:translate(7%, -25%); }
+          40% { transform:translate(-5%, 25%); }
+          50% { transform:translate(-15%, 10%); }
+          60% { transform:translate(15%, 0%); }
+          70% { transform:translate(0%, 15%); }
+          80% { transform:translate(3%, 35%); }
+          90% { transform:translate(-10%, 10%); }
+        }
+        @keyframes crt-flicker {
+          0% { opacity: 0.01; }
+          5% { opacity: 0.03; }
+          10% { opacity: 0.015; }
+          15% { opacity: 0.02; }
+          20% { opacity: 0.01; }
+          25% { opacity: 0.025; }
+          30% { opacity: 0.01; }
+          100% { opacity: 0.015; }
+        }
+        @keyframes scanline-roll {
+          0% { transform: translateY(-100%); }
+          100% { transform: translateY(100%); }
+        }
+        @keyframes marching-scanlines {
+          from { background-position: 0 0; }
+          to { background-position: 0 12px; }
+        }
+        @keyframes wave-silver {
+          0% { transform: translate(-100%, -100%) rotate(-40deg); }
+          100% { transform: translate(100%, 100%) rotate(-40deg); }
+        }
+        @keyframes wave-orange {
+          0% { transform: translate(100%, 100%) rotate(-40deg); }
+          100% { transform: translate(-100%, -100%) rotate(-40deg); }
+        }
+      `}</style>
+
+      {/* Mobile/Tablet Static Background */}
       <div 
-        className="absolute inset-0 bg-cover bg-end bg-no-repeat"
-        style={{ backgroundImage: `url('/media/aicodex_vector_wallpaper.png')`, opacity: 1, filter: 'blur(1px)' }}
+        className="mobile-bg absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ 
+          backgroundImage: `url('/media/aicodex_vector_wallpaper.png')`, 
+          opacity: 0.9, 
+          filter: 'blur(0.5px)'
+        }}
       />
+
+      {/* Desktop Animated Video Background */}
+      {showVideo && (
+        <video
+          ref={videoRef}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="desktop-video absolute inset-0 w-full h-full object-cover"
+          style={{ opacity: 0.2, filter: 'blur(0.5px)', objectPosition: 'center bottom' }}
+        >
+          <source src="/media/landscape_background.mp4" type="video/mp4" />
+        </video>
+      )}
+      {/* Mandatory Watermark Mask - Radial Gradient from Bottom-Right */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{ 
+          background: 'radial-gradient(circle at bottom right, #E2E8F0 0%, #E2E8F0 12%, transparent 35%)',
+          opacity: 0.95
+        }}
+      />
+      {/* Shifting Gradient Overlay (The "Energy Wave") */}
+      <div 
+        className="absolute inset-0 bg-gradient-to-tr from-[#FF6600]/5 via-transparent to-white/10 mix-blend-overlay"
+        style={{ 
+          animation: 'none' 
+        }}
+      />
+
+      {/* Subtle Glitch Layer - occasionally "slices" the view */}
+      {showGlitches && (
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-10 mix-blend-screen"
+          style={{ 
+            backgroundImage: `url('/media/aicodex_vector_wallpaper.png')`,
+            animation: isDynamic ? 'glitch-slice 15s linear infinite' : 'none'
+          }}
+        />
+      )}
+
+      {/* Additional Chromatic Aberration Glitch - High Intensity, Low Frequency */}
+      {showGlitches && (
+        <div 
+          className="absolute inset-0 bg-white opacity-0 mix-blend-overlay pointer-events-none"
+          style={{ 
+            animation: isDynamic ? 'chromatic-flicker 12s step-end infinite' : 'none'
+          }}
+        />
+      )}
       
       {/* P5 Animated Grid and Traces */}
       <div 
@@ -219,6 +466,87 @@ const P5Background: React.FC = () => {
         className="absolute inset-0 opacity-80" 
         style={{ filter: 'blur(1px)' }}
       />
+
+      {/* CRT System Overlay - Scanlines, Vignette, and Phosphor Mask */}
+      <div className="absolute inset-0 pointer-events-none z-[100] overflow-hidden">
+        {/* Diagonal Marching Scanlines - Thicker 12px lines */}
+        {showScanlines && (
+          <div 
+            className="absolute inset-[-50%] w-[200%] h-[200%] opacity-[0.1]"
+            style={{ 
+              backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.12) 50%)',
+              backgroundSize: '100% 12px',
+              transform: 'rotate(-40deg)',
+              animation: isDynamic ? 'marching-scanlines 1s linear infinite' : 'none'
+            }}
+          />
+        )}
+
+        {/* The Great Silver Wave - Sweeping diagonal highlight */}
+        {showWaves && (
+          <div 
+            className="absolute inset-[-100%] w-[300%] h-[300%] mix-blend-overlay pointer-events-none opacity-40"
+            style={{ 
+              background: 'linear-gradient(to bottom, transparent, rgba(192, 204, 218, 0.5), transparent)',
+              animation: isDynamic ? 'wave-silver 12s linear infinite' : 'none',
+              filter: 'blur(40px)'
+            }}
+          />
+        )}
+
+        {/* The Great Orange Wave - Counter-sweeping highlight */}
+        {showWaves && (
+          <div 
+            className="absolute inset-[-100%] w-[300%] h-[300%] mix-blend-overlay pointer-events-none opacity-30"
+            style={{ 
+              background: 'linear-gradient(to bottom, transparent, rgba(255, 102, 0, 0.4), transparent)',
+              animation: isDynamic ? 'wave-orange 18s linear infinite' : 'none',
+              filter: 'blur(60px)'
+            }}
+          />
+        )}
+
+        {/* Rolling Scanline (The "Refresh" bar) */}
+        {showScanlines && (
+          <div 
+            className="absolute w-full h-20 bg-white/10 opacity-30 pointer-events-none"
+            style={{ 
+              animation: isDynamic ? 'scanline-roll 10s linear infinite' : 'none',
+              filter: 'blur(15px)'
+            }}
+          />
+        )}
+
+        {/* RGB Phosphor Grid (Ultra subtle) */}
+        {showScanlines && (
+          <div 
+            className="absolute inset-0 w-full h-full opacity-[0.02]"
+            style={{ 
+              backgroundImage: 'linear-gradient(90deg, rgba(255, 0, 0, 0.5), rgba(0, 255, 0, 0.5), rgba(0, 0, 255, 0.5))',
+              backgroundSize: '3px 100%'
+            }}
+          />
+        )}
+
+        {/* Screen Flicker / Static Pulse - Switched to White for "Light Mode" CRT */}
+        {showScanlines && (
+          <div 
+            className="absolute inset-0 w-full h-full bg-white pointer-events-none"
+            style={{ 
+              animation: isDynamic ? 'crt-flicker 0.15s infinite' : 'none'
+            }}
+          />
+        )}
+
+        {/* CRT Vignette (Tube shape) - Softened */}
+        <div 
+          className="absolute inset-0 w-full h-full"
+          style={{ 
+            background: 'radial-gradient(circle, transparent 50%, rgba(0,0,0,0.15) 100%)',
+            boxShadow: 'inset 0 0 80px rgba(255,255,255,0.05)'
+          }}
+        />
+      </div>
     </div>
   );
 };
