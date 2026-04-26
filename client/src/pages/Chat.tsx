@@ -9,8 +9,10 @@ import { PROVIDER_MAP, getActiveProvider, getActiveProviderInfo } from '../compo
 import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
 import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 import ProviderSelector from '../components/ProviderSelector';
-import { useAI } from '../contexts/AIContext';
+import { useAI, type ProviderId } from '../contexts/AIContext';
 import P5Loader from '../components/P5Loader';
+import MetricsChart from '../components/MetricsChart';
+import { ChevronUpIcon, ChevronDownIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 
 type Message = {
   id: string;
@@ -61,6 +63,8 @@ const Chat: React.FC = () => {
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, igpu: 0, latency: '0ms' });
+  const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
+  const [isChartExpanded, setIsChartExpanded] = useState(false);
   
   // Global AI State
   const { provider: activeProvider, model: activeModel, getApiKey } = useAI();
@@ -154,7 +158,21 @@ const Chat: React.FC = () => {
     const mSocket = new WebSocket('ws://127.0.0.1:8000/api/metrics/ws/metrics');
     metricsWs.current = mSocket;
     mSocket.onmessage = (event) => {
-      setMetrics(JSON.parse(event.data));
+      const data = JSON.parse(event.data);
+      setMetrics(data);
+      
+      setMetricsHistory(prev => {
+        const newEntry = {
+          time: new Date().toLocaleTimeString(),
+          cpu: data.cpu,
+          ram: data.ram,
+          igpu: data.igpu || 0,
+          npu: data.npu || 0,
+          latency: parseInt(data.latency) || 0
+        };
+        const updated = [...prev, newEntry];
+        return updated.slice(-50); // Keep last 50 points
+      });
     };
 
     return () => {
@@ -310,7 +328,7 @@ const Chat: React.FC = () => {
               <span className={`text-[10px] font-bold uppercase tracking-tight ${
                 connected ? 'text-[#FF6600]' : 'text-red-600'
               }`}>
-                {activeProviderInfo.label}
+                {activeProviderInfo.label} API
               </span>
               <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
             </button>
@@ -339,17 +357,46 @@ const Chat: React.FC = () => {
 
         {/* Chat Area */}
         <main className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide relative z-10">
-          {!currentConvId && (
-            <div className="h-full flex flex-col items-center justify-center text-center">
-              <div className="w-20 h-20 bg-[var(--accent-light)] rounded-2xl flex items-center justify-center mb-6 border border-[var(--border-accent)] rotate-6 hover:rotate-0 transition-transform duration-500 shadow-lg">
-                <svg className="w-10 h-10 text-[#FF6600]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+          {!currentConvId && (() => {
+            const config = {
+              local: { label: 'Neural Core', icon: '/media/brand-icons/ollama-color.svg', desc: 'Execute models directly on your hardware for maximum privacy and low latency.' },
+              groq: { label: 'Linked Velocity', icon: '/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg', desc: 'Harness LPU technology for lightning-fast inference and real-time agentic reasoning.' },
+              openrouter: { label: 'Omni Interface', icon: '/media/brand-icons/openrouter.webp', desc: 'Unified gateway to the world\'s most powerful LLMs and specialist expert models.' },
+              gemini: { label: 'Expert Reasoning', icon: '/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg', desc: 'Leverage Google\'s most capable multimodal models for complex problem solving.' }
+            }[activeProvider as ProviderId] || { label: 'Neural Link', icon: null, desc: 'Select a session from the shelf or create a new workspace to begin agentic execution.' };
+
+            return (
+              <div className="h-full flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95 duration-700">
+                <div className={`w-24 h-24 rounded-3xl flex items-center justify-center mb-8 border transition-all duration-500 shadow-xl shadow-black/[0.02] rotate-3 hover:rotate-0 ${
+                  activeProvider === 'groq' 
+                    ? 'bg-[#0A0A0C] border-white/10' 
+                    : 'bg-white border-black/[0.04]'
+                }`}>
+                  {config.icon ? (
+                    <img src={config.icon} alt={config.label} className="w-12 h-12 object-contain" />
+                  ) : (
+                    <svg className="w-12 h-12 text-[#FF6600]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  )}
+                </div>
+                <h2 className="text-3xl font-bold text-[#1A1D2E] mb-3 tracking-tighter">
+                  Initialize <span className="text-[#FF6600]">{config.label}</span>
+                </h2>
+                <p className="max-w-md text-[#7A7D8E] text-sm leading-relaxed font-medium">
+                  {config.desc}
+                </p>
+                <div className="mt-8 flex gap-3">
+                  <div className="px-4 py-1.5 rounded-full bg-black/5 text-[10px] font-bold text-[#4A4D5E] uppercase tracking-widest border border-black/[0.03]">
+                    {activeProvider}
+                  </div>
+                  <div className="px-4 py-1.5 rounded-full bg-[#FF6600]/5 text-[10px] font-bold text-[#FF6600] uppercase tracking-widest border border-[#FF6600]/10">
+                    {activeModel}
+                  </div>
+                </div>
               </div>
-              <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-3 tracking-tight">Initialize Neural Link</h2>
-              <p className="max-w-sm text-[var(--text-secondary)] text-sm leading-relaxed">Select a session from the shelf or create a new workspace to begin agentic execution.</p>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Message List */}
           <div className="space-y-6">
@@ -522,19 +569,58 @@ const Chat: React.FC = () => {
               </div>
             </div>
 
-            {/* Metrics Strip */}
-            <div className="mt-2.5 flex justify-center gap-4 text-[10px] uppercase tracking-widest text-[#7A7D8E] font-medium">
-              <span className={metrics.cpu > 80 ? 'text-red-500' : ''}>CPU: {Math.round(metrics.cpu)}%</span>
-              <span className="text-[#BFC4CC]">•</span>
-              <span className={metrics.ram > 80 ? 'text-red-500' : ''}>RAM: {Math.round(metrics.ram)}%</span>
-              <span className="text-[#BFC4CC]">•</span>
-              <span className={metrics.igpu > 80 ? 'text-red-500' : ''}>iGPU: {Math.round(metrics.igpu || 0)}%</span>
-              <span className="text-[#BFC4CC]">•</span>
-              <span className={metrics.npu > 80 ? 'text-red-500' : ''}>NPU: {Math.round(metrics.npu || 0)}%</span>
-              <span className="text-[#BFC4CC]">•</span>
-              <span className="text-[#FF6600]/70">LATENCY: {metrics.latency}</span>
-              <span className="text-[#BFC4CC]">•</span>
-              <span>MOD: {metrics.model}</span>
+            {/* Enhanced Metrics Strip */}
+            <div className="mt-4 flex flex-col items-center">
+              <div className="flex items-center gap-4 bg-white/80 backdrop-blur-md border border-black/[0.04] rounded-full px-5 py-1.5 shadow-sm transition-all hover:shadow-md hover:bg-white/95">
+                <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-[#4A4D5E] font-bold">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#FF6600]" />
+                    <span className={metrics.cpu > 80 ? 'text-red-500' : ''}>CPU {Math.round(metrics.cpu)}%</span>
+                  </div>
+                  <span className="text-black/10">|</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#4A4D5E]" />
+                    <span className={metrics.ram > 80 ? 'text-red-500' : ''}>RAM {Math.round(metrics.ram)}%</span>
+                  </div>
+                  <span className="text-black/10">|</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
+                    <span className={metrics.igpu > 80 ? 'text-red-500' : ''}>iGPU {Math.round(metrics.igpu || 0)}%</span>
+                  </div>
+                  <span className="text-black/10">|</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
+                    <span className={metrics.npu > 80 ? 'text-red-500' : ''}>NPU {Math.round(metrics.npu || 0)}%</span>
+                  </div>
+                  <span className="text-black/10">|</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+                    <span className="text-[#10B981]">LAT {metrics.latency}</span>
+                  </div>
+                </div>
+
+                <div className="w-px h-3 bg-black/10 mx-1" />
+
+                <button
+                  type="button"
+                  onClick={() => setIsChartExpanded(!isChartExpanded)}
+                  className={`flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full transition-all border ${
+                    isChartExpanded 
+                      ? 'bg-[#FF6600] border-[#FF6600] text-white' 
+                      : 'border-black/[0.08] text-[#7A7D8E] hover:border-[#FF6600] hover:text-[#FF6600]'
+                  }`}
+                >
+                  <ChartBarIcon className="w-3 h-3" />
+                  {isChartExpanded ? 'Collapse' : 'Stats'}
+                </button>
+              </div>
+
+              {/* Real-time Hardware Chart */}
+              {isChartExpanded && (
+                <div className="w-full max-w-2xl px-4 overflow-hidden">
+                  <MetricsChart data={metricsHistory} />
+                </div>
+              )}
             </div>
           </form>
         </footer>

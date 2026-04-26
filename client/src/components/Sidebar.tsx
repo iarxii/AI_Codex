@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import SettingsModal from './SettingsModal';
-import { Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { 
+  Cog6ToothIcon, 
+  CpuChipIcon, 
+  BoltIcon, 
+  GlobeAltIcon, 
+  SparklesIcon 
+} from '@heroicons/react/24/outline';
 import { useAI, type ProviderId } from '../contexts/AIContext';
 
 type Conversation = {
@@ -64,25 +70,25 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
             <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-[var(--text-muted)] flex items-center gap-1.5">
               {provider === 'local' && (
                 <>
-                  <img src="/media/brand-icons/ollama-color.svg" alt="Local" className="w-3.5 h-3.5 object-contain" />
+                  <CpuChipIcon className="w-3.5 h-3.5 text-[#FF6600]" />
                   Neural Core
                 </>
               )}
               {provider === 'groq' && (
                 <>
-                  <img src="/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg" alt="Groq" className="w-3.5 h-3.5 object-contain" />
+                  <BoltIcon className="w-3.5 h-3.5 text-[#FF6600]" />
                   Linked Velocity
                 </>
               )}
               {provider === 'openrouter' && (
                 <>
-                  <img src="/media/brand-icons/openrouter.webp" alt="OpenRouter" className="w-3.5 h-3.5 object-contain" />
+                  <GlobeAltIcon className="w-3.5 h-3.5 text-[#FF6600]" />
                   Omni Interface
                 </>
               )}
               {provider === 'gemini' && (
                 <>
-                  <img src="/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg" alt="Gemini" className="w-3.5 h-3.5 object-contain" />
+                  <SparklesIcon className="w-3.5 h-3.5 text-[#FF6600]" />
                   Expert Reasoning
                 </>
               )}
