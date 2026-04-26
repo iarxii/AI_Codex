@@ -58,6 +58,7 @@ const P5Background: React.FC = () => {
         dir!: p5.Vector;
         history!: {x: number, y: number}[];
         life!: number;
+        maxLife!: number;
         speed!: number;
 
         constructor(p: p5) {
@@ -72,8 +73,9 @@ const P5Background: React.FC = () => {
           this.prevY = this.y;
           this.dir = this.getRandomDir();
           this.history = [];
-          this.life = this.p.random(50, 150);
-          this.speed = GRID_SIZE / 4;
+          this.maxLife = this.p.random(100, 300); // Longer life to account for slower speed
+          this.life = this.maxLife;
+          this.speed = GRID_SIZE / 8; // Reduced speed
         }
 
         getRandomDir() {
@@ -116,19 +118,38 @@ const P5Background: React.FC = () => {
         }
 
         display() {
-          this.p.noFill(); // Prevents the shape from being filled (fixes the orange triangles)
+          this.p.noFill();
           this.p.strokeWeight(2.5);
-          this.p.stroke(255, 102, 0, 220); // AdaptivOrange brighter
           
-          this.p.beginShape();
-          this.history.forEach(pos => this.p.vertex(pos.x, pos.y));
-          this.p.vertex(this.x, this.y);
-          this.p.endShape();
+          // Calculate lifecycle fade (spawn/die transitions)
+          let fadeMultiplier = 1;
+          const FADE_DUR = 30; // Frames to fade in/out
+          if (this.maxLife - this.life < FADE_DUR) {
+            fadeMultiplier = this.p.map(this.maxLife - this.life, 0, FADE_DUR, 0, 1);
+          } else if (this.life < FADE_DUR) {
+            fadeMultiplier = this.p.map(this.life, 0, FADE_DUR, 0, 1);
+          }
+
+          // Draw history segments with feathering (older points are more transparent)
+          for (let i = 0; i < this.history.length - 1; i++) {
+            const pos = this.history[i];
+            const nextPos = this.history[i + 1];
+            const segmentAlpha = this.p.map(i, 0, this.history.length, 0, 220) * fadeMultiplier;
+            this.p.stroke(255, 102, 0, segmentAlpha);
+            this.p.line(pos.x, pos.y, nextPos.x, nextPos.y);
+          }
+
+          // Draw the final segment from history to current head
+          if (this.history.length > 0) {
+            const lastPos = this.history[this.history.length - 1];
+            this.p.stroke(255, 102, 0, 220 * fadeMultiplier);
+            this.p.line(lastPos.x, lastPos.y, this.x, this.y);
+          }
 
           // Head glow
           this.p.noStroke();
-          this.p.fill(255, 102, 0, 255);
-          this.p.circle(this.x, this.y, 6); // Slightly larger head
+          this.p.fill(255, 102, 0, 255 * fadeMultiplier);
+          this.p.circle(this.x, this.y, 6);
         }
       }
 
