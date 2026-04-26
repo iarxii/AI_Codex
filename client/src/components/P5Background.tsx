@@ -190,11 +190,20 @@ const P5Background: React.FC = () => {
   }, []);
 
   return (
-    <div 
-      ref={containerRef} 
-      className="fixed inset-0 -z-10 pointer-events-none opacity-80" 
-      style={{ filter: 'blur(0.5px)' }}
-    />
+    <div className="fixed inset-0 -z-10 pointer-events-none">
+      {/* Base Vector Wallpaper */}
+      <div 
+        className="absolute inset-0 bg-cover bg-end bg-no-repeat"
+        style={{ backgroundImage: `url('/media/aicodex_vector_wallpaper.png')`, opacity: 0.8, filter: 'blur(1px)' }}
+      />
+      
+      {/* P5 Animated Grid and Traces */}
+      <div 
+        ref={containerRef} 
+        className="absolute inset-0 opacity-80" 
+        style={{ filter: 'blur(1px)' }}
+      />
+    </div>
   );
 };
 

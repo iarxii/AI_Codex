@@ -2,14 +2,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const Landing: React.FC = () => (
-  <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,102,0,0.05),transparent_60%)]"></div>
+  <div className="flex flex-col items-center justify-center min-h-screen bg-transparent text-[var(--text-primary)] relative z-10">
     
+
     <div className="relative z-10 bg-[var(--bg-surface)]/60 backdrop-blur-2xl rounded-2xl border border-black/[0.05] p-12 max-w-2xl w-full text-center shadow-2xl">
-      <div className="w-20 h-20 bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] rounded-3xl mx-auto mb-8 shadow-lg shadow-[var(--accent)]/20 flex items-center justify-center">
-        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-        </svg>
+      <div className="w-24 h-24 mx-auto mb-8 flex items-center justify-center drop-shadow-2xl">
+        <img src="/media/aicodex_logo_2_transp.png" alt="AICodex Logo" className="w-full h-full object-contain rounded-2xl border-2 border-[var(--accent)]" />
       </div>
       
       <h1 className="text-5xl font-extrabold mb-4 bg-gradient-to-r from-[var(--text-primary)] to-[var(--accent)] bg-clip-text text-transparent">
