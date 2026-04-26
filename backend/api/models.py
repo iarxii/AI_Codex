@@ -17,7 +17,14 @@ async def list_models(provider: str, api_key: str = None):
             response = requests.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
             if response.status_code == 200:
                 data = response.json()
-                return [{"id": m["name"], "name": m["name"]} for m in data.get("models", [])]
+                models = []
+                for m in data.get("models", []):
+                    name = m["name"].lower()
+                    # Filter out models that are obviously embeddings or non-chat
+                    if any(x in name for x in ["embed", "minilm", "nomic", "bert", "ranker"]):
+                        continue
+                    models.append({"id": m["name"], "name": m["name"]})
+                return models
             return []
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Ollama error: {str(e)}")

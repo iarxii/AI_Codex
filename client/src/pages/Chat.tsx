@@ -62,7 +62,7 @@ const Chat: React.FC = () => {
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 15, latency: '0ms' });
   
   // Global AI State
-  const { provider: activeProvider, model: activeModel } = useAI();
+  const { provider: activeProvider, model: activeModel, getApiKey } = useAI();
   const activeProviderInfo = PROVIDER_MAP[activeProvider] || PROVIDER_MAP['local'];
 
   const ws = useRef<WebSocket | null>(null);
@@ -81,14 +81,38 @@ const Chat: React.FC = () => {
   }, [navigate]);
 
   // 2. WebSockets management
+  const [reconnectCount, setReconnectCount] = useState(0);
+
   useEffect(() => {
+    console.log('Connecting WebSocket...');
     const socket = new WebSocket('ws://127.0.0.1:8000/api/chat/ws/agent');
     ws.current = socket;
-    socket.onopen = () => setConnected(true);
-    socket.onclose = () => setConnected(false);
+
+    socket.onopen = () => {
+      setConnected(true);
+      setReconnectCount(0);
+    };
+
+    socket.onclose = () => {
+      setConnected(false);
+      setLoading(false); // Reset loading on disconnect
+      // Simple reconnect with backoff
+      if (reconnectCount < 5) {
+        setTimeout(() => {
+          setReconnectCount(prev => prev + 1);
+        }, Math.pow(2, reconnectCount) * 1000);
+      }
+    };
+
+    socket.onerror = () => {
+      setConnected(false);
+      setLoading(false);
+    };
+
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === 'token') {
+        setThoughtLog([]); // Clear thinking process when bot starts talking
         setMessages(prev => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg && lastMsg.sender === 'bot') {
@@ -208,18 +232,32 @@ const Chat: React.FC = () => {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
     setCurrentToolCalls([]);
-    const { getApiKey } = useAI();
+    
     const apiKey = getApiKey(activeProvider) || '';
 
-    ws.current?.send(JSON.stringify({
-      message: input,
-      conversation_id: currentConvId,
-      provider: activeProvider,
-      model: activeModel,
-      api_key: apiKey
-    }));
-    
-    setInput('');
+    try {
+      if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+        throw new Error('Neural link disconnected. Please refresh or check connection.');
+      }
+
+      ws.current.send(JSON.stringify({
+        message: input,
+        conversation_id: currentConvId,
+        provider: activeProvider,
+        model: activeModel,
+        api_key: apiKey
+      }));
+      
+      setInput(''); // Clear input immediately
+    } catch (err: any) {
+      console.error('Send error:', err);
+      setMessages(prev => [...prev, { 
+        id: 'err-' + Date.now(), 
+        sender: 'bot', 
+        content: `❌ Send Failed: ${err.message}` 
+      }]);
+      setLoading(false);
+    }
   };
 
   return (
@@ -302,7 +340,7 @@ const Chat: React.FC = () => {
           {!currentConvId && (
             <div className="h-full flex flex-col items-center justify-center text-center">
               <div className="w-20 h-20 bg-[var(--accent-light)] rounded-2xl flex items-center justify-center mb-6 border border-[var(--border-accent)] rotate-6 hover:rotate-0 transition-transform duration-500 shadow-lg">
-                <svg className="w-10 h-10 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-10 h-10 text-[#FF6600]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
@@ -317,7 +355,7 @@ const Chat: React.FC = () => {
               const isUser = msg.sender === 'user';
               const isError = msg.content.startsWith('❌ Error:');
               
-              // Find if this is the last user message to anchor the thinking process
+              // Anchor the thinking process to the LAST user message only if loading
               const lastUserIndex = [...messages].reverse().findIndex(m => m.sender === 'user');
               const isLastUserMsg = lastUserIndex !== -1 && index === (messages.length - 1 - lastUserIndex);
 
@@ -336,48 +374,50 @@ const Chat: React.FC = () => {
                         </div>
                       </div>
                     </div>
+                  ) : isUser ? (
+                    <div className="flex justify-end animate-in fade-in slide-in-from-right-4">
+                      <div className="bg-[#FF6600] text-white px-5 py-3 rounded-2xl rounded-tr-none shadow-md shadow-[#FF6600]/10 max-w-[80%]">
+                        <p className="text-sm leading-relaxed font-medium whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                    </div>
                   ) : (
-                    <div 
-                      className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-in fade-in ${isUser ? 'slide-in-from-right-4' : 'slide-in-from-left-4'} duration-300`}
-                    >
-                      <div className={`max-w-[80%] px-5 py-3.5 rounded-2xl ${
-                        isUser 
-                          ? 'bg-[var(--accent)] text-white rounded-tr-sm shadow-lg shadow-[var(--accent)]/20' 
-                          : 'bg-[var(--bg-chat-bot)] border border-[var(--border)] text-[var(--text-primary)] rounded-tl-sm shadow-sm'
-                      }`}>
-                        <div className={`prose prose-sm max-w-none ${isUser ? 'prose-invert' : ''}`}>
+                    <div className="flex justify-start animate-in fade-in slide-in-from-left-4">
+                      <div className="bg-white border border-black/[0.04] p-5 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] relative group">
+                        <div className="absolute -left-1 top-2 w-1 h-10 bg-[#FF6600]/20 rounded-full"></div>
+                        <div className="prose prose-sm max-w-none text-[#1A1D2E] leading-relaxed font-medium">
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
                         {msg.status === 'typing' && (
-                          <div className="mt-2 flex gap-1">
-                            <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce"></div>
-                            <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                            <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                          <div className="flex gap-1 mt-3">
+                            <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                            <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                            <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce"></div>
                           </div>
                         )}
                       </div>
                     </div>
                   )}
 
-                  {/* Thinking Process — Collaborative Reasoning (Appears after the last user message) */}
-                  {isUser && isLastUserMsg && thoughtLog.length > 0 && (
-                    <div className="flex justify-start animate-in fade-in slide-in-from-left-4 duration-500 my-4">
-                      <div className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl rounded-tl-sm p-4 w-full max-w-2xl shadow-sm">
+                  {/* Thinking Process — Appear BELOW the user message but ABOVE the bot message if possible */}
+                  {/* Or specifically below the last user message when loading */}
+                  {isLastUserMsg && loading && thoughtLog.length > 0 && (
+                    <div className="flex justify-start pl-4 animate-in fade-in zoom-in-95 duration-300">
+                      <div className="bg-[#D8DCE4]/40 backdrop-blur-sm border border-black/[0.05] p-4 rounded-xl max-w-2xl w-full">
                         <details open className="group">
                           <summary className="flex items-center justify-between cursor-pointer list-none select-none">
-                            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--accent)]">
-                              <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]"></div>
+                            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[#FF6600]">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#FF6600] animate-pulse shadow-[0_0_8px_#FF6600]"></div>
                               Thinking Process
                             </div>
-                            <div className="text-[var(--text-muted)] group-open:rotate-180 transition-transform">
+                            <div className="text-[#7A7D8E] group-open:rotate-180 transition-transform">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
                             </div>
                           </summary>
-                          <div className="mt-4 space-y-2 pl-5 border-l-2 border-[var(--accent-border)]">
+                          <div className="mt-4 space-y-2 pl-5 border-l-2 border-[#FF6600]/20">
                             {thoughtLog.map((log, i) => (
-                              <div key={i} className="text-[11px] font-mono text-[var(--text-secondary)] flex gap-3 group/item">
-                                <span className="text-[var(--accent)] opacity-40 font-bold">[{i + 1}]</span>
-                                <span className="group-hover/item:text-[var(--text-primary)] transition-colors">{log}</span>
+                              <div key={i} className="text-[11px] font-mono text-[#4A4D5E] flex gap-3 group/item">
+                                <span className="text-[#FF6600] opacity-40 font-bold">[{i + 1}]</span>
+                                <span className="group-hover/item:text-[#1A1D2E] transition-colors">{log}</span>
                               </div>
                             ))}
                           </div>
