@@ -59,7 +59,7 @@ const Chat: React.FC = () => {
   const [thoughtLog, setThoughtLog] = useState<string[]>([]);
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 15, latency: '0ms' });
+  const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, igpu: 0, latency: '0ms' });
   
   // Global AI State
   const { provider: activeProvider, model: activeModel, getApiKey } = useAI();
@@ -526,6 +526,10 @@ const Chat: React.FC = () => {
               <span className={metrics.cpu > 80 ? 'text-red-500' : ''}>CPU: {Math.round(metrics.cpu)}%</span>
               <span className="text-[#BFC4CC]">•</span>
               <span className={metrics.ram > 80 ? 'text-red-500' : ''}>RAM: {Math.round(metrics.ram)}%</span>
+              <span className="text-[#BFC4CC]">•</span>
+              <span className={metrics.igpu > 80 ? 'text-red-500' : ''}>iGPU: {Math.round(metrics.igpu || 0)}%</span>
+              <span className="text-[#BFC4CC]">•</span>
+              <span className={metrics.npu > 80 ? 'text-red-500' : ''}>NPU: {Math.round(metrics.npu || 0)}%</span>
               <span className="text-[#BFC4CC]">•</span>
               <span className="text-[#FF6600]/70">LATENCY: {metrics.latency}</span>
               <span className="text-[#BFC4CC]">•</span>

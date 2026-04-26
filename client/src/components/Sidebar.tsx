@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import SettingsModal from './SettingsModal';
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
-import { useAI, ProviderId } from '../contexts/AIContext';
+import { useAI, type ProviderId } from '../contexts/AIContext';
 
 type Conversation = {
   id: number;
