@@ -47,7 +47,7 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
     <div className="w-full h-80 mt-4 bg-white/40 backdrop-blur-sm border border-black/[0.04] rounded-2xl p-4 animate-in fade-in slide-in-from-top-4 duration-500 overflow-hidden flex flex-col">
       <div className="flex items-center justify-between mb-4 px-2">
         <h3 className="text-[8px] font-bold text-[#7A7D8E] uppercase tracking-[0.2em]">
-          Real-time Hardware Performance Telemetry
+          Real-time Neural Hardware Performance Telemetry
         </h3>
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
