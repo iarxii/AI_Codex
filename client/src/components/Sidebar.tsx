@@ -48,11 +48,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
   return (
     <aside className="w-72 h-full flex flex-col bg-[var(--bg-surface)]/40 backdrop-blur-2xl border-r border-black/[0.06] z-30 transition-all duration-300">
       <div className="px-6 py-8 flex flex-col items-center justify-center text-center group">
-        <div className="relative mb-4">
+        <div className="relative mb-1">
           <img 
             src="/media/logo.png" 
             alt="AICodex Logo" 
-            className="w-12 h-12 object-contain transition-all duration-500 group-hover:scale-105"
+            className="w-18 h-18 object-contain transition-all duration-500 group-hover:scale-105"
           />
         </div>
 
@@ -61,12 +61,31 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
             AI<span className="text-[var(--accent)]">Codex</span>
           </h1>
           <div className="flex items-center gap-1.5 justify-center mt-1">
-            <span className="w-1 h-1 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"></span>
-            <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-[var(--text-muted)]">
-              {provider === 'local' && 'Neural Core'}
-              {provider === 'groq' && 'Velocity Link'}
-              {provider === 'openrouter' && 'Omni Interface'}
-              {provider === 'gemini' && 'Reasoning Engine'}
+            <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-[var(--text-muted)] flex items-center gap-1.5">
+              {provider === 'local' && (
+                <>
+                  <img src="/media/brand-icons/ollama-color.svg" alt="Local" className="w-3.5 h-3.5 object-contain" />
+                  Neural Core
+                </>
+              )}
+              {provider === 'groq' && (
+                <>
+                  <img src="/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg" alt="Groq" className="w-3.5 h-3.5 object-contain" />
+                  Linked Velocity
+                </>
+              )}
+              {provider === 'openrouter' && (
+                <>
+                  <img src="/media/brand-icons/openrouter.webp" alt="OpenRouter" className="w-3.5 h-3.5 object-contain" />
+                  Omni Interface
+                </>
+              )}
+              {provider === 'gemini' && (
+                <>
+                  <img src="/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg" alt="Gemini" className="w-3.5 h-3.5 object-contain" />
+                  Expert Reasoning
+                </>
+              )}
               {/* 👆 will be revised in future to offer "flavours" of agentic workflows for various purposes */}
             </span>
           </div>

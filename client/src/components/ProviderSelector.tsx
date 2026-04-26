@@ -2,13 +2,11 @@ import React, { Fragment, useEffect, useState } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { useAI } from '../contexts/AIContext';
-import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
-
 const providers = [
-  { id: 'local', name: 'Local (Ollama GPU)', icon: <span className="w-6 h-6 flex items-center justify-center text-xl">🦙</span> },
-  { id: 'groq', name: 'Groq (Cloud)', icon: <span className="w-6 h-6 flex items-center justify-center text-xl text-orange-500">⚡</span> },
-  { id: 'openrouter', name: 'OpenRouter (Cloud)', icon: <span className="w-6 h-6 flex items-center justify-center text-xl">🌐</span> },
-  { id: 'gemini', name: 'Gemini (Cloud)', icon: <img src={GeminiLogo} alt="Gemini Logo" className="w-6 h-6" /> },
+  { id: 'local', name: 'Local (Ollama GPU)', icon: <img src="/media/brand-icons/ollama-color.svg" alt="Local Logo" className="w-6 h-6 object-contain" /> },
+  { id: 'groq', name: 'Groq (Cloud)', icon: <img src="/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg" alt="Groq Logo" className="w-6 h-6 object-contain drop-shadow-md" /> },
+  { id: 'openrouter', name: 'OpenRouter (Cloud)', icon: <img src="/media/brand-icons/openrouter.webp" alt="OpenRouter Logo" className="w-6 h-6 object-contain" /> },
+  { id: 'gemini', name: 'Gemini (Cloud)', icon: <img src="/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg" alt="Gemini Logo" className="w-6 h-6 object-contain" /> },
 ];
 
 const ProviderSelector: React.FC = () => {

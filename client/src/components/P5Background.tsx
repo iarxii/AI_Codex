@@ -194,7 +194,7 @@ const P5Background: React.FC = () => {
       {/* Base Vector Wallpaper */}
       <div 
         className="absolute inset-0 bg-cover bg-end bg-no-repeat"
-        style={{ backgroundImage: `url('/media/aicodex_vector_wallpaper.png')`, opacity: 0.8, filter: 'blur(1px)' }}
+        style={{ backgroundImage: `url('/media/aicodex_vector_wallpaper.png')`, opacity: 1, filter: 'blur(1px)' }}
       />
       
       {/* P5 Animated Grid and Traces */}
