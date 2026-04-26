@@ -11,7 +11,7 @@ const P5Background: React.FC = () => {
       let traces: Trace[] = [];
       let curves: Curve[] = [];
       const GRID_SIZE = 40;
-      const MAX_TRACES = 15;
+      const MAX_TRACES = 30; // Increased density for dynamic activity
       const MAX_CURVES = 8;
 
       p.setup = () => {
@@ -60,6 +60,7 @@ const P5Background: React.FC = () => {
         life!: number;
         maxLife!: number;
         speed!: number;
+        color!: {r: number, g: number, b: number};
 
         constructor(p: p5) {
           this.p = p;
@@ -75,7 +76,22 @@ const P5Background: React.FC = () => {
           this.history = [];
           this.maxLife = this.p.random(100, 300); // Longer life to account for slower speed
           this.life = this.maxLife;
-          this.speed = GRID_SIZE / 8; // Reduced speed
+          this.speed = GRID_SIZE / 8; // Default speed
+
+          // Split colors: 2/3 White (faster), 1/3 Orange (standard)
+          const rand = this.p.random();
+          if (rand < 0.66) {
+            this.color = { r: 255, g: 255, b: 255 }; // White
+            this.speed = GRID_SIZE / 5; // Faster white traces for dynamic feel
+          } else {
+            this.color = { r: 255, g: 102, b: 0 }; // Orange
+            this.speed = GRID_SIZE / 8; // Standard speed
+          }
+          /* 
+          else {
+            this.color = { r: 40, g: 44, b: 52 }; // Deep Coal (Muted for now)
+          } 
+          */
         }
 
         getRandomDir() {
@@ -135,20 +151,20 @@ const P5Background: React.FC = () => {
             const pos = this.history[i];
             const nextPos = this.history[i + 1];
             const segmentAlpha = this.p.map(i, 0, this.history.length, 0, 220) * fadeMultiplier;
-            this.p.stroke(255, 102, 0, segmentAlpha);
+            this.p.stroke(this.color.r, this.color.g, this.color.b, segmentAlpha);
             this.p.line(pos.x, pos.y, nextPos.x, nextPos.y);
           }
 
           // Draw the final segment from history to current head
           if (this.history.length > 0) {
             const lastPos = this.history[this.history.length - 1];
-            this.p.stroke(255, 102, 0, 220 * fadeMultiplier);
+            this.p.stroke(this.color.r, this.color.g, this.color.b, 220 * fadeMultiplier);
             this.p.line(lastPos.x, lastPos.y, this.x, this.y);
           }
 
           // Head glow
           this.p.noStroke();
-          this.p.fill(255, 102, 0, 255 * fadeMultiplier);
+          this.p.fill(this.color.r, this.color.g, this.color.b, 255 * fadeMultiplier);
           this.p.circle(this.x, this.y, 6);
         }
       }
