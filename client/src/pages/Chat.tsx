@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import ContextInspector from '../components/ContextInspector';
+import AgentCanvas from '../components/AgentCanvas';
 import SettingsModal from '../components/SettingsModal';
 import { PROVIDER_MAP, getActiveProvider, getActiveProviderInfo } from '../components/providerMeta';
 import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
@@ -60,7 +61,7 @@ const Chat: React.FC = () => {
   const [currentToolCalls, setCurrentToolCalls] = useState<any[]>([]);
   const [currentContext, setCurrentContext] = useState<any[]>([]);
   const [thoughtLog, setThoughtLog] = useState<string[]>([]);
-  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+  const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, igpu: 0, latency: '0ms' });
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
@@ -134,7 +135,8 @@ const Chat: React.FC = () => {
         setThoughtLog(prev => [...prev, data.status]);
       } else if (data.type === 'tool_call') {
         setCurrentToolCalls(data.tool_calls);
-        setIsInspectorOpen(true);
+        // We can optionally auto-open the canvas if there's output, 
+        // but for now the inspector is inline.
       } else if (data.type === 'tool_result') {
         setCurrentToolCalls(prev => prev.map(tc => 
           tc.id === data.tool_call_id ? { ...tc, result: data.content } : tc
@@ -302,16 +304,16 @@ const Chat: React.FC = () => {
             </h2>
           </div>
           <div className="flex items-center gap-3">
-            {/* Inspector Toggle */}
+            {/* Canvas Toggle */}
             <button 
-              onClick={() => setIsInspectorOpen(!isInspectorOpen)}
+              onClick={() => setIsCanvasOpen(!isCanvasOpen)}
               className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-                isInspectorOpen 
+                isCanvasOpen 
                   ? 'bg-[#FF6600]/10 border-[#FF6600]/30 text-[#FF6600]' 
                   : 'bg-black/[0.04] border-black/[0.08] text-[#4A4D5E] hover:text-[#1A1D2E] hover:border-black/[0.15]'
               }`}
             >
-              Inspector
+              Canvas
             </button>
 
             {/* Provider Badge — clickable, opens SettingsModal */}
@@ -468,6 +470,12 @@ const Chat: React.FC = () => {
                                 <span className="group-hover/item:text-[#1A1D2E] transition-colors">{log}</span>
                               </div>
                             ))}
+
+                            {/* Inline Context Inspector */}
+                            <ContextInspector 
+                              toolCalls={currentToolCalls}
+                              contextData={currentContext}
+                            />
                           </div>
                         </details>
                       </div>
@@ -626,12 +634,10 @@ const Chat: React.FC = () => {
         </footer>
       </div>
 
-      {/* Context Inspector */}
-      <ContextInspector 
-        isOpen={isInspectorOpen} 
-        onClose={() => setIsInspectorOpen(false)} 
-        toolCalls={currentToolCalls}
-        contextData={currentContext}
+      {/* Agent Canvas Drawer */}
+      <AgentCanvas 
+        isOpen={isCanvasOpen} 
+        onClose={() => setIsCanvasOpen(false)} 
       />
 
       {/* Settings Modal */}
