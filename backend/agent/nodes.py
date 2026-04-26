@@ -41,7 +41,7 @@ def get_dynamic_llm(config: RunnableConfig):
         llm = ChatOpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key,
-            model=model or "meta-llama/llama-3.2-3b-instruct",
+            model=model or "meta-llama/llama-3.1-8b-instruct",
             temperature=0,
             streaming=True,
             default_headers={
@@ -51,7 +51,19 @@ def get_dynamic_llm(config: RunnableConfig):
         )
     elif provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
-        llm = ChatGoogleGenerativeAI(model=model or "gemini-1.5-flash", api_key=api_key, temperature=0, streaming=True)
+        # Ensure model name doesn't have redundant 'models/' prefix if library adds it,
+        # but the user might have selected it from the dynamic list.
+        target_model = model or "gemini-1.5-flash"
+        if target_model.startswith("models/"):
+            target_model = target_model.replace("models/", "")
+        
+        llm = ChatGoogleGenerativeAI(
+            model=target_model, 
+            api_key=api_key, 
+            temperature=0, 
+            streaming=True,
+            convert_system_message_to_human=True # Often needed for older models or specific API versions
+        )
     else:
         # local
         from langchain_ollama import ChatOllama

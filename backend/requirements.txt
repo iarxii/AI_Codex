@@ -22,3 +22,4 @@ requests
 GPUtil
 ollama
 rich
+google-generativeai

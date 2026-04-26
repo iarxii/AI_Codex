@@ -13,10 +13,7 @@ class GitHubSearchSkill(BaseSkill):
     Results are cached in the local VectorDB for future use.
     """
     name = "github_search"
-    description = (
-        "Searches GitHub repositories, code, issues, or discussions for solutions. "
-        "Requires a GITHUB_PAT in the configuration."
-    )
+    description = "Searches GitHub for repositories, code, issues, or discussions to find code solutions and examples."
     parameters = {
         "type": "object",
         "properties": {
@@ -42,6 +39,14 @@ class GitHubSearchSkill(BaseSkill):
     GRAPHQL_URL = "https://api.github.com/graphql"
 
     async def execute(self, query: str, search_type: str = "code", limit: int = 5) -> SkillResult:
+        """
+        Performs a search on GitHub.
+        
+        Args:
+            query: The search keywords (e.g., 'python websocket client').
+            search_type: Type of results to find. Options: 'repository', 'issue', 'discussion', 'code'.
+            limit: Maximum number of results to return (max 10).
+        """
         if not settings.GITHUB_PAT:
             return SkillResult(success=False, error="GITHUB_PAT is not configured in .env")
 
