@@ -51,8 +51,6 @@ def get_dynamic_llm(config: RunnableConfig):
         )
     elif provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
-        # Ensure model name doesn't have redundant 'models/' prefix if library adds it,
-        # but the user might have selected it from the dynamic list.
         target_model = model or "gemini-1.5-flash"
         if target_model.startswith("models/"):
             target_model = target_model.replace("models/", "")
@@ -61,8 +59,8 @@ def get_dynamic_llm(config: RunnableConfig):
             model=target_model, 
             api_key=api_key, 
             temperature=0, 
-            streaming=True,
-            convert_system_message_to_human=True # Often needed for older models or specific API versions
+            streaming=True
+            # Removed convert_system_message_to_human=True as Gemini 1.5 supports it natively
         )
     else:
         # local
@@ -78,12 +76,18 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     last_query = state["messages"][-1].content
     
     # 1. Retrieve relevant chunks from RAG
+    import asyncio
     retriever = get_retriever()
     retrieval_results = []
     if retriever:
         try:
-            retrieval_results = retriever.retrieve(last_query)
-            logger.info(f"RAG retrieved {len(retrieval_results)} chunks")
+            logger.info(f"Starting RAG retrieval for: {last_query[:50]}...")
+            start_rag = time.perf_counter()
+            # Wrap blocking call in a thread
+            retrieval_results = await asyncio.to_thread(retriever.retrieve, last_query)
+            duration_rag = time.perf_counter() - start_rag
+            logger.info(f"RAG retrieved {len(retrieval_results)} chunks in {duration_rag:.2f}s")
+            log_performance("RAG_RETRIEVAL", duration_rag, {"query_len": len(last_query)})
         except Exception as e:
             logger.warning(f"RAG retrieval failed: {e}")
     
@@ -133,21 +137,33 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     if not any(isinstance(m, SystemMessage) for m in messages):
         messages.insert(0, SystemMessage(content=system_prompt))
     
-    logger.info(f"Invoking LLM for reasoning turn...")
+    provider = config.get("configurable", {}).get("provider", "local")
+    model = config.get("configurable", {}).get("model", "default")
+
+    from backend.utils.logger import log_debug, log_error
+    log_debug(f"Invoking LLM ({provider}:{model}) for reasoning turn...")
     start_time = time.perf_counter()
     try:
         dynamic_llm = get_dynamic_llm(config)
-        response = await dynamic_llm.ainvoke(messages, config=config)
+        
+        # Use astream for real-time token yielding
+        # The graph's astream_events(v2) will catch these chunks
+        chunks = []
+        async for chunk in dynamic_llm.astream(messages):
+            chunks.append(chunk)
+        
+        # Combine chunks for consistency with the rest of the node logic
+        # LangChain messages can be added together
+        response = chunks[0]
+        for chunk in chunks[1:]:
+            response += chunk
+        
         duration = time.perf_counter() - start_time
-        
-        provider = config.get("configurable", {}).get("provider", "local")
-        model = config.get("configurable", {}).get("model", "default")
         log_performance("LLM_REASONING", duration, {"provider": provider, "model": model})
-        
-        logger.info(f"LLM Response received (length: {len(response.content)}) in {duration:.2f}s")
+        log_debug(f"LLM Response received (length: {len(response.content)}) in {duration:.2f}s")
     except Exception as e:
         err_msg = str(e)
-        logger.error(f"LLM Invocation failed: {err_msg}")
+        log_error(f"LLM Invocation failed: {err_msg}")
         if "connection" in err_msg.lower() or "11434" in err_msg:
             raise Exception("AICodex: Connection to Ollama failed. Ensure Ollama is running (ollama serve).")
         raise e

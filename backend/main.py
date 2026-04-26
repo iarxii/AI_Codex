@@ -53,7 +53,7 @@ app.include_router(skills.router, prefix=settings.API_V1_STR + "/skills", tags=[
 app.include_router(models.router, prefix=settings.API_V1_STR + "/models", tags=["models"])
 
 # Direct WebSocket registration for debugging
-from backend.api.chat import websocket_endpoint
-from backend.api.metrics import metrics_endpoint
-app.add_api_websocket_route("/ws/agent", websocket_endpoint)
-app.add_api_websocket_route("/ws/metrics", metrics_endpoint)
+# from backend.api.chat import websocket_endpoint
+# from backend.api.metrics import metrics_endpoint
+# app.add_api_websocket_route("/ws/agent", websocket_endpoint)
+# app.add_api_websocket_route("/ws/metrics", metrics_endpoint)

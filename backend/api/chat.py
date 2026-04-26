@@ -96,70 +96,74 @@ async def websocket_endpoint(websocket: WebSocket):
                 config = {"configurable": {"provider": provider, "model": model, "api_key": api_key}}
                 request_start = time.perf_counter()
                 
-                async for event in agent_graph.astream_events(initial_state, config=config, version="v2"):
-                    kind = event["event"]
-                    node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
-                    
-                    log_debug(f"Event: {kind} | Node: {node_name}")
-                    
-                    # Log tokens
-                    if kind == "on_chat_model_stream":
-                        content = event["data"]["chunk"].content
-                        if content:
-                            full_ai_response += content
+                try:
+                    async for event in agent_graph.astream_events(initial_state, config=config, version="v2"):
+                        kind = event["event"]
+                        node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
+                        
+                        log_debug(f"Event: {kind} | Node: {node_name}")
+                        
+                        # Log tokens
+                        if kind == "on_chat_model_stream":
+                            content = event["data"]["chunk"].content
+                            if content:
+                                full_ai_response += content
+                                await websocket.send_json({
+                                    "type": "token",
+                                    "content": full_ai_response,
+                                    "node": node_name,
+                                    "duration": time.perf_counter() - request_start
+                                })
+                        
+                        # Log node transitions for "Working" indicator
+                        elif kind == "on_chain_start" and "metadata" in event and "langgraph_node" in event["metadata"]:
                             await websocket.send_json({
-                                "type": "token",
-                                "content": full_ai_response,
-                                "node": node_name,
-                                "duration": time.perf_counter() - request_start
+                                "type": "status",
+                                "status": f"Agent working in node: {event['metadata']['langgraph_node']}",
+                                "node": event['metadata']['langgraph_node']
                             })
-                    
-                    # Log node transitions for "Working" indicator
-                    elif kind == "on_chain_start" and "metadata" in event and "langgraph_node" in event["metadata"]:
-                        await websocket.send_json({
-                            "type": "status",
-                            "status": f"Agent working in node: {event['metadata']['langgraph_node']}",
-                            "node": event['metadata']['langgraph_node']
-                        })
-                    
-                    # Tool Calls
-                    elif kind == "on_chat_model_end":
-                        msg = event["data"]["output"]
-                        if hasattr(msg, "tool_calls") and msg.tool_calls:
-                            log_debug(f"Tool Call detected: {msg.tool_calls}")
+                        
+                        # Tool Calls
+                        elif kind == "on_chat_model_end":
+                            msg = event["data"]["output"]
+                            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                log_debug(f"Tool Call detected: {msg.tool_calls}")
+                                await websocket.send_json({
+                                    "type": "tool_call",
+                                    "tool_calls": msg.tool_calls,
+                                    "node": node_name,
+                                    "duration": time.perf_counter() - request_start
+                                })
+                                
+                        # Tool Results
+                        elif kind == "on_tool_end":
+                            log_debug(f"Tool Result detected: {event['data']['output'][:100]}...")
                             await websocket.send_json({
-                                "type": "tool_call",
-                                "tool_calls": msg.tool_calls,
-                                "node": node_name,
-                                "duration": time.perf_counter() - request_start
+                                "type": "tool_result",
+                                "content": str(event["data"]["output"]),
+                                "tool_call_id": event["metadata"].get("tool_call_id", "unknown"),
+                                "node": node_name
                             })
-                            
-                    # Tool Results
-                    elif kind == "on_tool_end":
-                        log_debug(f"Tool Result detected: {event['data']['output'][:100]}...")
-                        await websocket.send_json({
-                            "type": "tool_result",
-                            "content": str(event["data"]["output"]),
-                            "tool_call_id": event["metadata"].get("tool_call_id", "unknown"),
-                            "node": node_name
-                        })
-                    
-                    elif kind == "on_error":
-                        log_error(f"Graph Error in {node_name}", event.get("data", {}).get("error"))
-                        await websocket.send_json({"type": "error", "message": f"Graph Error: {event.get('data', {}).get('error')}"})
+                        
+                        elif kind == "on_error":
+                            log_error(f"Graph Error in {node_name}", event.get("data", {}).get("error"))
+                            await websocket.send_json({"type": "error", "message": f"Graph Error: {event.get('data', {}).get('error')}"})
+                except Exception as e:
+                    log_error(f"Streaming Exception for conv {conversation_id}", str(e))
+                    await websocket.send_json({"type": "error", "message": f"Execution Error: {str(e)}"})
+                finally:
+                    # 5. Persist AI Response
+                    if full_ai_response:
+                        new_ai_msg = Message(
+                            conversation_id=conversation_id,
+                            role="assistant",
+                            content=full_ai_response
+                        )
+                        db.add(new_ai_msg)
+                        await db.commit()
+                        log_debug(f"Persisted AI response for conv {conversation_id}")
 
-                # 5. Persist AI Response
-                if full_ai_response:
-                    new_ai_msg = Message(
-                        conversation_id=conversation_id,
-                        role="assistant",
-                        content=full_ai_response
-                    )
-                    db.add(new_ai_msg)
-                    await db.commit()
-                    log_debug(f"Persisted AI response for conv {conversation_id}")
-
-                await websocket.send_json({"type": "done"})
+                    await websocket.send_json({"type": "done"})
             
     except WebSocketDisconnect:
         manager.disconnect(websocket)
