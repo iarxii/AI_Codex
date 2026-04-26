@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import SettingsModal from './SettingsModal';
 import { Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { useAI, ProviderId } from '../contexts/AIContext';
 
 type Conversation = {
   id: number;
@@ -16,6 +17,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConversation, onNewChat }) => {
+  const { provider } = useAI();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -45,6 +47,32 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
 
   return (
     <aside className="w-72 h-full flex flex-col bg-[var(--bg-surface)]/80 backdrop-blur-xl border-r border-black/[0.06] z-30 transition-all duration-300">
+      <div className="px-6 py-8 flex flex-col items-center justify-center text-center group">
+        <div className="relative mb-4">
+          <img 
+            src="/media/logo.png" 
+            alt="AICodex Logo" 
+            className="w-12 h-12 object-contain transition-all duration-500 group-hover:scale-105"
+          />
+        </div>
+
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+            AI<span className="text-[var(--accent)]">Codex</span>
+          </h1>
+          <div className="flex items-center gap-1.5 justify-center mt-1">
+            <span className="w-1 h-1 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"></span>
+            <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-[var(--text-muted)]">
+              {provider === 'local' && 'Neural Core'}
+              {provider === 'groq' && 'Velocity Link'}
+              {provider === 'openrouter' && 'Omni Interface'}
+              {provider === 'gemini' && 'Reasoning Engine'}
+              {/* 👆 will be revised in future to offer "flavours" of agentic workflows for various purposes */}
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div className="p-4 border-b border-black/[0.06]">
         <button 
           onClick={async () => {

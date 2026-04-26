@@ -38,10 +38,12 @@ def get_dynamic_llm(config: RunnableConfig):
         llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=0, streaming=True)
     elif provider == "openrouter":
         from langchain_openai import ChatOpenAI
+        # Using openrouter/free (Free Models Router) as default for better tool-use reliability
+        target_model = model or "openrouter/free"
         llm = ChatOpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key,
-            model=model or "meta-llama/llama-3.1-8b-instruct",
+            model=target_model,
             temperature=0,
             streaming=True,
             default_headers={
@@ -164,6 +166,15 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     except Exception as e:
         err_msg = str(e)
         log_error(f"LLM Invocation failed: {err_msg}")
+        
+        # Handle Rate Limits (429) gracefully
+        if "429" in err_msg or "rate" in err_msg.lower():
+            raise Exception(
+                "AICodex: Upstream rate limit reached (429). \n\n"
+                "💡 TIP: Try switching to a different model in the selector below, "
+                "or use the 'Local (Ollama)' provider for unlimited inference."
+            )
+            
         if "connection" in err_msg.lower() or "11434" in err_msg:
             raise Exception("AICodex: Connection to Ollama failed. Ensure Ollama is running (ollama serve).")
         raise e
