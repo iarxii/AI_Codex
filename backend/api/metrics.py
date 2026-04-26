@@ -36,9 +36,11 @@ async def metrics_endpoint(websocket: WebSocket):
             
             if collector:
                 snapshot = collector.get_snapshot()
-                metrics_data["cpu"] = snapshot.get("system", {}).get("cpu_percent", 0)
-                metrics_data["ram"] = snapshot.get("system", {}).get("memory_percent", 0)
-                metrics_data["npu"] = snapshot.get("system", {}).get("npu_percent", 15) # Fallback to 15 if not present
+                system = snapshot.get("system", {})
+                metrics_data["cpu"] = system.get("cpu_percent", 0)
+                metrics_data["ram"] = system.get("memory_percent", 0)
+                metrics_data["npu"] = system.get("npu_percent", 0)
+                metrics_data["igpu"] = system.get("igpu_percent", 0)
                 
                 model_info = snapshot.get("model", {})
                 model_name = model_info.get("name")

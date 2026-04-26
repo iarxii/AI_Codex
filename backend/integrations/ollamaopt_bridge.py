@@ -68,70 +68,76 @@ def get_metrics_collector():
         return getattr(module, "MetricsCollector", None)
     return None
 
-# Singleton-style initialized instances
+# Singleton-style initialized instances with thread safety
+import threading
+_init_lock = threading.Lock()
 _initialized_retriever = None
 _initialized_context_builder = None
 
 def get_retriever():
-    """Returns an initialized Retriever instance with fallback endpoint support."""
+    """Returns an initialized Retriever instance with fallback endpoint and model support."""
     global _initialized_retriever
     if _initialized_retriever:
         return _initialized_retriever
     
-    try:
-        rag_module = get_ollamaopt_module("rag")
-        if not rag_module: return None
-        
-        QdrantVectorStore = getattr(rag_module, "QdrantVectorStore")
-        OllamaEmbedder = getattr(rag_module, "OllamaEmbedder")
-        Retriever = getattr(rag_module, "Retriever")
-        
-        # Monkey-patch OllamaEmbedder to support /api/embed if /api/embeddings fails
-        original_embed_text = OllamaEmbedder.embed_text
-        
-        def patched_embed_text(self, text: str):
-            # Try legacy endpoint first (original logic)
-            res = original_embed_text(self, text)
-            if res is not None:
-                return res
+    with _init_lock:
+        # Re-check inside lock
+        if _initialized_retriever:
+            return _initialized_retriever
             
-            # If 404/failure, try modern /api/embed
-            import requests
-            try:
-                modern_endpoint = f"{self.api_base}/api/embed"
-                payload = {"model": self.model, "input": text}
-                resp = requests.post(modern_endpoint, json=payload, timeout=self.timeout)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    # /api/embed returns 'embeddings' (plural) for multiple or a list of lists
-                    embeddings = data.get("embeddings")
-                    if embeddings and len(embeddings) > 0:
-                        return [float(v) for v in embeddings[0]]
-            except Exception:
-                pass
-            return None
+        try:
+            rag_module = get_ollamaopt_module("rag")
+            if not rag_module: return None
+            
+            QdrantVectorStore = getattr(rag_module, "QdrantVectorStore")
+            OllamaEmbedder = getattr(rag_module, "OllamaEmbedder")
+            Retriever = getattr(rag_module, "Retriever")
+            
+            # Monkey-patch OllamaEmbedder for better resilience
+            original_embed_text = OllamaEmbedder.embed_text
+            
+            # Monkey-patch OllamaEmbedder to be modern and silent
+            def patched_embed_text(self, text: str):
+                import requests
+                # Try modern /api/embed directly to avoid legacy 404 noise
+                embedding_models = [self.model, "all-minilm:latest", "all-minilm", "nomic-embed-text"]
+                for model in embedding_models:
+                    if not model: continue
+                    try:
+                        resp = requests.post(
+                            f"{self.api_base}/api/embed", 
+                            json={"model": model, "input": text}, 
+                            timeout=5
+                        )
+                        if resp.status_code == 200:
+                            embeddings = resp.json().get("embeddings")
+                            if embeddings: return [float(v) for v in embeddings[0]]
+                    except Exception: continue
+                
+                # If all failed, return None (RAG will skip)
+                return None
 
-        OllamaEmbedder.embed_text = patched_embed_text
-        
-        store = QdrantVectorStore(
-            collection_name="aicodex_vectors",
-            persist_dir="data/qdrant",
-            embedding_dim=384, # all-minilm is 384
-        )
-        embedder = OllamaEmbedder(
-            api_base=settings.OLLAMA_BASE_URL,
-            model="all-minilm", # Use a smaller, more common model for compatibility
-        )
-        _initialized_retriever = Retriever(
-            store=store,
-            embedder=embedder,
-            top_k=5,
-            score_threshold=0.3,
-        )
-        return _initialized_retriever
-    except Exception as e:
-        logger.error(f"Failed to initialize Retriever: {e}")
-        return None
+            OllamaEmbedder.embed_text = patched_embed_text
+            
+            store = QdrantVectorStore(
+                collection_name="aicodex_vectors",
+                persist_dir="data/qdrant",
+                embedding_dim=384, 
+            )
+            embedder = OllamaEmbedder(
+                api_base=settings.OLLAMA_BASE_URL,
+                model="all-minilm:latest", 
+            )
+            _initialized_retriever = Retriever(
+                store=store,
+                embedder=embedder,
+                top_k=5,
+                score_threshold=0.3,
+            )
+            return _initialized_retriever
+        except Exception as e:
+            logger.error(f"Failed to initialize Retriever: {e}")
+            return None
 
 def get_context_builder():
     """Returns an initialized ContextBuilder instance."""

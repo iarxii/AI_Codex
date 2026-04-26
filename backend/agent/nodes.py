@@ -168,11 +168,12 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         log_error(f"LLM Invocation failed: {err_msg}")
         
         # Handle Rate Limits (429) gracefully
-        if "429" in err_msg or "rate" in err_msg.lower():
+        if "429" in err_msg or "rate" in err_msg.lower() or "quota" in err_msg.lower():
             raise Exception(
-                "AICodex: Upstream rate limit reached (429). \n\n"
-                "💡 TIP: Try switching to a different model in the selector below, "
-                "or use the 'Local (Ollama)' provider for unlimited inference."
+                "AICodex: Upstream rate limit or quota reached. \n\n"
+                "TIP: Try switching to a different model in the selector below, "
+                "or use the 'Local (Ollama)' provider for unlimited inference. "
+                "If using Gemini/OpenRouter, verify your API key credits."
             )
             
         if "connection" in err_msg.lower() or "11434" in err_msg:
