@@ -46,7 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
   };
 
   return (
-    <aside className="w-72 h-full flex flex-col bg-[var(--bg-surface)]/80 backdrop-blur-xl border-r border-black/[0.06] z-30 transition-all duration-300">
+    <aside className="w-72 h-full flex flex-col bg-[var(--bg-surface)]/40 backdrop-blur-2xl border-r border-black/[0.06] z-30 transition-all duration-300">
       <div className="px-6 py-8 flex flex-col items-center justify-center text-center group">
         <div className="relative mb-4">
           <img 

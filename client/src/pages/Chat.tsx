@@ -10,6 +10,7 @@ import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
 import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 import ProviderSelector from '../components/ProviderSelector';
 import { useAI } from '../contexts/AIContext';
+import P5Loader from '../components/P5Loader';
 
 type Message = {
   id: string;
@@ -261,7 +262,9 @@ const Chat: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#C8CDD5] text-[#1A1D2E] font-[Poppins] overflow-hidden">
+    <div className="flex h-screen bg-transparent text-[#1A1D2E] font-[Poppins] overflow-hidden relative">
+      {/* Semi-transparent overlay to ensure readability while showing P5 */}
+      <div className="absolute inset-0 bg-[#C8CDD5]/30 pointer-events-none -z-10"></div>
       {/* Sidebar */}
       <Sidebar 
         currentConversationId={currentConvId} 
@@ -271,11 +274,10 @@ const Chat: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 relative">
-        {/* Subtle circuit-trace overlay */}
-        <div className="absolute inset-0 opacity-[0.04] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/circuit-board.png')]"></div>
+        {/* P5Background is now global in App.tsx */}
         
         {/* Header */}
-        <header className="h-14 flex items-center justify-between px-5 bg-[#D8DCE4]/80 backdrop-blur-md border-b border-black/[0.06] z-20 shadow-sm">
+        <header className="h-14 flex items-center justify-between px-5 bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-20 shadow-sm">
           <div className="flex items-center gap-3">
             <h2 className="text-xs font-semibold uppercase tracking-widest text-[#4A4D5E]">
               {currentConvId ? `Workspace #${currentConvId}` : 'No Workspace'}
@@ -388,10 +390,9 @@ const Chat: React.FC = () => {
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
                         {msg.status === 'typing' && (
-                          <div className="flex gap-1 mt-3">
-                            <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                            <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                            <div className="w-1.5 h-1.5 bg-[#FF6600] rounded-full animate-bounce"></div>
+                          <div className="mt-3 flex items-center gap-2">
+                            <P5Loader />
+                            <span className="text-[10px] font-bold text-[#FF6600]/60 uppercase tracking-widest animate-pulse">Synthesizing...</span>
                           </div>
                         )}
                       </div>
@@ -406,7 +407,7 @@ const Chat: React.FC = () => {
                         <details open className="group">
                           <summary className="flex items-center justify-between cursor-pointer list-none select-none">
                             <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[#FF6600]">
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#FF6600] animate-pulse shadow-[0_0_8px_#FF6600]"></div>
+                              <P5Loader />
                               Thinking Process
                             </div>
                             <div className="text-[#7A7D8E] group-open:rotate-180 transition-transform">
@@ -433,7 +434,7 @@ const Chat: React.FC = () => {
         </main>
 
         {/* Input Area — Enriched */}
-        <footer className="px-6 pb-5 pt-3 bg-[#C8CDD5] border-t border-black/[0.04] z-20">
+        <footer className="px-6 pb-5 pt-3 bg-transparent border-t border-black/[0.04] z-20">
           <div className="max-w-4xl mx-auto mb-3">
             <ProviderSelector />
           </div>

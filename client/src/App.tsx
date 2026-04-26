@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
 import { AIProvider } from './contexts/AIContext';
+import P5Background from './components/P5Background';
 
 import './App.css';
 
@@ -13,6 +14,7 @@ const App: React.FC = () => {
 
   return (
     <AIProvider>
+      <P5Background />
       <Router>
         <Routes>
           <Route path="/" element={<Landing />} />
