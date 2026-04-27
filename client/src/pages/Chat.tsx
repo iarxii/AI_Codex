@@ -11,7 +11,7 @@ import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
 import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 import ProviderSelector from '../components/ProviderSelector';
 import { useAI, type ProviderId } from '../contexts/AIContext';
-import P5Loader from '../components/P5Loader';
+import AgentPulse from '../components/AgentPulse';
 import MetricsChart from '../components/MetricsChart';
 import WorkspaceOnboardingModal from '../components/WorkspaceOnboardingModal';
 import { ChevronUpIcon, ChevronDownIcon, ChartBarIcon } from '@heroicons/react/24/outline';
@@ -68,6 +68,7 @@ const Chat: React.FC = () => {
 
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const isProcessing = useRef(false);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, igpu: 0, latency: '0ms' });
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
   const [isChartExpanded, setIsChartExpanded] = useState(false);
@@ -97,7 +98,7 @@ const Chat: React.FC = () => {
 
   useEffect(() => {
     console.log('Connecting WebSocket...');
-    const socket = new WebSocket('ws://127.0.0.1:8000/api/chat/ws/agent');
+    const socket = new WebSocket('ws://localhost:8000/api/chat/ws/agent');
     ws.current = socket;
 
     socket.onopen = () => {
@@ -105,10 +106,13 @@ const Chat: React.FC = () => {
       setReconnectCount(0);
     };
 
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       setConnected(false);
-      setLoading(false); // Reset loading on disconnect
-      // Simple reconnect with backoff
+      setLoading(false);
+      
+      // Do not reconnect if closure was intentional (from cleanup)
+      if ((socket as any).wasCleanlyClosed) return;
+
       if (reconnectCount < 5) {
         setTimeout(() => {
           setReconnectCount(prev => prev + 1);
@@ -179,6 +183,7 @@ const Chat: React.FC = () => {
         });
       } else if (data.type === 'done') {
         setLoading(false);
+        isProcessing.current = false;
         setMessages(prev => {
           const updated = [...prev];
           if (updated.length > 0 && updated[updated.length - 1].sender === 'bot') {
@@ -189,10 +194,11 @@ const Chat: React.FC = () => {
       } else if (data.type === 'error') {
         setMessages(prev => [...prev, { id: 'err-' + Date.now(), sender: 'bot', content: '❌ Error: ' + data.message }]);
         setLoading(false);
+        isProcessing.current = false;
       }
     };
 
-    const mSocket = new WebSocket('ws://127.0.0.1:8000/api/metrics/ws/metrics');
+    const mSocket = new WebSocket('ws://localhost:8000/api/metrics/ws/metrics');
     metricsWs.current = mSocket;
     mSocket.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -213,6 +219,7 @@ const Chat: React.FC = () => {
     };
 
     return () => {
+      (socket as any).wasCleanlyClosed = true;
       if (socket.readyState !== WebSocket.CLOSED) socket.close();
       if (mSocket.readyState !== WebSocket.CLOSED) mSocket.close();
     };
@@ -277,13 +284,16 @@ const Chat: React.FC = () => {
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !connected || loading) return;
+    if (!input.trim() || !connected || loading || isProcessing.current) return;
 
     if (!currentConvId) {
       handleNewChat().then(() => {});
       alert("Please select or create a workspace first.");
+      isProcessing.current = false;
       return;
     }
+
+    isProcessing.current = true;
 
     const userMsg: Message = { id: Date.now().toString(), sender: 'user', content: input };
     setMessages(prev => [...prev, userMsg]);
@@ -316,6 +326,7 @@ const Chat: React.FC = () => {
         content: `❌ Send Failed: ${err.message}` 
       }]);
       setLoading(false);
+      isProcessing.current = false;
     }
   };
 
@@ -391,6 +402,11 @@ const Chat: React.FC = () => {
                 </span>
               </div>
             )}
+
+            {/* Agent Pulse Status */}
+            <div className="hidden md:flex items-center px-4 border-l border-black/[0.06] ml-2">
+              <AgentPulse mode={loading ? 'thinking' : 'idle'} showText={false} />
+            </div>
 
             {/* Logout */}
             <button 
@@ -488,7 +504,6 @@ const Chat: React.FC = () => {
                         </div>
                         {msg.status === 'typing' && (
                           <div className="mt-3 flex items-center gap-2">
-                            <P5Loader />
                             <span className="text-[10px] font-bold text-[#FF6600]/60 uppercase tracking-widest animate-pulse">Synthesizing...</span>
                           </div>
                         )}
@@ -503,9 +518,11 @@ const Chat: React.FC = () => {
                       <div className="bg-[#D8DCE4]/40 backdrop-blur-sm border border-[#FF6600]/40 p-4 rounded-xl max-w-2xl w-full shadow-sm shadow-[#FF6600]/5">
                         <details open={loading} className="group">
                           <summary className="flex items-center justify-between cursor-pointer list-none select-none">
-                            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[#FF6600]">
-                              {loading && <P5Loader />}
-                              Thinking Process
+                            <div className="flex items-center gap-3">
+                              <span className={`text-[10px] font-bold uppercase tracking-[0.15em] ${loading ? 'text-[#FF6600]' : 'text-[#7A7D8E]'}`}>
+                                {loading ? 'Thinking Process' : 'Neural Trace'}
+                              </span>
+                              <AgentPulse mode={loading ? 'thinking' : 'idle'} showText={false} />
                               {!loading && thoughtStartTime && thoughtLog.length > 0 && (
                                 <span className="text-[#7A7D8E] lowercase font-mono">
                                   ({(() => {

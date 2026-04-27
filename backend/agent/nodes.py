@@ -74,8 +74,12 @@ def get_dynamic_llm(config: RunnableConfig):
         if not base_url.endswith("/v1"):
             base_url = f"{base_url.rstrip('/')}/v1"
             
+        # llama-server often prefers 'default' or a specific name; if 'local' is passed, 
+        # it might be a UI artifact, so we normalize it.
+        local_model = target_model if target_model and target_model != "local" else "default"
+            
         llm = ChatOpenAI(
-            model=target_model, 
+            model=local_model, 
             base_url=base_url, 
             api_key="sk-local",
             temperature=0, 
@@ -123,10 +127,18 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 } for r in retrieval_results
             ]
             
+            # Convert LangChain messages to dicts for ContextBuilder
+            history_dicts = []
+            for m in state["messages"][:-1]:
+                role = "assistant" if isinstance(m, (ToolMessage, SystemMessage)) or getattr(m, "role", "") == "assistant" else "user"
+                # For tool messages, include the result
+                content = m.content if hasattr(m, "content") else str(m)
+                history_dicts.append({"role": role, "content": content})
+
             # Build context (including history, RAG, and memory)
             assembled = context_builder.build(
                 user_query=last_query,
-                chat_history=state["messages"][:-1],
+                chat_history=history_dicts,
                 retrieved_chunks=chunks,
                 memory_items=[], # Long-term memory handled here
                 tool_results=[] # Tool results are handled in the loop
@@ -137,20 +149,15 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             logger.warning(f"Context building failed: {e}")
 
     # 3. Invoke LLM with grounded prompt
-    # We maintain the message sequence but ensure the grounding context 
-    # is available. We'll prepend the grounding to the latest turn if it's a new turn,
-    # or just use the history as is if we are in a tool loop.
-    messages = list(state["messages"])
-    
-    # If the last message is a ToolMessage, we are continuing a loop.
-    # If it's a HumanMessage, it's a new turn.
-    if isinstance(messages[-1], HumanMessage):
-        messages[-1] = HumanMessage(content=full_prompt)
-        
+    # To prevent duplication and ensure budget enforcement, we send a single 
+    # HumanMessage containing the entire budget-capped context from ContextBuilder.
     system_prompt = build_system_prompt()
-
-    if not any(isinstance(m, SystemMessage) for m in messages):
-        messages.insert(0, SystemMessage(content=system_prompt))
+    logger.info(f"PIPELINE: Prompt sizes - System: {len(system_prompt)}, Context: {len(full_prompt)}")
+    
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=full_prompt)
+    ]
     
     provider = config.get("configurable", {}).get("provider", "local")
     model = config.get("configurable", {}).get("model", "default")
@@ -158,53 +165,12 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     from backend.utils.logger import log_debug, log_error
     log_debug(f"Invoking LLM ({provider}:{model}) for reasoning turn...")
     start_time = time.perf_counter()
-    try:
-        dynamic_llm = get_dynamic_llm(config)
-        
-        # Use astream for real-time token yielding
-        # The graph's astream_events(v2) will catch these chunks IF config is passed
-        chunks = []
-        async for chunk in dynamic_llm.astream(messages, config):
-            chunks.append(chunk)
-        
-        # Combine chunks for consistency with the rest of the node logic
-        # LangChain messages can be added together
-        response = chunks[0]
-        for chunk in chunks[1:]:
-            response += chunk
-        
-        duration = time.perf_counter() - start_time
-        log_performance("LLM_REASONING", duration, {"provider": provider, "model": model})
-        log_debug(f"LLM Response received (length: {len(response.content)}) in {duration:.2f}s")
-    except Exception as e:
-        from backend.utils.logger import log_error
-        log_error(f"LLM Invocation failed for provider {provider}", e)
-        
-        err_msg = str(e).lower()
-        err_type = type(e).__name__
-
-        # Authentication / API Key Errors
-        if "authenticationerror" in err_type.lower() or "401" in err_msg or "unauthorized" in err_msg or "invalid api key" in err_msg or "defaultcredentialserror" in err_type.lower():
-            raise Exception(f"AICodex Authentication Error: Invalid API Key for {provider}. Please verify your key in settings.")
-            
-        # Rate Limits / Quotas
-        if "ratelimiterror" in err_type.lower() or "429" in err_msg or "rate limit" in err_msg or "quota" in err_msg:
-            raise Exception(
-                "AICodex Rate Limit Error: Upstream rate limit or quota reached. \n\n"
-                "TIP: Try switching to a different model, or use the 'Local (Ollama)' provider for unlimited inference. "
-                "If using Gemini/OpenRouter, verify your API key credits."
-            )
-            
-        # Bad Gateway / Server Errors (OpenRouter common)
-        if "502" in err_msg or "bad gateway" in err_msg:
-            raise Exception(f"AICodex Upstream Error: {provider} returned a 502 Bad Gateway. The provider is likely experiencing high traffic. Please try again later.")
-            
-        # Connection Errors (Ollama local)
-        if "connecterror" in err_type.lower() or "connection" in err_msg or "11434" in err_msg or "connection refused" in err_msg:
-            raise Exception("AICodex Connection Error: Failed to connect. If using Ollama, ensure it is running (ollama serve).")
-            
-        # Generic Exception Re-raise
-        raise Exception(f"AICodex Execution Error: {err_type} - {str(e)}")
+    
+    llm = get_dynamic_llm(config)
+    response = await llm.ainvoke(messages)
+    
+    duration = time.perf_counter() - start_time
+    log_performance("LLM_REASONING", duration, {"provider": provider, "model": model})
     
     # Extract tool calls if any
     tool_calls = getattr(response, "tool_calls", [])
