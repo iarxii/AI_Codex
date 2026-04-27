@@ -261,13 +261,14 @@ const Chat: React.FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ title: `Session ${new Date().toLocaleTimeString()}` })
+        body: JSON.stringify({ title: `Workspace ${new Date().toLocaleTimeString()}` })
       });
       if (response.ok) {
         const data = await response.json();
         setCurrentConvId(data.id);
         setMessages([]);
         setCurrentLatency(null);
+        setIsOnboardingOpen(true);
       }
     } catch (error) {
       console.error('Failed to create chat:', error);
