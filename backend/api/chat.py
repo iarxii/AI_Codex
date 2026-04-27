@@ -112,13 +112,25 @@ async def websocket_endpoint(websocket: WebSocket):
                         kind = event["event"]
                         node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
                         
-                        log_debug(f"Event: {kind} | Node: {node_name}")
+                        # Pipeline monitoring in terminal and UI
+                        # We use on_chain_start and check if the name matches the node_name to avoid graph-level events
+                        if kind == "on_chain_start" and node_name != "unknown" and event.get("name") == node_name:
+                            print(f"\nPIPELINE: Entering node [{node_name}]")
+                            await websocket.send_json({
+                                "type": "status",
+                                "status": f"Agent working in node: {node_name}",
+                                "node": node_name,
+                                "duration": time.perf_counter() - request_start
+                            })
                         
-                        # Log tokens
+                        # Log tokens (briefly to terminal)
                         if kind == "on_chat_model_stream":
                             content = event["data"]["chunk"].content
                             if content:
                                 full_ai_response += content
+                                # Print token to terminal for real-time monitoring
+                                print(content, end="", flush=True)
+                                
                                 await websocket.send_json({
                                     "type": "token",
                                     "content": full_ai_response,
@@ -126,19 +138,11 @@ async def websocket_endpoint(websocket: WebSocket):
                                     "duration": time.perf_counter() - request_start
                                 })
                         
-                        # Log node transitions for "Working" indicator
-                        elif kind == "on_chain_start" and "metadata" in event and "langgraph_node" in event["metadata"]:
-                            await websocket.send_json({
-                                "type": "status",
-                                "status": f"Agent working in node: {event['metadata']['langgraph_node']}",
-                                "node": event['metadata']['langgraph_node']
-                            })
-                        
                         # Tool Calls
                         elif kind == "on_chat_model_end":
                             msg = event["data"]["output"]
                             if hasattr(msg, "tool_calls") and msg.tool_calls:
-                                log_debug(f"Tool Call detected: {msg.tool_calls}")
+                                print(f"PIPELINE: Tool Call detected: {msg.tool_calls[0]['name']}")
                                 await websocket.send_json({
                                     "type": "tool_call",
                                     "tool_calls": msg.tool_calls,
@@ -148,7 +152,7 @@ async def websocket_endpoint(websocket: WebSocket):
                                 
                         # Tool Results
                         elif kind == "on_tool_end":
-                            log_debug(f"Tool Result detected: {event['data']['output'][:100]}...")
+                            print(f"PIPELINE: Tool Result: {str(event['data']['output'])[:50]}...")
                             await websocket.send_json({
                                 "type": "tool_result",
                                 "content": str(event["data"]["output"]),
@@ -158,11 +162,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         
                         elif kind == "on_error":
                             error_obj = event.get("data", {}).get("error")
-                            error_str = str(error_obj) if error_obj else "Unknown graph error"
-                            log_error(f"Graph Error in {node_name}", error_obj if isinstance(error_obj, Exception) else None)
-                            await websocket.send_json({"type": "error", "message": f"Graph Error: {error_str}"})
+                            print(f"PIPELINE ERROR: {error_obj}")
+                            await websocket.send_json({"type": "error", "message": f"Graph Error: {str(error_obj)}"})
                 except Exception as e:
-                    log_error(f"Streaming Exception for conv {conversation_id}", e)
+                    print(f"PIPELINE EXCEPTION: {e}")
                     await websocket.send_json({"type": "error", "message": f"Execution Error: {str(e)}"})
                 finally:
                     # 5. Persist AI Response
@@ -174,7 +177,17 @@ async def websocket_endpoint(websocket: WebSocket):
                         )
                         db.add(new_ai_msg)
                         await db.commit()
-                        log_debug(f"Persisted AI response for conv {conversation_id}")
+                        
+                        duration = time.perf_counter() - request_start
+                        print(f"\nPIPELINE: Finished in {duration:.2f}s")
+                        print(f"PIPELINE: Agent Thought Result: {full_ai_response[:100]}...")
+                        
+                        # Reset status in UI
+                        await websocket.send_json({
+                            "type": "status",
+                            "status": "Ready",
+                            "node": "idle"
+                        })
 
                     await websocket.send_json({"type": "done"})
             

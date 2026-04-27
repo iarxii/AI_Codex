@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.db.session import init_db
@@ -33,7 +33,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -47,7 +47,7 @@ from backend.api import auth, chat, metrics, rag, skills, conversations, models
 app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
 app.include_router(conversations.router, prefix=settings.API_V1_STR + "/conversations", tags=["conversations"])
 app.include_router(chat.router, prefix=settings.API_V1_STR + "/chat", tags=["chat"])
-# app.include_router(metrics.router, prefix=settings.API_V1_STR + "/metrics", tags=["metrics"])
+app.include_router(metrics.router, prefix=settings.API_V1_STR + "/metrics", tags=["metrics"])
 app.include_router(rag.router, prefix=settings.API_V1_STR + "/rag", tags=["rag"])
 app.include_router(skills.router, prefix=settings.API_V1_STR + "/skills", tags=["skills"])
 app.include_router(models.router, prefix=settings.API_V1_STR + "/models", tags=["models"])

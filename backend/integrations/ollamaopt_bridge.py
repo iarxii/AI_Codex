@@ -99,22 +99,48 @@ def get_retriever():
             # Monkey-patch OllamaEmbedder to be modern and silent
             def patched_embed_text(self, text: str):
                 import requests
-                # Try modern /api/embed directly to avoid legacy 404 noise
-                embedding_models = [self.model, "all-minilm:latest", "all-minilm", "nomic-embed-text"]
-                for model in embedding_models:
-                    if not model: continue
-                    try:
-                        resp = requests.post(
-                            f"{self.api_base}/api/embed", 
-                            json={"model": model, "input": text}, 
-                            timeout=5
-                        )
-                        if resp.status_code == 200:
-                            embeddings = resp.json().get("embeddings")
-                            if embeddings: return [float(v) for v in embeddings[0]]
-                    except Exception: continue
+                # Clean base URL (strip trailing /v1 if present for segment-based joining)
+                raw_base = self.api_base.rstrip('/')
+                if raw_base.endswith('/v1'):
+                    raw_base = raw_base[:-3].rstrip('/')
                 
-                # If all failed, return None (RAG will skip)
+                # Try multiple endpoints for compatibility
+                endpoints = ["/v1/embeddings", "/api/embed", "/api/embeddings", "/embedding"]
+                embedding_models = [self.model, "all-minilm:latest", "all-minilm", "nomic-embed-text"]
+                
+                for endpoint in endpoints:
+                    endpoint_failed = False
+                    for model in embedding_models:
+                        if not model: continue
+                        try:
+                            url = f"{raw_base}{endpoint}"
+                            target_model = model if model else "default"
+                            
+                            if "v1" in endpoint:
+                                payload = {"model": target_model, "input": text}
+                            elif "embed" in endpoint:
+                                payload = {"model": target_model, "input": text}
+                            else: # /embedding (llama.cpp legacy)
+                                payload = {"content": text}
+                                
+                            resp = requests.post(url, json=payload, timeout=10) # Increased timeout
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                if "embeddings" in data:
+                                    return [float(v) for v in data["embeddings"][0]]
+                                elif "embedding" in data:
+                                    emb = data["embedding"]
+                                    if isinstance(emb, list) and isinstance(emb[0], list):
+                                        return [float(v) for v in emb[0]]
+                                    return [float(v) for v in emb]
+                                elif "data" in data and isinstance(data["data"], list):
+                                    return [float(v) for v in data["data"][0]["embedding"]]
+                            elif resp.status_code in [400, 404, 405]:
+                                endpoint_failed = True
+                                break 
+                        except Exception: 
+                            endpoint_failed = True
+                            break
                 return None
 
             OllamaEmbedder.embed_text = patched_embed_text
@@ -136,10 +162,19 @@ def get_retriever():
             
             QdrantVectorStore.__init__ = patched_qdrant_init
             
+            # Detect embedding dimension dynamically
+            test_embedder = OllamaEmbedder(
+                api_base=settings.OLLAMA_BASE_URL,
+                model="all-minilm:latest"
+            )
+            dummy_vec = test_embedder.embed_text("test")
+            detected_dim = len(dummy_vec) if dummy_vec else 384
+            logger.info(f"Detected embedding dimension: {detected_dim}")
+
             store = QdrantVectorStore(
                 collection_name="aicodex_vectors",
                 persist_dir="data/qdrant",
-                embedding_dim=384, 
+                embedding_dim=detected_dim, 
             )
             embedder = OllamaEmbedder(
                 api_base=settings.OLLAMA_BASE_URL,
