@@ -62,7 +62,7 @@ const Chat: React.FC = () => {
   const [currentToolCalls, setCurrentToolCalls] = useState<any[]>([]);
   const [currentContext, setCurrentContext] = useState<any[]>([]);
   
-  type ThoughtLogEntry = { text: string; timestamp: number };
+  type ThoughtLogEntry = { text: string; timestamp: number; details?: string; type?: string; };
   const [thoughtLog, setThoughtLog] = useState<ThoughtLogEntry[]>([]);
   const [thoughtStartTime, setThoughtStartTime] = useState<number | null>(null);
 
@@ -136,16 +136,44 @@ const Chat: React.FC = () => {
             return [...prev, { id: Date.now().toString(), sender: 'bot', content: data.content, status: 'typing' }];
           }
         });
+        
+        setThoughtLog(prev => {
+          if (prev.length === 0) return prev;
+          const updated = [...prev];
+          const lastLog = updated[updated.length - 1];
+          if (lastLog.text.includes('reason')) {
+            const thinkMatch = data.content.match(/<think>([\s\S]*?)(<\/think>|$)/);
+            if (thinkMatch) {
+              lastLog.details = thinkMatch[1].trim();
+            } else if (data.content.length > 0) {
+              lastLog.details = data.content.length > 500 ? '...' + data.content.substring(data.content.length - 500) : data.content;
+            }
+          }
+          return updated;
+        });
       } else if (data.type === 'status') {
-        setThoughtLog(prev => [...prev, { text: data.status, timestamp: Date.now() }]);
+        setThoughtLog(prev => [...prev, { text: data.status, timestamp: Date.now(), type: data.node }]);
       } else if (data.type === 'tool_call') {
         setCurrentToolCalls(data.tool_calls);
-        // We can optionally auto-open the canvas if there's output, 
-        // but for now the inspector is inline.
+        setThoughtLog(prev => {
+          if (prev.length === 0) return prev;
+          const updated = [...prev];
+          const lastLog = updated[updated.length - 1];
+          lastLog.details = JSON.stringify(data.tool_calls, null, 2);
+          return updated;
+        });
       } else if (data.type === 'tool_result') {
         setCurrentToolCalls(prev => prev.map(tc => 
           tc.id === data.tool_call_id ? { ...tc, result: data.content } : tc
         ));
+        setThoughtLog(prev => {
+          if (prev.length === 0) return prev;
+          const updated = [...prev];
+          const lastLog = updated[updated.length - 1];
+          const resText = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
+          lastLog.details = (lastLog.details ? lastLog.details + '\n\n' : '') + `Result:\n${resText}`;
+          return updated;
+        });
       } else if (data.type === 'done') {
         setLoading(false);
         setMessages(prev => {
@@ -495,12 +523,32 @@ const Chat: React.FC = () => {
                               const prevTime = i === 0 ? thoughtStartTime! : thoughtLog[i - 1].timestamp;
                               const delta = ((log.timestamp - prevTime) / 1000).toFixed(2);
                               return (
-                                <div key={i} className="text-[11px] font-mono text-[#4A4D5E] flex gap-3 group/item">
-                                  <span className="text-[#FF6600] opacity-40 font-bold">[{i + 1}]</span>
-                                  <span className="group-hover/item:text-[#1A1D2E] transition-colors flex-1">{log.text}</span>
-                                  <span className="text-[#7A7D8E] opacity-50 group-hover/item:opacity-100 transition-opacity text-[9px] w-8 text-right">
-                                    {delta}s
-                                  </span>
+                                <div key={i} className="group/item">
+                                  {log.details ? (
+                                    <details className="group/details">
+                                      <summary className="text-[11px] font-mono text-[#4A4D5E] flex gap-3 cursor-pointer list-none hover:bg-white/40 p-1 rounded transition-colors">
+                                        <span className="text-[#FF6600] opacity-40 font-bold">[{i + 1}]</span>
+                                        <span className="group-hover/item:text-[#1A1D2E] transition-colors flex-1 flex items-center gap-2">
+                                          {log.text}
+                                          <ChevronDownIcon className="w-3 h-3 opacity-50 group-open/details:rotate-180 transition-transform" />
+                                        </span>
+                                        <span className="text-[#7A7D8E] opacity-50 group-hover/item:opacity-100 transition-opacity text-[9px] w-8 text-right mt-0.5">
+                                          {delta}s
+                                        </span>
+                                      </summary>
+                                      <div className="mt-2 ml-7 mb-2 pl-3 border-l border-[#FF6600]/20 text-[10px] font-mono text-[#7A7D8E] whitespace-pre-wrap max-h-60 overflow-y-auto bg-white/30 rounded p-2">
+                                        {log.details}
+                                      </div>
+                                    </details>
+                                  ) : (
+                                    <div className="text-[11px] font-mono text-[#4A4D5E] flex gap-3 p-1">
+                                      <span className="text-[#FF6600] opacity-40 font-bold">[{i + 1}]</span>
+                                      <span className="group-hover/item:text-[#1A1D2E] transition-colors flex-1">{log.text}</span>
+                                      <span className="text-[#7A7D8E] opacity-50 group-hover/item:opacity-100 transition-opacity text-[9px] w-8 text-right mt-0.5">
+                                        {delta}s
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
