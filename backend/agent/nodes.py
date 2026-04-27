@@ -66,9 +66,21 @@ def get_dynamic_llm(config: RunnableConfig):
         )
     else:
         # local
-        from langchain_ollama import ChatOllama
+        from langchain_openai import ChatOpenAI
         target_model = model or settings.DEFAULT_MODEL
-        llm = ChatOllama(model=target_model, base_url=settings.OLLAMA_BASE_URL, temperature=0, streaming=True)
+        
+        # Ensure base URL points to the OpenAI-compatible /v1 endpoint
+        base_url = settings.OLLAMA_BASE_URL
+        if not base_url.endswith("/v1"):
+            base_url = f"{base_url.rstrip('/')}/v1"
+            
+        llm = ChatOpenAI(
+            model=target_model, 
+            base_url=base_url, 
+            api_key="sk-local",
+            temperature=0, 
+            streaming=True
+        )
         
     return llm.bind_tools(tools)
 

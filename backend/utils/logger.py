@@ -3,8 +3,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-# Ensure logs directory exists
-LOGS_DIR = Path(__file__).resolve().parents[1] / "logs"
+# Ensure logs directory exists at project root (outside backend to prevent uvicorn reload loop)
+LOGS_DIR = Path(__file__).resolve().parents[2] / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
 
 DEBUG_LOG = LOGS_DIR / "debug.log"

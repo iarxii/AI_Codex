@@ -32,10 +32,21 @@ agent_graph = create_agent_graph()
 
 @router.websocket("/ws/agent")
 async def websocket_endpoint(websocket: WebSocket):
+    print("DEBUG: WebSocket connection request received on /ws/agent")
     await manager.connect(websocket)
+    print("DEBUG: WebSocket connection accepted on /ws/agent")
     try:
         while True:
-            data = await websocket.receive_text()
+            try:
+                data = await websocket.receive_text()
+                print(f"DEBUG: Received WebSocket data: {data[:100]}...")
+            except WebSocketDisconnect:
+                print("DEBUG: WebSocket client disconnected gracefully")
+                break
+            except Exception as e:
+                print(f"DEBUG: WebSocket receive error: {e}")
+                break
+                
             payload = json.loads(data)
             user_message = payload.get("message")
             conversation_id = payload.get("conversation_id")
