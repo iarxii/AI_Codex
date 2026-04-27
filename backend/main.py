@@ -32,7 +32,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,13 +47,14 @@ from backend.api import auth, chat, metrics, rag, skills, conversations, models
 app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
 app.include_router(conversations.router, prefix=settings.API_V1_STR + "/conversations", tags=["conversations"])
 app.include_router(chat.router, prefix=settings.API_V1_STR + "/chat", tags=["chat"])
-app.include_router(metrics.router, prefix=settings.API_V1_STR + "/metrics", tags=["metrics"])
+# app.include_router(metrics.router, prefix=settings.API_V1_STR + "/metrics", tags=["metrics"])
 app.include_router(rag.router, prefix=settings.API_V1_STR + "/rag", tags=["rag"])
 app.include_router(skills.router, prefix=settings.API_V1_STR + "/skills", tags=["skills"])
 app.include_router(models.router, prefix=settings.API_V1_STR + "/models", tags=["models"])
 
-# Direct WebSocket registration for debugging
-# from backend.api.chat import websocket_endpoint
-# from backend.api.metrics import metrics_endpoint
-# app.add_api_websocket_route("/ws/agent", websocket_endpoint)
-# app.add_api_websocket_route("/ws/metrics", metrics_endpoint)
+@app.websocket("/ws/debug")
+async def debug_websocket(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        await websocket.send_text(f"Echo: {data}")

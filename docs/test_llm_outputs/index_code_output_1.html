@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fireworks Demo</title>
+    <style>
+        body { background: linear-gradient(to right, #ff0000, #ff0000); animation: flash 1s ease-in-out;}
+        .firework { animation: flash 1s infinite; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="firework"></div>
+    </div>
+    <script>
+        // Simulate animated fireworks effect
+        const interval = setInterval(() => {
+            const div = document.getElementById('container');
+            div.innerHTML = '<div class="firework"></div>';
+        }, 100);
+    </script>
+</body>
+</html>
