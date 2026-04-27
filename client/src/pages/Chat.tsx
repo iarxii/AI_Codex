@@ -13,6 +13,7 @@ import ProviderSelector from '../components/ProviderSelector';
 import { useAI, type ProviderId } from '../contexts/AIContext';
 import P5Loader from '../components/P5Loader';
 import MetricsChart from '../components/MetricsChart';
+import WorkspaceOnboardingModal from '../components/WorkspaceOnboardingModal';
 import { ChevronUpIcon, ChevronDownIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 
 type Message = {
@@ -60,12 +61,17 @@ const Chat: React.FC = () => {
   // UI State
   const [currentToolCalls, setCurrentToolCalls] = useState<any[]>([]);
   const [currentContext, setCurrentContext] = useState<any[]>([]);
-  const [thoughtLog, setThoughtLog] = useState<string[]>([]);
+  
+  type ThoughtLogEntry = { text: string; timestamp: number };
+  const [thoughtLog, setThoughtLog] = useState<ThoughtLogEntry[]>([]);
+  const [thoughtStartTime, setThoughtStartTime] = useState<number | null>(null);
+
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, igpu: 0, latency: '0ms' });
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
   const [isChartExpanded, setIsChartExpanded] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   
   // Global AI State
   const { provider: activeProvider, model: activeModel, getApiKey } = useAI();
@@ -118,7 +124,6 @@ const Chat: React.FC = () => {
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === 'token') {
-        setThoughtLog([]); // Clear thinking process when bot starts talking
         setMessages(prev => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg && lastMsg.sender === 'bot') {
@@ -132,7 +137,7 @@ const Chat: React.FC = () => {
           }
         });
       } else if (data.type === 'status') {
-        setThoughtLog(prev => [...prev, data.status]);
+        setThoughtLog(prev => [...prev, { text: data.status, timestamp: Date.now() }]);
       } else if (data.type === 'tool_call') {
         setCurrentToolCalls(data.tool_calls);
         // We can optionally auto-open the canvas if there's output, 
@@ -143,7 +148,6 @@ const Chat: React.FC = () => {
         ));
       } else if (data.type === 'done') {
         setLoading(false);
-        setThoughtLog([]);
         setMessages(prev => {
           const updated = [...prev];
           if (updated.length > 0 && updated[updated.length - 1].sender === 'bot') {
@@ -253,6 +257,8 @@ const Chat: React.FC = () => {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
     setCurrentToolCalls([]);
+    setThoughtStartTime(Date.now());
+    setThoughtLog([]);
     
     const apiKey = getApiKey(activeProvider) || '';
 
@@ -299,9 +305,19 @@ const Chat: React.FC = () => {
         {/* Header */}
         <header className="h-14 flex items-center justify-between px-5 bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-20 shadow-sm">
           <div className="flex items-center gap-3">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-[#4A4D5E]">
-              {currentConvId ? `Workspace #${currentConvId}` : 'No Workspace'}
-            </h2>
+            <button 
+              onClick={() => { if (currentConvId) setIsOnboardingOpen(true); }}
+              className="text-left group/card hover:bg-black/5 p-1.5 -ml-1.5 rounded-lg transition-colors"
+            >
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-[#4A4D5E] group-hover/card:text-[#FF6600] flex items-center gap-2">
+                {currentConvId ? `Workspace #${currentConvId}` : 'No Workspace'}
+                {currentConvId && (
+                  <span className="opacity-0 group-hover/card:opacity-100 text-[9px] font-bold tracking-widest bg-[#FF6600]/10 text-[#FF6600] px-1.5 py-0.5 rounded transition-opacity">
+                    PROFILE
+                  </span>
+                )}
+              </h2>
+            </button>
           </div>
           <div className="flex items-center gap-3">
             {/* Canvas Toggle */}
@@ -450,26 +466,44 @@ const Chat: React.FC = () => {
 
                   {/* Thinking Process — Appear BELOW the user message but ABOVE the bot message if possible */}
                   {/* Or specifically below the last user message when loading */}
-                  {isLastUserMsg && loading && thoughtLog.length > 0 && (
+                  {isLastUserMsg && (loading || thoughtLog.length > 0) && (thoughtLog.length > 0 || currentToolCalls.length > 0 || currentContext.length > 0) && (
                     <div className="flex justify-start pl-4 animate-in fade-in zoom-in-95 duration-300">
-                      <div className="bg-[#D8DCE4]/40 backdrop-blur-sm border border-black/[0.05] p-4 rounded-xl max-w-2xl w-full">
-                        <details open className="group">
+                      <div className="bg-[#D8DCE4]/40 backdrop-blur-sm border border-[#FF6600]/40 p-4 rounded-xl max-w-2xl w-full shadow-sm shadow-[#FF6600]/5">
+                        <details open={loading} className="group">
                           <summary className="flex items-center justify-between cursor-pointer list-none select-none">
                             <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[#FF6600]">
-                              <P5Loader />
+                              {loading && <P5Loader />}
                               Thinking Process
+                              {!loading && thoughtStartTime && thoughtLog.length > 0 && (
+                                <span className="text-[#7A7D8E] lowercase font-mono">
+                                  ({(() => {
+                                    const totalSecs = (thoughtLog[thoughtLog.length - 1].timestamp - thoughtStartTime) / 1000;
+                                    if (totalSecs < 60) return `${totalSecs.toFixed(2)}s`;
+                                    const m = Math.floor(totalSecs / 60);
+                                    const s = Math.floor(totalSecs % 60);
+                                    return `${m}m ${s}s`;
+                                  })()})
+                                </span>
+                              )}
                             </div>
                             <div className="text-[#7A7D8E] group-open:rotate-180 transition-transform">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
                             </div>
                           </summary>
                           <div className="mt-4 space-y-2 pl-5 border-l-2 border-[#FF6600]/20">
-                            {thoughtLog.map((log, i) => (
-                              <div key={i} className="text-[11px] font-mono text-[#4A4D5E] flex gap-3 group/item">
-                                <span className="text-[#FF6600] opacity-40 font-bold">[{i + 1}]</span>
-                                <span className="group-hover/item:text-[#1A1D2E] transition-colors">{log}</span>
-                              </div>
-                            ))}
+                            {thoughtLog.map((log, i) => {
+                              const prevTime = i === 0 ? thoughtStartTime! : thoughtLog[i - 1].timestamp;
+                              const delta = ((log.timestamp - prevTime) / 1000).toFixed(2);
+                              return (
+                                <div key={i} className="text-[11px] font-mono text-[#4A4D5E] flex gap-3 group/item">
+                                  <span className="text-[#FF6600] opacity-40 font-bold">[{i + 1}]</span>
+                                  <span className="group-hover/item:text-[#1A1D2E] transition-colors flex-1">{log.text}</span>
+                                  <span className="text-[#7A7D8E] opacity-50 group-hover/item:opacity-100 transition-opacity text-[9px] w-8 text-right">
+                                    {delta}s
+                                  </span>
+                                </div>
+                              );
+                            })}
 
                             {/* Inline Context Inspector */}
                             <ContextInspector 
@@ -593,7 +627,7 @@ const Chat: React.FC = () => {
                   <span className="text-black/10">|</span>
                   <div className="flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
-                    <span className={metrics.igpu > 80 ? 'text-red-500' : ''}>iGPU {Math.round(metrics.igpu || 0)}%</span>
+                    <span className={metrics.igpu > 80 ? 'text-red-500' : ''}>GPU {Math.round(metrics.igpu || 0)}%</span>
                   </div>
                   <span className="text-black/10">|</span>
                   <div className="flex items-center gap-1.5">
@@ -642,6 +676,21 @@ const Chat: React.FC = () => {
 
       {/* Settings Modal */}
       <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
+
+      {/* Onboarding Modal */}
+      <WorkspaceOnboardingModal 
+        isOpen={isOnboardingOpen} 
+        setIsOpen={setIsOnboardingOpen} 
+        onSubmit={({ profile, goals }) => {
+          const initPrompt = `WORKSPACE INITIALIZATION:\n\nProfile Context:\n${profile}\n\nProject Goals:\n${goals}\n\nPlease acknowledge these goals and outline your initial execution plan.`;
+          setInput(initPrompt);
+          // Small delay to allow react state to update before submit
+          setTimeout(() => {
+            const form = document.querySelector('form');
+            if (form) form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+          }, 100);
+        }}
+      />
     </div>
   );
 };

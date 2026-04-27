@@ -101,7 +101,7 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
             isAnimationActive={false}
           />
           <Line
-            name="iGPU"
+            name="GPU"
             type="monotone"
             dataKey="igpu"
             stroke="#06B6D4" // Cyan

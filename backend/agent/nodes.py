@@ -67,7 +67,8 @@ def get_dynamic_llm(config: RunnableConfig):
     else:
         # local
         from langchain_ollama import ChatOllama
-        llm = ChatOllama(model=settings.DEFAULT_MODEL, base_url=settings.OLLAMA_BASE_URL, temperature=0, streaming=True)
+        target_model = model or settings.DEFAULT_MODEL
+        llm = ChatOllama(model=target_model, base_url=settings.OLLAMA_BASE_URL, temperature=0, streaming=True)
         
     return llm.bind_tools(tools)
 
@@ -164,21 +165,34 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         log_performance("LLM_REASONING", duration, {"provider": provider, "model": model})
         log_debug(f"LLM Response received (length: {len(response.content)}) in {duration:.2f}s")
     except Exception as e:
-        err_msg = str(e)
-        log_error(f"LLM Invocation failed: {err_msg}")
+        from backend.utils.logger import log_error
+        log_error(f"LLM Invocation failed for provider {provider}", e)
         
-        # Handle Rate Limits (429) gracefully
-        if "429" in err_msg or "rate" in err_msg.lower() or "quota" in err_msg.lower():
+        err_msg = str(e).lower()
+        err_type = type(e).__name__
+
+        # Authentication / API Key Errors
+        if "authenticationerror" in err_type.lower() or "401" in err_msg or "unauthorized" in err_msg or "invalid api key" in err_msg or "defaultcredentialserror" in err_type.lower():
+            raise Exception(f"AICodex Authentication Error: Invalid API Key for {provider}. Please verify your key in settings.")
+            
+        # Rate Limits / Quotas
+        if "ratelimiterror" in err_type.lower() or "429" in err_msg or "rate limit" in err_msg or "quota" in err_msg:
             raise Exception(
-                "AICodex: Upstream rate limit or quota reached. \n\n"
-                "TIP: Try switching to a different model in the selector below, "
-                "or use the 'Local (Ollama)' provider for unlimited inference. "
+                "AICodex Rate Limit Error: Upstream rate limit or quota reached. \n\n"
+                "TIP: Try switching to a different model, or use the 'Local (Ollama)' provider for unlimited inference. "
                 "If using Gemini/OpenRouter, verify your API key credits."
             )
             
-        if "connection" in err_msg.lower() or "11434" in err_msg:
-            raise Exception("AICodex: Connection to Ollama failed. Ensure Ollama is running (ollama serve).")
-        raise e
+        # Bad Gateway / Server Errors (OpenRouter common)
+        if "502" in err_msg or "bad gateway" in err_msg:
+            raise Exception(f"AICodex Upstream Error: {provider} returned a 502 Bad Gateway. The provider is likely experiencing high traffic. Please try again later.")
+            
+        # Connection Errors (Ollama local)
+        if "connecterror" in err_type.lower() or "connection" in err_msg or "11434" in err_msg or "connection refused" in err_msg:
+            raise Exception("AICodex Connection Error: Failed to connect. If using Ollama, ensure it is running (ollama serve).")
+            
+        # Generic Exception Re-raise
+        raise Exception(f"AICodex Execution Error: {err_type} - {str(e)}")
     
     # Extract tool calls if any
     tool_calls = getattr(response, "tool_calls", [])

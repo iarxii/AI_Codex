@@ -119,6 +119,23 @@ def get_retriever():
 
             OllamaEmbedder.embed_text = patched_embed_text
             
+            # Monkey-patch QdrantVectorStore.__init__ to fallback to memory if locked
+            original_qdrant_init = QdrantVectorStore.__init__
+            def patched_qdrant_init(self, *args, **kwargs):
+                original_qdrant_init(self, *args, **kwargs)
+                if getattr(self, '_client', None) is None:
+                    logger.warning("QdrantClient failed to initialize with path. Attempting in-memory fallback.")
+                    from qdrant_client import QdrantClient
+                    try:
+                        self._client = QdrantClient(location=":memory:")
+                        logger.info("Successfully fell back to in-memory QdrantClient.")
+                        if hasattr(self, '_ensure_collection'):
+                            self._ensure_collection()
+                    except Exception as fallback_exc:
+                        logger.error(f"Fallback to in-memory QdrantClient also failed: {fallback_exc}")
+            
+            QdrantVectorStore.__init__ = patched_qdrant_init
+            
             store = QdrantVectorStore(
                 collection_name="aicodex_vectors",
                 persist_dir="data/qdrant",

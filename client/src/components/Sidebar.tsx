@@ -5,7 +5,8 @@ import {
   CpuChipIcon, 
   BoltIcon, 
   GlobeAltIcon, 
-  SparklesIcon 
+  SparklesIcon,
+  PencilSquareIcon
 } from '@heroicons/react/24/outline';
 import { useAI, type ProviderId } from '../contexts/AIContext';
 
@@ -27,6 +28,26 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const handleUpdateTitle = async (id: number, newTitle: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/conversations/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ title: newTitle })
+      });
+      if (res.ok) {
+        setConversations(prev => prev.map(c => c.id === id ? { ...c, title: newTitle } : c));
+      }
+    } catch (e) {
+      console.error('Update failed', e);
+    }
+  };
 
   useEffect(() => {
     fetchConversations();
@@ -134,13 +155,51 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
           >
             <div className="flex items-center gap-3">
               <div className={`w-2 h-2 rounded-full transition-all ${currentConversationId === conv.id ? 'bg-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)]' : 'bg-[var(--text-muted)]'}`}></div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm truncate font-medium ${currentConversationId === conv.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}>
-                  {conv.title}
-                </p>
-                <p className="text-[10px] text-[var(--text-muted)] font-mono uppercase tracking-tighter mt-0.5">
-                  {new Date(conv.updated_at).toLocaleDateString()}
-                </p>
+              <div className="flex-1 min-w-0 flex items-center justify-between group/item">
+                <div className="flex-1 min-w-0">
+                  {editingId === conv.id ? (
+                    <input
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={() => {
+                        setEditingId(null);
+                        if (editValue.trim() && editValue !== conv.title) {
+                          handleUpdateTitle(conv.id, editValue.trim());
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur();
+                        } else if (e.key === 'Escape') {
+                          setEditingId(null);
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full bg-white/50 border border-[var(--accent)]/30 rounded px-1 py-0.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                      autoFocus
+                    />
+                  ) : (
+                    <p className={`text-sm truncate font-medium ${currentConversationId === conv.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}>
+                      {conv.title}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-[var(--text-muted)] font-mono uppercase tracking-tighter mt-0.5">
+                    {new Date(conv.updated_at).toLocaleDateString()}
+                  </p>
+                </div>
+                {currentConversationId === conv.id && editingId !== conv.id && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditValue(conv.title);
+                      setEditingId(conv.id);
+                    }}
+                    className="opacity-0 group-hover/item:opacity-100 p-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-all"
+                  >
+                    <PencilSquareIcon className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           </button>

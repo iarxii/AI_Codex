@@ -1,7 +1,6 @@
 import requests
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Dict, Any
-import google.generativeai as genai
 from backend.config import settings
 
 router = APIRouter()
@@ -58,13 +57,13 @@ async def list_models(provider: str, api_key: str = None):
         if not api_key:
             return []
         try:
-            genai.configure(api_key=api_key)
+            from google import genai
+            client = genai.Client(api_key=api_key)
             models = []
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
-                    # Strip 'models/' prefix if present for consistency with ChatGoogleGenerativeAI
-                    model_id = m.name.replace("models/", "")
-                    models.append({"id": model_id, "name": m.display_name})
+            for m in client.models.list():
+                model_id = m.name.replace("models/", "")
+                if "gemini" in model_id.lower() or "learnlm" in model_id.lower():
+                    models.append({"id": model_id, "name": getattr(m, 'display_name', model_id)})
             return models
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
