@@ -150,9 +150,9 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         dynamic_llm = get_dynamic_llm(config)
         
         # Use astream for real-time token yielding
-        # The graph's astream_events(v2) will catch these chunks
+        # The graph's astream_events(v2) will catch these chunks IF config is passed
         chunks = []
-        async for chunk in dynamic_llm.astream(messages):
+        async for chunk in dynamic_llm.astream(messages, config):
             chunks.append(chunk)
         
         # Combine chunks for consistency with the rest of the node logic
