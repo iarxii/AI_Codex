@@ -12,6 +12,8 @@ export interface VisualSettings {
   showWaves: boolean;
   showNeuralStrings: boolean;
   stringColor: 'orange' | 'white' | 'dark';
+  showMonochrome: boolean;
+  showStillBackground: boolean;
 }
 
 interface AIContextType {
@@ -50,14 +52,16 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     }
     return {
       isDynamic: true,
-      showScanlines: false,
+      showScanlines: true,
       showGlitches: true,
-      showGrain: true,
+      showGrain: false,
       showVideo: false,
       showTraces: true,
       showWaves: true,
       showNeuralStrings: true,
-      stringColor: 'orange',
+      stringColor: 'white',
+      showMonochrome: false,
+      showStillBackground: true,
     };
   });
 
@@ -77,7 +81,15 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   const updateVisualSetting = <K extends keyof VisualSettings>(key: K, value: VisualSettings[K]) => {
     setVisualSettings(prev => {
-      const next = { ...prev, [key]: value };
+      let next = { ...prev, [key]: value };
+      
+      // Mutual exclusion: Still Background vs Video Layer
+      if (key === 'showStillBackground' && value === true) {
+        next.showVideo = false;
+      } else if (key === 'showVideo' && value === true) {
+        next.showStillBackground = false;
+      }
+
       localStorage.setItem('ai_visual_settings', JSON.stringify(next));
       return next;
     });

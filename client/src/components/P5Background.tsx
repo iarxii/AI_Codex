@@ -30,8 +30,8 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
       let glitches: Glitch[] = [];
       let grainTexture: p5.Graphics;
       const GRID_SIZE = 40;
-      const MAX_TRACES = 30; // Increased density for dynamic activity
-      const MAX_CURVES = 8;
+      const MAX_TRACES = 9; 
+      const MAX_CURVES = 4;
 
       p.setup = () => {
         const canvas = p.createCanvas(p.windowWidth, p.windowHeight);
@@ -291,42 +291,69 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
           this.p = p;
           this.seed = this.p.random(1000);
           this.points = [];
-          for (let i = 0; i < 5; i++) {
-            this.points.push(this.p.createVector(this.p.random(this.p.width), this.p.random(this.p.height)));
+          // Increase density for "simulated" smoothness
+          for (let i = 0; i < 12; i++) {
+            this.points.push(this.p.createVector(
+              this.p.random(this.p.width), 
+              this.p.random(this.p.height)
+            ));
           }
         }
 
         update() {
           this.points.forEach((pt, i) => {
-            pt.x += (this.p.noise(this.seed + i, this.p.frameCount * 0.005) - 0.5) * 2;
-            pt.y += (this.p.noise(this.seed + i + 100, this.p.frameCount * 0.005) - 0.5) * 2;
+            // Finer noise for smoother drifting
+            pt.x += (this.p.noise(this.seed + i, this.p.frameCount * 0.003) - 0.5) * 1.5;
+            pt.y += (this.p.noise(this.seed + i + 100, this.p.frameCount * 0.003) - 0.5) * 1.5;
           });
         }
 
         display() {
-          this.p.noFill();
+          if (!this.points || this.points.length < 2) return;
           
-          let strokeCol;
-          if (stringColor === 'orange') {
-            strokeCol = this.p.color(255, 102, 0, 100); // AdaptivOrange
-          } else if (stringColor === 'white') {
-            strokeCol = this.p.color(255, 255, 255, 150); // Sharp White
-          } else {
-            strokeCol = this.p.color(26, 29, 46, 120); // Dark/Coal
-          }
+          try {
+            this.p.noFill();
+            
+            let strokeCol;
+            if (stringColor === 'orange') {
+              strokeCol = this.p.color(255, 102, 0, 180);
+            } else if (stringColor === 'white') {
+              strokeCol = this.p.color(255, 255, 255, 210); // Sharp high-contrast white
+            } else {
+              strokeCol = this.p.color(26, 29, 46, 150);
+            }
 
-          this.p.stroke(strokeCol);
-          this.p.strokeWeight(1.5);
-          this.p.beginShape();
-          this.points.forEach(pt => this.p.vertex(pt.x, pt.y));
-          this.p.endShape();
+            this.p.stroke(strokeCol);
+            this.p.strokeWeight(1.8);
+            
+            // Ultra-Smooth Vertex Path
+            this.p.beginShape();
+            for (let i = 0; i < this.points.length; i++) {
+              this.p.vertex(this.points[i].x, this.points[i].y);
+            }
+            this.p.endShape();
+
+            // Pulsing terminal nodes
+            const start = this.points[0];
+            const end = this.points[this.points.length - 1];
+            
+            const pulse = this.p.sin(this.p.frameCount * 0.08 + this.seed) * 4;
+            const nodeSize = 6 + pulse;
+
+            this.p.fill(strokeCol);
+            this.p.noStroke();
+            this.p.circle(start.x, start.y, nodeSize);
+            this.p.circle(end.x, end.y, nodeSize);
+          } catch (e) {
+            // Silently fail
+          }
         }
       }
     };
 
     const p5Instance = new p5(sketch);
     return () => p5Instance.remove();
-  }, []);
+  }, [visualSettings, isDynamic]);
 
   return (
     <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden bg-[#E2E8F0]">
@@ -422,6 +449,19 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
         >
           <source src="/media/landscape_background.mp4" type="video/mp4" />
         </video>
+      )}
+
+      {/* Still Vector Background */}
+      {visualSettings.showStillBackground && (
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat animate-in fade-in duration-700"
+          style={{ 
+            backgroundImage: `url('/media/thabang_vector_wallpaper_2.png')`, 
+            opacity: 0.25, 
+            filter: 'blur(0.5px)',
+            objectPosition: 'center'
+          }}
+        />
       )}
       {/* Mandatory Watermark Mask - Radial Gradient from Bottom-Right */}
       <div 
@@ -540,12 +580,43 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
 
         {/* CRT Vignette (Tube shape) - Softened */}
         <div 
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 w-full h-full pointer-events-none"
           style={{ 
             background: 'radial-gradient(circle, transparent 50%, rgba(0,0,0,0.15) 100%)',
-            boxShadow: 'inset 0 0 80px rgba(255,255,255,0.05)'
+            zIndex: 40
           }}
         />
+
+        {/* GREEN MONOCHROME OVERLAY (The "Matrix" / Dark CRT Look) */}
+        {visualSettings.showMonochrome && (
+          <>
+            {/* The Phosphor Wash */}
+            <div 
+              className="absolute inset-0 w-full h-full pointer-events-none mix-blend-screen opacity-40 animate-in fade-in duration-1000"
+              style={{ 
+                backgroundColor: '#00FF41',
+                zIndex: 45,
+                animation: visualSettings.isDynamic ? 'crt-flicker 0.2s infinite' : 'none'
+              }}
+            />
+            {/* The Darkening Layer (The "Darker" part of the request) */}
+            <div 
+              className="absolute inset-0 w-full h-full pointer-events-none mix-blend-multiply opacity-50"
+              style={{ 
+                backgroundColor: '#0A1A0A',
+                zIndex: 44
+              }}
+            />
+            {/* Extra Green Vignette */}
+            <div 
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              style={{ 
+                background: 'radial-gradient(circle, transparent 40%, rgba(0, 40, 0, 0.4) 100%)',
+                zIndex: 46
+              }}
+            />
+          </>
+        )}
       </div>
     </div>
   );
