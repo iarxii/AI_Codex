@@ -189,16 +189,17 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
                   </p>
                 </div>
                 {currentConversationId === conv.id && editingId !== conv.id && (
-                  <button
+                  <div
+                    role="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setEditValue(conv.title);
                       setEditingId(conv.id);
                     }}
-                    className="opacity-0 group-hover/item:opacity-100 p-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-all"
+                    className="opacity-0 group-hover/item:opacity-100 p-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-all cursor-pointer"
                   >
                     <PencilSquareIcon className="w-4 h-4" />
-                  </button>
+                  </div>
                 )}
               </div>
             </div>
