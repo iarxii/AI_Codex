@@ -66,6 +66,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
     // Dispatch custom event for parts of the app not yet using Context
     window.dispatchEvent(new Event('ai-settings-changed'));
     setIsOpen(false);
+    
+    // Force a hard reload to reset P5 and video buffers
+    window.location.reload();
   };
 
   return (
@@ -206,10 +209,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                       { key: 'showTraces', label: 'Neural Energy Traces' },
                       { key: 'showNeuralStrings', label: 'Neural Drifting Strings' },
                       { key: 'showScanlines', label: 'CRT Scanlines' },
+                      { key: 'showMonochrome', label: 'Monochrome Neural Phosphor' },
                       { key: 'showWaves', label: 'Great Neural Waves' },
                       { key: 'showGrain', label: 'Cinematic Film Grain' },
                       { key: 'showGlitches', label: 'Digital Glitch Artifacts' },
                       { key: 'showVideo', label: 'High-Fi Video Layer' },
+                      { key: 'showStillBackground', label: 'Static Vector Wallpaper' },
                     ].map((item) => (
                       <div key={item.key} className="flex items-center justify-between group">
                         <span className="text-sm text-[#1A1D2E] font-medium group-hover:text-[#FF6600] transition-colors">
