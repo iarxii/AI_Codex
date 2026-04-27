@@ -213,10 +213,10 @@ const Chat: React.FC = () => {
     };
 
     return () => {
-      socket.close();
-      mSocket.close();
+      if (socket.readyState !== WebSocket.CLOSED) socket.close();
+      if (mSocket.readyState !== WebSocket.CLOSED) mSocket.close();
     };
-  }, []);
+  }, [reconnectCount]);
 
   // 3. Auto-scroll
   useEffect(() => {
