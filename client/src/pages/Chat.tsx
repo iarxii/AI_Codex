@@ -140,7 +140,7 @@ const Chat: React.FC = () => {
         setThoughtLog(prev => {
           if (prev.length === 0) return prev;
           const updated = [...prev];
-          const lastLog = updated[updated.length - 1];
+          const lastLog = { ...updated[updated.length - 1] };
           if (lastLog.text.includes('reason')) {
             const thinkMatch = data.content.match(/<think>([\s\S]*?)(<\/think>|$)/);
             if (thinkMatch) {
@@ -149,6 +149,7 @@ const Chat: React.FC = () => {
               lastLog.details = data.content.length > 500 ? '...' + data.content.substring(data.content.length - 500) : data.content;
             }
           }
+          updated[updated.length - 1] = lastLog;
           return updated;
         });
       } else if (data.type === 'status') {
@@ -158,8 +159,9 @@ const Chat: React.FC = () => {
         setThoughtLog(prev => {
           if (prev.length === 0) return prev;
           const updated = [...prev];
-          const lastLog = updated[updated.length - 1];
+          const lastLog = { ...updated[updated.length - 1] };
           lastLog.details = JSON.stringify(data.tool_calls, null, 2);
+          updated[updated.length - 1] = lastLog;
           return updated;
         });
       } else if (data.type === 'tool_result') {
@@ -169,9 +171,10 @@ const Chat: React.FC = () => {
         setThoughtLog(prev => {
           if (prev.length === 0) return prev;
           const updated = [...prev];
-          const lastLog = updated[updated.length - 1];
+          const lastLog = { ...updated[updated.length - 1] };
           const resText = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
           lastLog.details = (lastLog.details ? lastLog.details + '\n\n' : '') + `Result:\n${resText}`;
+          updated[updated.length - 1] = lastLog;
           return updated;
         });
       } else if (data.type === 'done') {
