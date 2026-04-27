@@ -146,10 +146,12 @@ async def websocket_endpoint(websocket: WebSocket):
                             })
                         
                         elif kind == "on_error":
-                            log_error(f"Graph Error in {node_name}", event.get("data", {}).get("error"))
-                            await websocket.send_json({"type": "error", "message": f"Graph Error: {event.get('data', {}).get('error')}"})
+                            error_obj = event.get("data", {}).get("error")
+                            error_str = str(error_obj) if error_obj else "Unknown graph error"
+                            log_error(f"Graph Error in {node_name}", error_obj if isinstance(error_obj, Exception) else None)
+                            await websocket.send_json({"type": "error", "message": f"Graph Error: {error_str}"})
                 except Exception as e:
-                    log_error(f"Streaming Exception for conv {conversation_id}", str(e))
+                    log_error(f"Streaming Exception for conv {conversation_id}", e)
                     await websocket.send_json({"type": "error", "message": f"Execution Error: {str(e)}"})
                 finally:
                     # 5. Persist AI Response
