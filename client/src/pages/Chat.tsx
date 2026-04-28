@@ -70,6 +70,7 @@ const Chat: React.FC = () => {
   const [thoughtStartTime, setThoughtStartTime] = useState<number | null>(null);
 
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const isProcessing = useRef(false);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, igpu: 0, latency: '0ms' });
@@ -343,6 +344,8 @@ const Chat: React.FC = () => {
         currentConversationId={currentConvId} 
         onSelectConversation={loadConversation} 
         onNewChat={handleNewChat}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
 
       {/* Main Content Area */}
@@ -351,13 +354,36 @@ const Chat: React.FC = () => {
         
         {/* Header */}
         <header className="h-14 flex items-center justify-between px-5 bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-20 shadow-sm">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            {/* Sidebar Toggle */}
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-1.5 text-[#4A4D5E] hover:text-[#FF6600] hover:bg-black/5 rounded-lg transition-all active:scale-95"
+              title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            {/* Logo shown when sidebar is closed or on mobile */}
+            <div className={`flex items-center gap-2 animate-in fade-in slide-in-from-left-4 duration-300 ${isSidebarOpen ? 'lg:hidden' : ''}`}>
+              <img
+                src="/media/aicodex_logo_2_transp.png"
+                alt="AICodex Logo"
+                className="w-7 h-7 object-contain rounded-lg border border-[var(--accent)]"
+              />
+              <span className="text-sm font-bold tracking-tight text-[var(--text-primary)] hidden sm:block">
+                AI<span className="text-[var(--accent)]">Codex</span>
+              </span>
+            </div>
+
+            <div className="w-px h-4 bg-black/[0.08] mx-1"></div>
+
             <button 
               onClick={() => { if (currentConvId) setIsOnboardingOpen(true); }}
-              className="text-left group/card hover:bg-black/5 p-1.5 -ml-1.5 rounded-lg transition-colors"
+              className="text-left group/card hover:bg-black/5 p-1.5 rounded-lg transition-colors"
             >
-              {/* add a Sidebar toggle icon and implements / hook up the functionality. The sidebar should a slide-over drawer from the left on mobile only for better UX */}
-              {/* when the sidebar is toggled off, then also show the logo image - copy it from the Sidebar.tsx but tweak the dimensions so that its smaller and fits our current header here */}
               <h2 className="text-xs font-semibold uppercase tracking-widest text-[#4A4D5E] group-hover/card:text-[#FF6600] flex items-center gap-2">
                 {currentConvId ? `Workspace #${currentConvId}` : 'No Workspace'}
                 {currentConvId && (
