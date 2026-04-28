@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Integer
+from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Integer, Index
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 class Base(DeclarativeBase):
     pass
@@ -53,3 +54,18 @@ class Skill(Base):
     is_enabled: Mapped[bool] = mapped_column(default=True)
     config: Mapped[Optional[str]] = mapped_column(Text) # JSON config
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_path: Mapped[str] = mapped_column(String(500))
+    content: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[Vector] = mapped_column(Vector(1536)) # Default to 1536 for common models
+    metadata_json: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # Index for cosine similarity
+    __table_args__ = (
+        Index("idx_document_chunks_embedding", embedding, postgresql_using="ivfflat", postgresql_with={"lists": 100}, postgresql_ops={"embedding": "vector_cosine_ops"}),
+    )

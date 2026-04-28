@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { config } from '../config';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -18,7 +19,7 @@ const Login: React.FC = () => {
       params.append('username', username);
       params.append('password', password);
 
-      const response = await fetch('http://localhost:8000/api/auth/login', {
+      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

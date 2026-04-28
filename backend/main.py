@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,11 +7,21 @@ from backend.db.session import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Sync SQLite from GCS if in Cloud Run
+    is_cloud_run = os.getenv("K_SERVICE") is not None
+    if is_cloud_run and settings.DB_TYPE == "sqlite":
+        from backend.utils.storage import download_db_from_gcs
+        download_db_from_gcs()
+
     # Initialize DB on startup
     await init_db()
     # TODO: Initialize OllamaOpt bridge
     yield
-    # Cleanup code here if needed
+    
+    # Sync SQLite back to GCS on shutdown
+    if is_cloud_run and settings.DB_TYPE == "sqlite":
+        from backend.utils.storage import upload_db_to_gcs
+        upload_db_to_gcs()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -28,12 +39,13 @@ origins = [
     "http://127.0.0.1:5174",
     "http://127.0.0.1:5175",
     "http://127.0.0.1:5176",
+    "https://aicodex-frontend-1096425756328.us-central1.run.app",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

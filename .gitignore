@@ -34,3 +34,7 @@ Thumbs.db
 # Qdrant Database and git temp files
 data/qdrant/
 .gitmessage  
+
+# Temporary Build Contexts
+temp_*_build/
+backend/OllamaOpt_local/
