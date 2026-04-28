@@ -6,6 +6,13 @@
 
 :root {
   color-scheme: light;
+  --glass-bg: rgba(226, 230, 236, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --text-h: #1A1D2E;
+  --text: #4A4D5E;
+  --text-primary: #1A1D2E;
+  --text-muted: #7A7D8E;
+  --accent: #FF6600;
 }
 
 body {

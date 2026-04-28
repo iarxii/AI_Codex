@@ -7,7 +7,7 @@
 import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
 import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 
-export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini';
+export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud';
 
 export interface ProviderInfo {
   id: ProviderId;
@@ -24,6 +24,14 @@ export const PROVIDERS: ProviderInfo[] = [
     label: 'Ollama',
     description: 'Local GPU inference',
     color: '#A3E635',
+    icon: OllamaLogo,
+    iconType: 'svg-file',
+  },
+  {
+    id: 'ollama_cloud',
+    label: 'Ollama Cloud',
+    description: 'Remote Ollama instance',
+    color: '#34D399',
     icon: OllamaLogo,
     iconType: 'svg-file',
   },

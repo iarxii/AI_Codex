@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import SettingsModal from './SettingsModal';
-import { 
-  Cog6ToothIcon, 
-  CpuChipIcon, 
-  BoltIcon, 
-  GlobeAltIcon, 
+import React, { useEffect, useState } from "react";
+import SettingsModal from "./SettingsModal";
+import {
+  Cog6ToothIcon,
+  CpuChipIcon,
+  BoltIcon,
+  GlobeAltIcon,
   SparklesIcon,
-  PencilSquareIcon
-} from '@heroicons/react/24/outline';
-import { useAI } from '../contexts/AIContext';
-import { config } from '../config';
+  PencilSquareIcon,
+  CloudIcon,
+} from "@heroicons/react/24/outline";
+import { useAI } from "../contexts/AIContext";
+import { config } from "../config";
 
 type Conversation = {
   id: number;
@@ -24,29 +25,38 @@ interface SidebarProps {
   onNewChat: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConversation, onNewChat }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  currentConversationId,
+  onSelectConversation,
+  onNewChat,
+}) => {
   const { provider } = useAI();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [editValue, setEditValue] = useState("");
 
   const handleUpdateTitle = async (id: number, newTitle: string) => {
     try {
-      const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/conversations/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+      const res = await fetch(
+        `${config.API_BASE_URL}${config.API_V1_STR}/conversations/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({ title: newTitle }),
         },
-        body: JSON.stringify({ title: newTitle })
-      });
+      );
       if (res.ok) {
-        setConversations(prev => prev.map(c => c.id === id ? { ...c, title: newTitle } : c));
+        setConversations((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, title: newTitle } : c)),
+        );
       }
     } catch (e) {
-      console.error('Update failed', e);
+      console.error("Update failed", e);
     }
   };
 
@@ -57,17 +67,20 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
   const fetchConversations = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/conversations/`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await fetch(
+        `${config.API_BASE_URL}${config.API_V1_STR}/conversations/`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        },
+      );
       if (response.ok) {
         const data = await response.json();
         setConversations(data);
       }
     } catch (error) {
-      console.error('Failed to fetch conversations:', error);
+      console.error("Failed to fetch conversations:", error);
     } finally {
       setLoading(false);
     }
@@ -77,10 +90,16 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
     <aside className="w-72 h-full flex flex-col bg-[var(--bg-surface)]/40 backdrop-blur-2xl border-r border-black/[0.06] z-30 transition-all duration-300">
       <div className="px-6 py-8 flex flex-col items-center justify-center text-center group">
         <div className="relative mb-1">
-          <img 
+          {/* <img 
             src="/media/logo.png" 
             alt="AICodex Logo" 
             className="w-18 h-18 object-contain transition-all duration-500 group-hover:scale-105"
+          /> */}
+          <img
+            src="/media/aicodex_logo_2_transp.png"
+            alt="Adaptivconcept FL Logo"
+            className="w-20 h-20 cursor-pointer object-contain rounded-3xl border-2 border-[var(--accent)]"
+            title="AdaptivConcept FL"
           />
         </div>
 
@@ -90,28 +109,34 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
           </h1>
           <div className="flex items-center gap-1.5 justify-center mt-1">
             <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-[var(--text-muted)] flex items-center gap-1.5">
-              {provider === 'local' && (
+              {provider === "local" && (
                 <>
                   <CpuChipIcon className="w-3.5 h-3.5 text-[#FF6600]" />
                   Neural Core
                 </>
               )}
-              {provider === 'groq' && (
+              {provider === "ollama_cloud" && (
+                <>
+                  <CloudIcon className="w-3.5 h-3.5 text-[#FF6600]" />
+                  Neural Cloud
+                </>
+              )}
+              {provider === "groq" && (
                 <>
                   <BoltIcon className="w-3.5 h-3.5 text-[#FF6600]" />
-                  Linked Velocity
+                  Neural Velocity
                 </>
               )}
-              {provider === 'openrouter' && (
+              {provider === "openrouter" && (
                 <>
                   <GlobeAltIcon className="w-3.5 h-3.5 text-[#FF6600]" />
-                  Omni Interface
+                  Neural Interface
                 </>
               )}
-              {provider === 'gemini' && (
+              {provider === "gemini" && (
                 <>
                   <SparklesIcon className="w-3.5 h-3.5 text-[#FF6600]" />
-                  Expert Reasoning
+                  Neural Expert
                 </>
               )}
               {/* 👆 will be revised in future to offer "flavours" of agentic workflows for various purposes */}
@@ -121,26 +146,42 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
       </div>
 
       <div className="p-4 border-b border-black/[0.06]">
-        <button 
+        <button
           onClick={async () => {
             await onNewChat();
             await fetchConversations();
           }}
           className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-xl text-sm font-semibold text-white transition-all active:scale-95 shadow-md shadow-[var(--accent)]/20 group"
         >
-          <svg className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+          <svg
+            className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-300"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M12 4v16m8-8H4"
+            />
           </svg>
           New Workspace
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-1.5 scrollbar-hide">
-        {loading && <div className="text-center py-4 text-[var(--text-secondary)] text-xs uppercase tracking-widest font-semibold animate-pulse">Syncing History...</div>}
-        
+        {loading && (
+          <div className="text-center py-4 text-[var(--text-secondary)] text-xs uppercase tracking-widest font-semibold animate-pulse">
+            Syncing History...
+          </div>
+        )}
+
         {!loading && conversations.length === 0 && (
           <div className="text-center py-10 px-4">
-            <p className="text-xs text-[var(--text-muted)] font-medium">No active sessions.</p>
+            <p className="text-xs text-[var(--text-muted)] font-medium">
+              No active sessions.
+            </p>
           </div>
         )}
 
@@ -149,13 +190,15 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
             key={conv.id}
             onClick={() => onSelectConversation(conv.id)}
             className={`w-full text-left p-3 rounded-xl transition-all group relative overflow-hidden ${
-              currentConversationId === conv.id 
-                ? 'bg-[var(--accent)]/12 border border-[var(--accent)]/25 shadow-sm' 
-                : 'hover:bg-black/[0.04] border border-transparent'
+              currentConversationId === conv.id
+                ? "bg-[var(--accent)]/12 border border-[var(--accent)]/25 shadow-sm"
+                : "hover:bg-black/[0.04] border border-transparent"
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className={`w-2 h-2 rounded-full transition-all ${currentConversationId === conv.id ? 'bg-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)]' : 'bg-[var(--text-muted)]'}`}></div>
+              <div
+                className={`w-2 h-2 rounded-full transition-all ${currentConversationId === conv.id ? "bg-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)]" : "bg-[var(--text-muted)]"}`}
+              ></div>
               <div className="flex-1 min-w-0 flex items-center justify-between group/item">
                 <div className="flex-1 min-w-0">
                   {editingId === conv.id ? (
@@ -170,9 +213,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
                         }
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
+                        if (e.key === "Enter") {
                           e.currentTarget.blur();
-                        } else if (e.key === 'Escape') {
+                        } else if (e.key === "Escape") {
                           setEditingId(null);
                         }
                       }}
@@ -181,7 +224,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
                       autoFocus
                     />
                   ) : (
-                    <p className={`text-sm truncate font-medium ${currentConversationId === conv.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}>
+                    <p
+                      className={`text-sm truncate font-medium ${currentConversationId === conv.id ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"}`}
+                    >
                       {conv.title}
                     </p>
                   )}
@@ -214,10 +259,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
             ADM
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-[var(--text-primary)] truncate">Administrator</p>
-            <p className="text-[10px] text-green-600 font-mono">System.Active</p>
+            <p className="text-xs font-semibold text-[var(--text-primary)] truncate">
+              Administrator
+            </p>
+            <p className="text-[10px] text-green-600 font-mono">
+              System.Active
+            </p>
           </div>
-          <button 
+          <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors"
           >
@@ -225,7 +274,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
           </button>
         </div>
       </div>
-      
+
       <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
     </aside>
   );

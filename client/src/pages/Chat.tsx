@@ -46,6 +46,8 @@ const ProviderBadgeIcon: React.FC<{ providerId: string }> = ({ providerId }) => 
       );
     case 'gemini':
       return <img src={GeminiLogo} alt="Gemini" className="w-4 h-4" />;
+    case 'ollama_cloud':
+      return <img src={OllamaLogo} alt="Ollama Cloud" className="w-4 h-4" />;
     default:
       return <span className="text-xs">🤖</span>;
   }
@@ -315,7 +317,8 @@ const Chat: React.FC = () => {
         conversation_id: currentConvId,
         provider: activeProvider,
         model: activeModel,
-        api_key: apiKey
+        api_key: apiKey,
+        base_url: localStorage.getItem('ollama_cloud_url') || ''
       }));
       
       setInput(''); // Clear input immediately
@@ -353,6 +356,8 @@ const Chat: React.FC = () => {
               onClick={() => { if (currentConvId) setIsOnboardingOpen(true); }}
               className="text-left group/card hover:bg-black/5 p-1.5 -ml-1.5 rounded-lg transition-colors"
             >
+              {/* add a Sidebar toggle icon and implements / hook up the functionality. The sidebar should a slide-over drawer from the left on mobile only for better UX */}
+              {/* when the sidebar is toggled off, then also show the logo image - copy it from the Sidebar.tsx but tweak the dimensions so that its smaller and fits our current header here */}
               <h2 className="text-xs font-semibold uppercase tracking-widest text-[#4A4D5E] group-hover/card:text-[#FF6600] flex items-center gap-2">
                 {currentConvId ? `Workspace #${currentConvId}` : 'No Workspace'}
                 {currentConvId && (
@@ -427,9 +432,10 @@ const Chat: React.FC = () => {
           {!currentConvId && (() => {
             const config = {
               local: { label: 'Neural Core', icon: '/media/brand-icons/ollama-color.svg', desc: 'Execute models directly on your hardware for maximum privacy and low latency.' },
-              groq: { label: 'Linked Velocity', icon: '/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg', desc: 'Harness LPU technology for lightning-fast inference and real-time agentic reasoning.' },
-              openrouter: { label: 'Omni Interface', icon: '/media/brand-icons/openrouter.webp', desc: 'Unified gateway to the world\'s most powerful LLMs and specialist expert models.' },
-              gemini: { label: 'Expert Reasoning', icon: '/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg', desc: 'Leverage Google\'s most capable multimodal models for complex problem solving.' }
+              ollama_cloud: { label: 'Neural Cloud', icon: '/media/brand-icons/ollama-color.svg', desc: 'Connect to your remote Ollama instances with high-performance cloud scale.' },
+              groq: { label: 'Neural Velocity', icon: '/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg', desc: 'Harness LPU technology for lightning-fast inference and real-time agentic reasoning.' },
+              openrouter: { label: 'Neural Interface', icon: '/media/brand-icons/openrouter.webp', desc: 'Unified gateway to the world\'s most powerful LLMs and specialist expert models.' },
+              gemini: { label: 'Neural Expert', icon: '/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg', desc: 'Leverage Google\'s most capable multimodal models for complex problem solving.' }
             }[activeProvider as ProviderId] || { label: 'Neural Link', icon: null, desc: 'Select a session from the shelf or create a new workspace to begin agentic execution.' };
 
             return (

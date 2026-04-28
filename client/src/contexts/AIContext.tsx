@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
-export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini';
+export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud';
 
 export interface VisualSettings {
   isDynamic: boolean;
@@ -39,7 +39,12 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     groq: localStorage.getItem('ai_model_groq') || '',
     openrouter: localStorage.getItem('ai_model_openrouter') || '',
     gemini: localStorage.getItem('ai_model_gemini') || '',
+    ollama_cloud: localStorage.getItem('ai_model_ollama_cloud') || '',
   });
+
+  const [ollamaCloudKey, setOllamaCloudKey] = useState<string>(localStorage.getItem('ollama_cloud_key') || '');
+  const [ollamaCloudUrl, setOllamaCloudUrl] = useState<string>(localStorage.getItem('ollama_cloud_url') || 'https://ollama.com');
+  const [ollamaCloudModels, setOllamaCloudModels] = useState<any[]>([]);
 
   const [visualSettings, setVisualSettings] = useState<VisualSettings>(() => {
     const saved = localStorage.getItem('ai_visual_settings');
@@ -102,6 +107,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       case 'groq': return localStorage.getItem('groq_api_key');
       case 'openrouter': return localStorage.getItem('openrouter_api_key');
       case 'gemini': return localStorage.getItem('gemini_api_key');
+      case 'ollama_cloud': return localStorage.getItem('ollama_cloud_key');
       default: return null;
     }
   };
@@ -116,6 +122,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         groq: localStorage.getItem('ai_model_groq') || '',
         openrouter: localStorage.getItem('ai_model_openrouter') || '',
         gemini: localStorage.getItem('ai_model_gemini') || '',
+        ollama_cloud: localStorage.getItem('ai_model_ollama_cloud') || '',
       });
 
       const savedVisuals = localStorage.getItem('ai_visual_settings');
