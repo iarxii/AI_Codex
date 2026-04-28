@@ -15,7 +15,10 @@ async def lifespan(app: FastAPI):
 
     # Initialize DB on startup
     await init_db()
-    # TODO: Initialize OllamaOpt bridge
+    
+    # Initialize OllamaOpt bridge
+    from backend.integrations.ollamaopt_bridge import setup_ollamaopt_bridge
+    setup_ollamaopt_bridge()
     yield
     
     # Sync SQLite back to GCS on shutdown
@@ -30,21 +33,11 @@ app = FastAPI(
 )
 
 # Set up CORS
-origins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://localhost:5176",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-    "http://127.0.0.1:5175",
-    "http://127.0.0.1:5176",
-    "https://aicodex-frontend-1096425756328.us-central1.run.app",
-]
+origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins if origins else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,6 +46,11 @@ app.add_middleware(
 @app.get("/")
 async def root():
     return {"message": f"Welcome to {settings.PROJECT_NAME} API", "status": "running"}
+
+@app.get("/healthz")
+async def health_check():
+    from datetime import datetime
+    return {"status": "healthy", "timestamp": str(datetime.now())}
 
 # Include routers
 from backend.api import auth, chat, metrics, rag, skills, conversations, models

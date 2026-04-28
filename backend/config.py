@@ -1,6 +1,11 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Explicitly load .env relative to this file
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "AICodex"
@@ -20,6 +25,9 @@ class Settings(BaseSettings):
     DB_TYPE: str = "sqlite" # "sqlite" or "postgres"
     EMBEDDING_DIM: int = 384 # Default for all-minilm
     SEED_ADMIN: bool = False
+    # CORS
+    CORS_ORIGINS: str = "*" # CSV of allowed origins
+    
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_SERVER: str = "localhost"
@@ -41,7 +49,7 @@ class Settings(BaseSettings):
     # OllamaOpt Integration
     OLLAMAOPT_PATH: str = "../../OllamaOpt"
     
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(extra="ignore")
 
     @property
     def async_database_url(self) -> str:

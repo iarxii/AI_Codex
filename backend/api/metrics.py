@@ -1,16 +1,27 @@
 import asyncio
 import json
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from backend.integrations.ollamaopt_bridge import get_metrics_collector
+from backend.api.auth import get_user_from_token
+from backend.db.session import AsyncSessionLocal
 
 router = APIRouter()
 MetricsCollector = get_metrics_collector()
 
 @router.websocket("/ws/metrics")
-async def metrics_endpoint(websocket: WebSocket):
+async def metrics_endpoint(websocket: WebSocket, token: str = Query(None)):
     print(f"DEBUG: WebSocket connection attempt on /ws/metrics")
     await websocket.accept()
-    print(f"DEBUG: WebSocket connected on /ws/metrics")
+    
+    # WebSocket Authentication
+    async with AsyncSessionLocal() as db:
+        user = await get_user_from_token(token, db)
+        if not user:
+            await websocket.send_json({"type": "error", "message": "Authentication failed"})
+            await websocket.close(code=4401)
+            return
+
+    print(f"DEBUG: WebSocket connected on /ws/metrics for user: {user.username}")
     
     # Get the global collector instance
     from backend.integrations.ollamaopt_bridge import get_ollamaopt_module

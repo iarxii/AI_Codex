@@ -1,11 +1,12 @@
 import json
 import time
 import logging
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
 from typing import List, Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from backend.utils.logger import log_debug, log_error
+from backend.api.auth import get_user_from_token
 
 from datetime import datetime
 from backend.db.session import get_db, AsyncSessionLocal
@@ -25,16 +26,28 @@ class ConnectionManager:
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
 
 manager = ConnectionManager()
 agent_graph = create_agent_graph()
 
 @router.websocket("/ws/agent")
-async def websocket_endpoint(websocket: WebSocket):
-    print("DEBUG: WebSocket connection request received on /ws/agent")
+async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
+    print(f"DEBUG: WebSocket connection attempt on /ws/agent (token: {'present' if token else 'missing'})")
     await manager.connect(websocket)
-    print("DEBUG: WebSocket connection accepted on /ws/agent")
+    
+    # WebSocket Authentication
+    async with AsyncSessionLocal() as db:
+        user = await get_user_from_token(token, db)
+        if not user:
+            log_error("WS Auth Failed: Invalid or missing token", None)
+            await websocket.send_json({"type": "error", "message": "Authentication failed. Invalid token."})
+            await websocket.close(code=4401) # Unauthorized
+            manager.disconnect(websocket)
+            return
+            
+    print(f"DEBUG: WebSocket connected on /ws/agent for user: {user.username}")
     try:
         while True:
             try:
@@ -111,12 +124,15 @@ async def websocket_endpoint(websocket: WebSocket):
                 # 4. Execute graph with event streaming
                 log_debug(f"Starting graph execution for conv {conversation_id}")
                 
-                config = {"configurable": {
-                    "provider": provider, 
-                    "model": model, 
-                    "api_key": api_key,
-                    "base_url": base_url
-                }}
+                config = {
+                    "configurable": {
+                        "provider": provider, 
+                        "model": model, 
+                        "api_key": api_key,
+                        "base_url": base_url
+                    },
+                    "recursion_limit": 10 # Prevent runaway loops
+                }
                 request_start = time.perf_counter()
                 
                 try:
