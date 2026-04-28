@@ -177,7 +177,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             print(f"PIPELINE ERROR: {error_obj}")
                             await websocket.send_json({"type": "error", "message": f"Graph Error: {str(error_obj)}"})
                 except Exception as e:
-                    print(f"PIPELINE EXCEPTION: {e}")
+                    log_error(f"PIPELINE EXCEPTION for conv {conversation_id}", e)
                     await websocket.send_json({"type": "error", "message": f"Execution Error: {str(e)}"})
                 finally:
                     # 5. Persist AI Response
@@ -206,7 +206,7 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:
-        print(f"WS Error: {e}")
+        log_error("WS General Error", e)
         try:
             await websocket.send_json({"type": "error", "message": str(e)})
         except:
