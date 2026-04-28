@@ -102,7 +102,8 @@ const Chat: React.FC = () => {
 
   useEffect(() => {
     console.log('Connecting WebSocket...');
-    const socket = new WebSocket(`${config.WS_BASE_URL}${config.API_V1_STR}/chat/ws/agent`);
+    const token = localStorage.getItem('token');
+    const socket = new WebSocket(`${config.WS_BASE_URL}${config.API_V1_STR}/chat/ws/agent?token=${token}`);
     ws.current = socket;
 
     socket.onopen = () => {
@@ -202,7 +203,8 @@ const Chat: React.FC = () => {
       }
     };
 
-    const mSocket = new WebSocket(`${config.WS_BASE_URL}${config.API_V1_STR}/metrics/ws/metrics`);
+    // 2. Metrics Socket
+    const mSocket = new WebSocket(`${config.WS_BASE_URL}${config.API_V1_STR}/metrics/ws/metrics?token=${token}`);
     metricsWs.current = mSocket;
     mSocket.onmessage = (event) => {
       const data = JSON.parse(event.data);

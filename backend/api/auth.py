@@ -53,6 +53,18 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: As
         raise credentials_exception
     return user
 
+async def get_user_from_token(token: str, db: AsyncSession) -> User | None:
+    """Helper for WebSocket authentication."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+        result = await db.execute(select(User).filter_by(username=username))
+        return result.scalar_one_or_none()
+    except JWTError:
+        return None
+
 @router.post("/login", response_model=Token)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
