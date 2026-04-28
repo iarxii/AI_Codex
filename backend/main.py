@@ -4,6 +4,10 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.db.session import init_db
+from backend.utils.logger import mask_uvicorn_logs
+
+# Ensure logging is masked on startup
+mask_uvicorn_logs()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
