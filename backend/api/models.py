@@ -1,15 +1,21 @@
 import requests
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Header
 from typing import List, Dict, Any
 from backend.config import settings
 
 router = APIRouter()
 
 @router.get("")
-async def list_models(provider: str, api_key: str = None):
+async def list_models(
+    provider: str, 
+    api_key: str = Query(None), 
+    x_api_key: str = Header(None),
+    x_base_url: str = Header(None)
+):
     """
     Dynamically list available models for a given provider.
     """
+    actual_key = x_api_key or api_key
     if provider == "local":
         try:
             # Call Ollama API
@@ -28,8 +34,26 @@ async def list_models(provider: str, api_key: str = None):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Ollama error: {str(e)}")
 
+    elif provider == "ollama_cloud":
+        if not x_base_url:
+            return []
+        try:
+            # Call remote Ollama API
+            url = f"{x_base_url.rstrip('/')}/api/tags"
+            headers = {}
+            if actual_key:
+                headers["Authorization"] = f"Bearer {actual_key}" if not actual_key.startswith("Bearer") else actual_key
+                
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                return [{"id": m["name"], "name": m["name"]} for m in data.get("models", [])]
+            return []
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Ollama Cloud error: {str(e)}")
+
     elif provider == "openrouter":
-        if not api_key:
+        if not actual_key:
             return []
         try:
             response = requests.get("https://openrouter.ai/api/v1/models")
@@ -41,10 +65,10 @@ async def list_models(provider: str, api_key: str = None):
             raise HTTPException(status_code=500, detail=f"OpenRouter error: {str(e)}")
 
     elif provider == "groq":
-        if not api_key:
+        if not actual_key:
             return []
         try:
-            headers = {"Authorization": f"Bearer {api_key}"}
+            headers = {"Authorization": f"Bearer {actual_key}"}
             response = requests.get("https://api.groq.com/openai/v1/models", headers=headers)
             if response.status_code == 200:
                 data = response.json()
@@ -54,11 +78,11 @@ async def list_models(provider: str, api_key: str = None):
             raise HTTPException(status_code=500, detail=f"Groq error: {str(e)}")
 
     elif provider == "gemini":
-        if not api_key:
+        if not actual_key:
             return []
         try:
             from google import genai
-            client = genai.Client(api_key=api_key)
+            client = genai.Client(api_key=actual_key)
             models = []
             for m in client.models.list():
                 model_id = m.name.replace("models/", "")

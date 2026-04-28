@@ -34,6 +34,22 @@ def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
     if provider == "groq":
         from langchain_groq import ChatGroq
         llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=0, streaming=True)
+    elif provider == "ollama_cloud":
+        from langchain_openai import ChatOpenAI
+        target_model = model or "llama3"
+        base_url = config.get("configurable", {}).get("base_url") or "https://ollama.com"
+        
+        # Ensure /v1 suffix for OpenAI compatibility
+        if not base_url.endswith("/v1"):
+            base_url = f"{base_url.rstrip('/')}/v1"
+            
+        llm = ChatOpenAI(
+            model=target_model, 
+            base_url=base_url, 
+            api_key=api_key or "sk-ollama", # Some proxies require a placeholder if no key
+            temperature=0, 
+            streaming=True
+        )
     elif provider == "openrouter":
         from langchain_openai import ChatOpenAI
         target_model = model or "openrouter/free"

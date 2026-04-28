@@ -5,6 +5,8 @@ import { PROVIDERS, type ProviderId } from './providerMeta';
 import { useAI, type VisualSettings } from '../contexts/AIContext';
 import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
 import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
+import { config } from '../config';
+import { CheckCircleIcon, ExclamationCircleIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 
 type SettingsModalProps = {
   isOpen: boolean;
@@ -47,6 +49,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const [groqKey, setGroqKey] = useState('');
   const [openRouterKey, setOpenRouterKey] = useState('');
   const [geminiKey, setGeminiKey] = useState('');
+  const [ollamaCloudKey, setOllamaCloudKey] = useState('');
+  const [ollamaCloudUrl, setOllamaCloudUrl] = useState('');
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -54,14 +60,48 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
       setGroqKey(localStorage.getItem('groq_api_key') || '');
       setOpenRouterKey(localStorage.getItem('openrouter_api_key') || '');
       setGeminiKey(localStorage.getItem('gemini_api_key') || '');
+      setOllamaCloudKey(localStorage.getItem('ollama_cloud_key') || '');
+      setOllamaCloudUrl(localStorage.getItem('ollama_cloud_url') || 'https://ollama.com');
     }
   }, [isOpen, provider]);
+
+  const testOllamaCloud = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const headers: Record<string, string> = {
+        'X-Base-Url': ollamaCloudUrl || 'https://ollama.com'
+      };
+      if (ollamaCloudKey) headers['X-API-Key'] = ollamaCloudKey;
+
+      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/models?provider=ollama_cloud`, {
+        headers
+      });
+      
+      if (response.ok) {
+        const models = await response.json();
+        setTestResult({ 
+          success: true, 
+          message: models.length > 0 ? `Connected! Found ${models.length} models.` : "Connected, but no models found." 
+        });
+      } else {
+        const err = await response.json();
+        setTestResult({ success: false, message: err.detail || "Connection failed." });
+      }
+    } catch (e) {
+      setTestResult({ success: false, message: "Network error. Check URL." });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   const handleSave = () => {
     setProvider(activeProvider);
     localStorage.setItem('groq_api_key', groqKey);
     localStorage.setItem('openrouter_api_key', openRouterKey);
     localStorage.setItem('gemini_api_key', geminiKey);
+    localStorage.setItem('ollama_cloud_key', ollamaCloudKey);
+    localStorage.setItem('ollama_cloud_url', ollamaCloudUrl);
     
     // Dispatch custom event for parts of the app not yet using Context
     window.dispatchEvent(new Event('ai-settings-changed'));
@@ -118,7 +158,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                   <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-3">
                     Default Provider
                   </label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-5 gap-2">
                     {PROVIDERS.map((provider) => {
                       const isActive = activeProvider === provider.id;
                       return (
@@ -155,6 +195,59 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                         Using local Ollama GPU — no API key needed
                       </p>
                       <p className="text-[10px] text-green-600/70 mt-1.5">Ensure Ollama is running on localhost:11434</p>
+                    </div>
+                  )}
+
+                  {activeProvider === 'ollama_cloud' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">Remote Ollama URL</label>
+                        <input 
+                          type="text" 
+                          value={ollamaCloudUrl}
+                          onChange={(e) => setOllamaCloudUrl(e.target.value)}
+                          placeholder="https://ollama.your-domain.com"
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#FF6600]/40 focus:border-[#FF6600]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">Authorization Token (Optional)</label>
+                        <input 
+                          type="password" 
+                          value={ollamaCloudKey}
+                          onChange={(e) => setOllamaCloudKey(e.target.value)}
+                          placeholder="Bearer token or API key"
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#FF6600]/40 focus:border-[#FF6600]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={testOllamaCloud}
+                          disabled={isTesting}
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                            isTesting 
+                              ? 'bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed'
+                              : 'bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]'
+                          }`}
+                        >
+                          {isTesting ? (
+                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <ArrowPathIcon className="w-4 h-4" />
+                          )}
+                          Test Connection
+                        </button>
+
+                        {testResult && (
+                          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
+                            testResult.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {testResult.success ? <CheckCircleIcon className="w-4 h-4" /> : <ExclamationCircleIcon className="w-4 h-4" />}
+                            {testResult.message}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 

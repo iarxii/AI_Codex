@@ -39,7 +39,13 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             try:
                 data = await websocket.receive_text()
-                print(f"DEBUG: Received WebSocket data: {data[:100]}...")
+                # Log only keys of the payload, not the values (to protect API keys)
+                try:
+                    p_preview = json.loads(data)
+                    safe_preview = {k: "********" if "key" in k.lower() or "token" in k.lower() else v for k, v in p_preview.items()}
+                    log_debug(f"Received WS payload: {list(safe_preview.keys())}")
+                except:
+                    pass
             except WebSocketDisconnect:
                 print("DEBUG: WebSocket client disconnected gracefully")
                 break
@@ -53,6 +59,7 @@ async def websocket_endpoint(websocket: WebSocket):
             provider = payload.get("provider", "local")
             model = payload.get("model")
             api_key = payload.get("api_key")
+            base_url = payload.get("base_url")
             
             if not conversation_id:
                 await websocket.send_json({"type": "error", "message": "conversation_id is required"})
@@ -104,7 +111,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 # 4. Execute graph with event streaming
                 log_debug(f"Starting graph execution for conv {conversation_id}")
                 
-                config = {"configurable": {"provider": provider, "model": model, "api_key": api_key}}
+                config = {"configurable": {
+                    "provider": provider, 
+                    "model": model, 
+                    "api_key": api_key,
+                    "base_url": base_url
+                }}
                 request_start = time.perf_counter()
                 
                 try:

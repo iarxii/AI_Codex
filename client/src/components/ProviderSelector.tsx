@@ -6,6 +6,7 @@ import { config } from '../config';
 
 const providers = [
   { id: 'local', name: 'Local (Ollama GPU)', icon: <img src="/media/brand-icons/ollama-color.svg" alt="Local Logo" className="w-6 h-6 object-contain" /> },
+  { id: 'ollama_cloud', name: 'Ollama (Remote Cloud)', icon: <img src="/media/brand-icons/ollama-color.svg" alt="Ollama Cloud Logo" className="w-6 h-6 object-contain" /> },
   { id: 'groq', name: 'Groq (Cloud)', icon: <img src="/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg" alt="Groq Logo" className="w-6 h-6 object-contain drop-shadow-md" /> },
   { id: 'openrouter', name: 'OpenRouter (Cloud)', icon: <img src="/media/brand-icons/openrouter.webp" alt="OpenRouter Logo" className="w-6 h-6 object-contain" /> },
   { id: 'gemini', name: 'Gemini (Cloud)', icon: <img src="/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg" alt="Gemini Logo" className="w-6 h-6 object-contain" /> },
@@ -29,8 +30,16 @@ const ProviderSelector: React.FC = () => {
     else if (provider === 'gemini') apiKey = localStorage.getItem('gemini_api_key') || '';
 
     try {
-      const url = `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=${provider}${apiKey ? `&api_key=${apiKey}` : ''}`;
-      const response = await fetch(url);
+      const url = `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=${provider}`;
+      const headers: Record<string, string> = {};
+      if (apiKey) headers['X-API-Key'] = apiKey;
+      
+      if (provider === 'ollama_cloud') {
+        const cloudUrl = localStorage.getItem('ollama_cloud_url');
+        if (cloudUrl) headers['X-Base-Url'] = cloudUrl;
+      }
+
+      const response = await fetch(url, { headers });
       if (response.ok) {
         const data = await response.json();
         setAvailableModels(data);

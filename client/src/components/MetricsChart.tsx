@@ -7,7 +7,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  ReferenceArea
 } from 'recharts';
 
 interface MetricsData {
@@ -55,17 +56,35 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
         </div>
       </div>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 30 }}>
+        <LineChart data={data} margin={{ top: 10, right: 35, left: -15, bottom: 30 }}>
+          <defs>
+            <linearGradient id="heatGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ef4444" stopOpacity={0.15} />
+              <stop offset="30%" stopColor="#ef4444" stopOpacity={0.05} />
+              <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.04)" />
           <XAxis 
             dataKey="time" 
             hide={true} 
           />
           <YAxis 
+            yAxisId="percentage"
             domain={[0, 100]} 
             tick={{ fontSize: 9, fill: '#7A7D8E', fontWeight: 600 }}
             axisLine={false}
             tickLine={false}
+            label={{ value: '%', angle: -90, position: 'insideLeft', offset: 10, fontSize: 8, fill: '#7A7D8E' }}
+          />
+          <YAxis 
+            yAxisId="latency"
+            orientation="right"
+            domain={[0, 'auto']} 
+            tick={{ fontSize: 9, fill: '#10B981', fontWeight: 600 }}
+            axisLine={false}
+            tickLine={false}
+            label={{ value: 'ms', angle: 90, position: 'insideRight', offset: 10, fontSize: 8, fill: '#10B981' }}
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend 
@@ -80,7 +99,15 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
               letterSpacing: '0.1em'
             }}
           />
+          <ReferenceArea 
+            yAxisId="percentage" 
+            y1={0} 
+            y2={100} 
+            fill="url(#heatGradient)" 
+            isFront={false} 
+          />
           <Line
+            yAxisId="percentage"
             name="CPU"
             type="monotone"
             dataKey="cpu"
@@ -91,6 +118,7 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
             isAnimationActive={false}
           />
           <Line
+            yAxisId="percentage"
             name="RAM"
             type="monotone"
             dataKey="ram"
@@ -101,6 +129,7 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
             isAnimationActive={false}
           />
           <Line
+            yAxisId="percentage"
             name="GPU"
             type="monotone"
             dataKey="igpu"
@@ -111,6 +140,7 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
             isAnimationActive={false}
           />
           <Line
+            yAxisId="percentage"
             name="NPU"
             type="monotone"
             dataKey="npu"
@@ -121,6 +151,7 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
             isAnimationActive={false}
           />
           <Line
+            yAxisId="latency"
             name="Latency"
             type="monotone"
             dataKey="latency"
