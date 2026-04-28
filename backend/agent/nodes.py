@@ -26,19 +26,16 @@ def log_performance(event: str, duration: float, metadata: dict = None):
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {event}: {duration:.4f}s{meta_str}\n")
 
-def get_dynamic_llm(config: RunnableConfig):
+def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
     provider = config.get("configurable", {}).get("provider", "local")
     model = config.get("configurable", {}).get("model")
     api_key = config.get("configurable", {}).get("api_key")
-    
-    tools = get_agent_tools()
     
     if provider == "groq":
         from langchain_groq import ChatGroq
         llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=0, streaming=True)
     elif provider == "openrouter":
         from langchain_openai import ChatOpenAI
-        # Using openrouter/free (Free Models Router) as default for better tool-use reliability
         target_model = model or "openrouter/free"
         llm = ChatOpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -62,20 +59,16 @@ def get_dynamic_llm(config: RunnableConfig):
             api_key=api_key, 
             temperature=0, 
             streaming=True
-            # Removed convert_system_message_to_human=True as Gemini 1.5 supports it natively
         )
     else:
         # local
         from langchain_openai import ChatOpenAI
         target_model = model or settings.DEFAULT_MODEL
         
-        # Ensure base URL points to the OpenAI-compatible /v1 endpoint
         base_url = settings.OLLAMA_BASE_URL
         if not base_url.endswith("/v1"):
             base_url = f"{base_url.rstrip('/')}/v1"
             
-        # llama-server often prefers 'default' or a specific name; if 'local' is passed, 
-        # it might be a UI artifact, so we normalize it.
         local_model = target_model if target_model and target_model != "local" else "default"
             
         llm = ChatOpenAI(
@@ -86,101 +79,67 @@ def get_dynamic_llm(config: RunnableConfig):
             streaming=True
         )
         
-    return llm.bind_tools(tools)
+    if bind_tools:
+        tools = get_agent_tools()
+        return llm.bind_tools(tools)
+    return llm
+
+async def summarize_history(messages: List[BaseMessage], config: RunnableConfig) -> str:
+    """
+    Summarizes older messages to save context space.
+    """
+    if len(messages) < 10:
+        return ""
+    
+    # We take messages between index 1 and -5 (keep system and last few)
+    to_summarize = messages[1:-5]
+    if not to_summarize:
+        return ""
+        
+    llm = get_dynamic_llm(config, bind_tools=False)
+    summary_prompt = "Summarize the key points of the preceding conversation history concisely. Focus on technical decisions and user goals."
+    response = await llm.ainvoke([HumanMessage(content=f"{str(to_summarize)}\n\n{summary_prompt}")])
+    return response.content
 
 async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
-    LLM reasoning node. Grounds the query with RAG context before invoking the LLM.
+    Main reasoning node. Serves as the 'Planner'. 
+    Decides whether to respond directly or use tools.
     """
-    last_query = state["messages"][-1].content
+    messages = state["messages"]
     
-    # 1. Retrieve relevant chunks from RAG
-    import asyncio
-    retriever = get_retriever()
-    retrieval_results = []
-    if retriever:
-        try:
-            logger.info(f"Starting RAG retrieval for: {last_query[:50]}...")
-            start_rag = time.perf_counter()
-            # Wrap blocking call in a thread
-            retrieval_results = await asyncio.to_thread(retriever.retrieve, last_query)
-            duration_rag = time.perf_counter() - start_rag
-            logger.info(f"RAG retrieved {len(retrieval_results)} chunks in {duration_rag:.2f}s")
-            log_performance("RAG_RETRIEVAL", duration_rag, {"query_len": len(last_query)})
-        except Exception as e:
-            logger.warning(f"RAG retrieval failed: {e}")
-    
-    # 2. Build assembled context using OllamaOpt ContextBuilder
-    context_builder = get_context_builder()
-    full_prompt = last_query
-    context_stats = {}
-    
-    if context_builder:
-        try:
-            # Convert retrieval results to dict format
-            chunks = [
-                {
-                    "title": r.title,
-                    "source_path": r.source_path,
-                    "content": r.content,
-                    "score": r.score
-                } for r in retrieval_results
-            ]
-            
-            # Convert LangChain messages to dicts for ContextBuilder
-            history_dicts = []
-            for m in state["messages"][:-1]:
-                role = "assistant" if isinstance(m, (ToolMessage, SystemMessage)) or getattr(m, "role", "") == "assistant" else "user"
-                # For tool messages, include the result
-                content = m.content if hasattr(m, "content") else str(m)
-                history_dicts.append({"role": role, "content": content})
+    # Context Budgeting: If history is long, summarize older parts
+    summary = ""
+    if len(messages) > 15:
+        summary = await summarize_history(messages, config)
+        # Keep only the system message, the summary, and the last 5 messages
+        system_msg = messages[0]
+        recent_msgs = messages[-5:]
+        messages = [system_msg, HumanMessage(content=f"Summary of previous turns: {summary}")] + recent_msgs
 
-            # Build context (including history, RAG, and memory)
-            assembled = context_builder.build(
-                user_query=last_query,
-                chat_history=history_dicts,
-                retrieved_chunks=chunks,
-                memory_items=[], # Long-term memory handled here
-                tool_results=[] # Tool results are handled in the loop
-            )
-            full_prompt = context_builder.assemble_prompt_string(assembled, last_query)
-            context_stats = context_builder.get_stats(assembled)
-        except Exception as e:
-            logger.warning(f"Context building failed: {e}")
-
-    # 3. Invoke LLM with grounded prompt
-    # To prevent duplication and ensure budget enforcement, we send a single 
-    # HumanMessage containing the entire budget-capped context from ContextBuilder.
     system_prompt = build_system_prompt()
-    logger.info(f"PIPELINE: Prompt sizes - System: {len(system_prompt)}, Context: {len(full_prompt)}")
     
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=full_prompt)
-    ]
+    # Use the dynamic LLM with tools bound
+    llm = get_dynamic_llm(config, bind_tools=True)
+    
+    # First turn: check if it's just a greeting or simple request
+    # To save tokens and latency, we don't do RAG here.
+    # The agent can call 'codebase_search' if it needs more info.
+    
+    start_time = time.perf_counter()
+    response = await llm.ainvoke(messages)
+    duration = time.perf_counter() - start_time
     
     provider = config.get("configurable", {}).get("provider", "local")
     model = config.get("configurable", {}).get("model", "default")
-
-    from backend.utils.logger import log_debug, log_error
-    log_debug(f"Invoking LLM ({provider}:{model}) for reasoning turn...")
-    start_time = time.perf_counter()
-    
-    llm = get_dynamic_llm(config)
-    response = await llm.ainvoke(messages)
-    
-    duration = time.perf_counter() - start_time
     log_performance("LLM_REASONING", duration, {"provider": provider, "model": model})
     
-    # Extract tool calls if any
     tool_calls = getattr(response, "tool_calls", [])
-    if tool_calls:
-        logger.info(f"Detected {len(tool_calls)} tool calls")
     
     return {
         "messages": [response],
         "current_tool_calls": tool_calls,
-        "context_data": context_stats
+        "context_data": {"history_len": len(messages), "summarized": bool(summary)}
     }
 
 async def execute_tool_node(state: AgentState) -> Dict[str, Any]:

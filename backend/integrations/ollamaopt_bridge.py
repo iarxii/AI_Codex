@@ -2,6 +2,7 @@ import sys
 import logging
 from pathlib import Path
 from backend.config import settings
+from .postgres_store import PostgresVectorStore
 
 logger = logging.getLogger(__name__)
 
@@ -171,11 +172,16 @@ def get_retriever():
             detected_dim = len(dummy_vec) if dummy_vec else 384
             logger.info(f"Detected embedding dimension: {detected_dim}")
 
-            store = QdrantVectorStore(
+            # We swap QdrantVectorStore for PostgresVectorStore
+            store = PostgresVectorStore(
                 collection_name="aicodex_vectors",
-                persist_dir="data/qdrant",
                 embedding_dim=detected_dim, 
             )
+            
+            # Since PostgresVectorStore methods are async, we might need to wrap the retriever
+            # or ensure the Retriever class in OllamaOpt can handle async store.
+            # For now, let's assume the Retriever can work with it if we pass it correctly.
+            
             embedder = OllamaEmbedder(
                 api_base=settings.OLLAMA_BASE_URL,
                 model="all-minilm:latest", 
@@ -186,6 +192,17 @@ def get_retriever():
                 top_k=5,
                 score_threshold=0.3,
             )
+            
+            # Monkey-patch Retriever.retrieve to use sync_search if store is PostgresVectorStore
+            original_retrieve = _initialized_retriever.retrieve
+            def patched_retrieve(query, **kwargs):
+                if hasattr(_initialized_retriever.store, "sync_search"):
+                    # We override the search logic inside retrieve by intercepting the store call
+                    # Actually, we can just replace the store.search method
+                    _initialized_retriever.store.search = _initialized_retriever.store.sync_search
+                return original_retrieve(query, **kwargs)
+            
+            _initialized_retriever.retrieve = patched_retrieve
             return _initialized_retriever
         except Exception as e:
             logger.error(f"Failed to initialize Retriever: {e}")

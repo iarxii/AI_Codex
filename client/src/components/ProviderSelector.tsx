@@ -2,6 +2,8 @@ import React, { Fragment, useEffect, useState } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { useAI } from '../contexts/AIContext';
+import { config } from '../config';
+
 const providers = [
   { id: 'local', name: 'Local (Ollama GPU)', icon: <img src="/media/brand-icons/ollama-color.svg" alt="Local Logo" className="w-6 h-6 object-contain" /> },
   { id: 'groq', name: 'Groq (Cloud)', icon: <img src="/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg" alt="Groq Logo" className="w-6 h-6 object-contain drop-shadow-md" /> },
@@ -27,16 +29,13 @@ const ProviderSelector: React.FC = () => {
     else if (provider === 'gemini') apiKey = localStorage.getItem('gemini_api_key') || '';
 
     try {
-      const url = `http://localhost:8000/api/models?provider=${provider}${apiKey ? `&api_key=${apiKey}` : ''}`;
+      const url = `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=${provider}${apiKey ? `&api_key=${apiKey}` : ''}`;
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setAvailableModels(data);
         
-        // If current model is empty or not in new list, pick the first one as default
         if (data.length > 0 && (!model || !data.find((m: any) => m.id === model))) {
-          // Only auto-select if we don't have a persisted model for this provider yet
-          // or if the persisted model is no longer available
           const persisted = localStorage.getItem(`ai_model_${provider}`);
           if (persisted && data.find((m: any) => m.id === persisted)) {
             setModel(persisted);

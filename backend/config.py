@@ -17,7 +17,17 @@ class Settings(BaseSettings):
     DEFAULT_MODEL: str = "llama3.2:3b"
     
     # Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./data/aicodex.db"
+    DB_TYPE: str = "sqlite" # "sqlite" or "postgres"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_PORT: str = "5432"
+    POSTGRES_DB: str = "aicodex"
+    DATABASE_URL: str = "" # Set via env or constructed
+    
+    # GCS Persistence (for SQLite on Cloud Run)
+    GCS_BUCKET_NAME: str = "aicodex-data-1096425756328"
+    DATABASE_FILE: str = "data/aicodex.db"
     
     # Skills & Sandbox
     ALLOWED_COMMANDS: str = "git,python,pip,node,npm,dir,type,cat,ls"
@@ -30,6 +40,14 @@ class Settings(BaseSettings):
     OLLAMAOPT_PATH: str = "../../OllamaOpt"
     
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @property
+    def async_database_url(self) -> str:
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
+        if self.DB_TYPE == "sqlite":
+            return f"sqlite+aiosqlite:///./{self.DATABASE_FILE}"
+        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
 settings = Settings()
 

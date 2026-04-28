@@ -6,15 +6,16 @@ import Sidebar from '../components/Sidebar';
 import ContextInspector from '../components/ContextInspector';
 import AgentCanvas from '../components/AgentCanvas';
 import SettingsModal from '../components/SettingsModal';
-import { PROVIDER_MAP, getActiveProvider, getActiveProviderInfo } from '../components/providerMeta';
+import { PROVIDER_MAP } from '../components/providerMeta';
 import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
 import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 import ProviderSelector from '../components/ProviderSelector';
 import { useAI, type ProviderId } from '../contexts/AIContext';
 import AgentPulse from '../components/AgentPulse';
+import { config } from '../config';
 import MetricsChart from '../components/MetricsChart';
 import WorkspaceOnboardingModal from '../components/WorkspaceOnboardingModal';
-import { ChevronUpIcon, ChevronDownIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 
 type Message = {
   id: string;
@@ -98,7 +99,7 @@ const Chat: React.FC = () => {
 
   useEffect(() => {
     console.log('Connecting WebSocket...');
-    const socket = new WebSocket('ws://localhost:8000/api/chat/ws/agent');
+    const socket = new WebSocket(`${config.WS_BASE_URL}${config.API_V1_STR}/chat/ws/agent`);
     ws.current = socket;
 
     socket.onopen = () => {
@@ -106,7 +107,7 @@ const Chat: React.FC = () => {
       setReconnectCount(0);
     };
 
-    socket.onclose = (event) => {
+    socket.onclose = () => {
       setConnected(false);
       setLoading(false);
       
@@ -198,7 +199,7 @@ const Chat: React.FC = () => {
       }
     };
 
-    const mSocket = new WebSocket('ws://localhost:8000/api/metrics/ws/metrics');
+    const mSocket = new WebSocket(`${config.WS_BASE_URL}${config.API_V1_STR}/metrics/ws/metrics`);
     metricsWs.current = mSocket;
     mSocket.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -239,7 +240,7 @@ const Chat: React.FC = () => {
     setCurrentToolCalls([]);
 
     try {
-      const response = await fetch(`http://localhost:8000/api/conversations/${id}`, {
+      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/conversations/${id}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.ok) {
@@ -262,7 +263,7 @@ const Chat: React.FC = () => {
   // 5. Create New Conversation
   const handleNewChat = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/conversations/', {
+      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/conversations/`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

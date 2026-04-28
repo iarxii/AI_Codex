@@ -35,4 +35,31 @@ def get_agent_tools() -> List[StructuredTool]:
         except Exception as e:
             logger.error(f"Failed to convert skill {skill.name} to tool: {e}")
             
+    # Add native agent tools
+    tools.append(codebase_search)
+    
     return tools
+
+@StructuredTool.from_function
+async def codebase_search(query: str) -> str:
+    """
+    Search the codebase for relevant snippets, definitions, or documentation.
+    Use this when you need context about how something is implemented.
+    """
+    from backend.integrations.ollamaopt_bridge import get_retriever
+    retriever = get_retriever()
+    if not retriever:
+        return "Error: Codebase retriever not initialized."
+    
+    try:
+        results = await retriever.retrieve(query)
+        if not results:
+            return "No relevant code snippets found for that query."
+        
+        formatted = []
+        for r in results:
+            formatted.append(f"--- {r.source_path} (Score: {r.score:.2f}) ---\n{r.content}")
+        
+        return "\n\n".join(formatted)
+    except Exception as e:
+        return f"Error during codebase search: {str(e)}"

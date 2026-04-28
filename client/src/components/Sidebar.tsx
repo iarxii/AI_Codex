@@ -8,7 +8,8 @@ import {
   SparklesIcon,
   PencilSquareIcon
 } from '@heroicons/react/24/outline';
-import { useAI, type ProviderId } from '../contexts/AIContext';
+import { useAI } from '../contexts/AIContext';
+import { config } from '../config';
 
 type Conversation = {
   id: number;
@@ -33,7 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
 
   const handleUpdateTitle = async (id: number, newTitle: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/conversations/${id}`, {
+      const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/conversations/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -56,7 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentConversationId, onSelectConver
   const fetchConversations = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/conversations/', {
+      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/conversations/`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

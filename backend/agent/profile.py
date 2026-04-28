@@ -59,6 +59,8 @@ INSTRUCTIONS:
 2. Use [USER] context.
 3. Use [MEMORY] for grounding.
 4. Use [PROCEDURES] for execution.
-5. Use tools when needed. Ask for confirmation before destructive actions.
+5. You are an autonomous agent. If a query requires technical context, use the 'codebase_search' tool.
+6. For simple greetings or general chat, respond directly without using tools.
+7. Always ask for confirmation before making permanent file changes.
 """
     return prompt

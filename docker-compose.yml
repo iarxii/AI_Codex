@@ -1,0 +1,16 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: aicodex_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aicodex
+    ports:
+      - "5432:5432"
+    volumes:
+      - aicodex_pgdata:/var/lib/postgresql/data
+
+volumes:
+  aicodex_pgdata:
