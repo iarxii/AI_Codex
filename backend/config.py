@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
     
     # Auth
-    SECRET_KEY: str = "CHANGEME_SUPER_SECRET"
+    SECRET_KEY: str  # Required - no default for security
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week
     
@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     
     # Database
     DB_TYPE: str = "sqlite" # "sqlite" or "postgres"
+    EMBEDDING_DIM: int = 384 # Default for all-minilm
+    SEED_ADMIN: bool = False
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_SERVER: str = "localhost"

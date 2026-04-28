@@ -25,10 +25,11 @@ async def execute_sandboxed(command: str, cwd: str = ".") -> SandboxResult:
     
     base_cmd = parts[0].lower()
     # Basic check for common shell operators that could bypass simple validation
-    if any(op in command for op in [";", "&&", "||", "|", ">", "<"]):
-        # If shell operators are used, we'd need more complex parsing.
-        # For v1, let's keep it simple but warned.
-        pass
+    # Block command injection and chaining
+    blocked_operators = [";", "&&", "||", "|", ">", "<", "`", "$("]
+    for op in blocked_operators:
+        if op in command:
+            return SandboxResult(success=False, error=f"Security Violation: Operator '{op}' is not allowed in commands.")
 
     if base_cmd not in allowed_cmds:
         return SandboxResult(success=False, error=f"Command '{base_cmd}' not in allowlist")

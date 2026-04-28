@@ -61,7 +61,7 @@ class DocumentChunk(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     source_path: Mapped[str] = mapped_column(String(500))
     content: Mapped[str] = mapped_column(Text)
-    embedding: Mapped[Vector] = mapped_column(Vector(1536)) # Default to 1536 for common models
+    embedding: Mapped[Vector] = mapped_column(Vector(settings.EMBEDDING_DIM)) # Use dimension from settings
     metadata_json: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     

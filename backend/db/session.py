@@ -22,15 +22,16 @@ async def init_db():
         async with AsyncSessionLocal() as session:
             # Seed admin user if not exists
             from sqlalchemy import select
-            result = await session.execute(select(User).filter_by(username="admin"))
-            if not result.scalar_one_or_none():
-                admin_user = User(
-                    username="admin",
-                    hashed_password=pwd_context.hash("admin123")
-                )
-                session.add(admin_user)
-                await session.commit()
-                print("Seeded admin user (admin / admin123)")
+            if settings.SEED_ADMIN:
+                result = await session.execute(select(User).filter_by(username="admin"))
+                if not result.scalar_one_or_none():
+                    admin_user = User(
+                        username="admin",
+                        hashed_password=pwd_context.hash("admin123")
+                    )
+                    session.add(admin_user)
+                    await session.commit()
+                    print("Seeded admin user (admin / admin123)")
     except Exception as e:
         print(f"Warning: Database initialization failed. Server starting without DB connectivity. Error: {e}")
 

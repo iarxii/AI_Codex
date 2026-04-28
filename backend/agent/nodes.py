@@ -27,78 +27,80 @@ def log_performance(event: str, duration: float, metadata: dict = None):
         f.write(f"[{timestamp}] {event}: {duration:.4f}s{meta_str}\n")
 
 def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
+    """
+    Retrieves and configures the LLM provider based on the provided configuration.
+    Includes robustness fixes for tool binding and connection failures.
+    """
     provider = config.get("configurable", {}).get("provider", "local")
     model = config.get("configurable", {}).get("model")
     api_key = config.get("configurable", {}).get("api_key")
     
-    if provider == "groq":
-        from langchain_groq import ChatGroq
-        llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=0, streaming=True)
-    elif provider == "ollama_cloud":
-        from langchain_openai import ChatOpenAI
-        target_model = model or "llama3"
-        base_url = config.get("configurable", {}).get("base_url") or "https://ollama.com"
-        
-        # Ensure /v1 suffix for OpenAI compatibility
-        if not base_url.endswith("/v1"):
-            base_url = f"{base_url.rstrip('/')}/v1"
+    # Debug logging for model initialization
+    print(f"DEBUG: Initializing LLM Provider: {provider} | Model: {model}")
+
+    try:
+        if provider == "groq":
+            from langchain_groq import ChatGroq
+            llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=0, streaming=True)
+        elif provider == "ollama_cloud":
+            from langchain_openai import ChatOpenAI
+            target_model = model or "llama3"
+            base_url = config.get("configurable", {}).get("base_url") or "https://ollama.com"
+            if not base_url.endswith("/v1"):
+                base_url = f"{base_url.rstrip('/')}/v1"
+            llm = ChatOpenAI(model=target_model, base_url=base_url, api_key=api_key or "sk-ollama", temperature=0, streaming=True)
+        elif provider == "openrouter":
+            from langchain_openai import ChatOpenAI
+            target_model = model or "openrouter/free"
+            llm = ChatOpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=api_key,
+                model=target_model,
+                temperature=0,
+                streaming=True,
+                default_headers={"HTTP-Referer": "https://aicodex.ai", "X-Title": "AICodex Agentic IDE"}
+            )
+        elif provider == "gemini":
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            target_model = model or "gemini-1.5-flash"
+            if target_model.startswith("models/"):
+                target_model = target_model.replace("models/", "")
+            llm = ChatGoogleGenerativeAI(model=target_model, api_key=api_key, temperature=0, streaming=True)
+        else:
+            # Local provider (llama-server.exe or Ollama)
+            from langchain_openai import ChatOpenAI
+            target_model = model or settings.DEFAULT_MODEL
+            base_url = settings.OLLAMA_BASE_URL
             
-        llm = ChatOpenAI(
-            model=target_model, 
-            base_url=base_url, 
-            api_key=api_key or "sk-ollama", # Some proxies require a placeholder if no key
-            temperature=0, 
-            streaming=True
-        )
-    elif provider == "openrouter":
-        from langchain_openai import ChatOpenAI
-        target_model = model or "openrouter/free"
-        llm = ChatOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key,
-            model=target_model,
-            temperature=0,
-            streaming=True,
-            default_headers={
-                "HTTP-Referer": "https://aicodex.ai",
-                "X-Title": "AICodex Agentic IDE"
-            }
-        )
-    elif provider == "gemini":
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        target_model = model or "gemini-1.5-flash"
-        if target_model.startswith("models/"):
-            target_model = target_model.replace("models/", "")
-        
-        llm = ChatGoogleGenerativeAI(
-            model=target_model, 
-            api_key=api_key, 
-            temperature=0, 
-            streaming=True
-        )
-    else:
-        # local
-        from langchain_openai import ChatOpenAI
-        target_model = model or settings.DEFAULT_MODEL
-        
-        base_url = settings.OLLAMA_BASE_URL
-        if not base_url.endswith("/v1"):
-            base_url = f"{base_url.rstrip('/')}/v1"
+            # Note: llama-server.exe (turboquant) is often OpenAI compatible at the root or /v1
+            if not base_url.endswith("/v1"):
+                base_url = f"{base_url.rstrip('/')}/v1"
+                
+            local_model = target_model if target_model and target_model != "local" else "default"
+            print(f"DEBUG: Local Neural Core at {base_url} (Model: {local_model})")
+                
+            llm = ChatOpenAI(
+                model=local_model, 
+                base_url=base_url, 
+                api_key="sk-local",
+                temperature=0, 
+                streaming=True,
+                max_retries=1
+            )
             
-        local_model = target_model if target_model and target_model != "local" else "default"
-            
-        llm = ChatOpenAI(
-            model=local_model, 
-            base_url=base_url, 
-            api_key="sk-local",
-            temperature=0, 
-            streaming=True
-        )
-        
-    if bind_tools:
-        tools = get_agent_tools()
-        return llm.bind_tools(tools)
-    return llm
+        if bind_tools:
+            try:
+                tools = get_agent_tools()
+                # Try to bind tools, but catch if the model/provider doesn't support it
+                return llm.bind_tools(tools)
+            except Exception as e:
+                print(f"WARNING: Provider {provider} does not support tool binding: {e}. Proceeding with plain LLM.")
+                return llm
+        return llm
+
+    except Exception as e:
+        print(f"ERROR: Failed to initialize LLM for provider {provider}: {e}")
+        raise e
 
 async def summarize_history(messages: List[BaseMessage], config: RunnableConfig) -> str:
     """
