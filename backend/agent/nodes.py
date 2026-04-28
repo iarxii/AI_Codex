@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 from langchain_ollama import ChatOllama
-from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
+from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage, BaseMessage
 from langchain_core.runnables import RunnableConfig
 from .state import AgentState
 from .tools import get_agent_tools
