@@ -154,6 +154,17 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     """
     messages = state["messages"]
     
+    # Workspace Sentinel: update status file periodically
+    from backend.agent.workspace_sentinel import (
+        should_update_status, extract_status_from_history, write_workspace_status
+    )
+    turn_count = len([m for m in messages if m.type == "human"])
+    if should_update_status(turn_count):
+        status = extract_status_from_history(messages)
+        if status:
+            write_workspace_status(status)
+            print(f"SENTINEL: Status updated at turn {turn_count} ({len(status)} chars)")
+    
     # Context Budgeting: If history is long, summarize older parts
     summary = ""
     if len(messages) > 15:

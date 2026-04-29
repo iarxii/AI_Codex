@@ -7,6 +7,8 @@ interface ChatInputProps {
   onSend: (e: React.FormEvent) => void;
   loading: boolean;
   currentConvId: number | null;
+  showTelemetry: boolean;
+  setShowTelemetry: (val: boolean) => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
@@ -14,12 +16,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
   setInput,
   onSend,
   loading,
-  currentConvId
+  currentConvId,
+  showTelemetry,
+  setShowTelemetry
 }) => {
   return (
     <footer className="px-6 pb-5 pt-3 bg-transparent border-t border-black/[0.04] z-20">
       <div className="max-w-4xl mx-auto mb-3">
-        <ProviderSelector />
+        <ProviderSelector showTelemetry={showTelemetry} setShowTelemetry={setShowTelemetry} />
       </div>
       <form onSubmit={onSend} className="max-w-4xl mx-auto">
         {/* Main Input Container */}
