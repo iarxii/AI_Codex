@@ -18,7 +18,7 @@ export interface ProviderInfo {
 export const PROVIDERS: ProviderInfo[] = [
   {
     id: 'local',
-    label: 'Ollama',
+    label: 'Llama.cpp',
     description: 'Local GPU inference',
     color: '#A3E635',
     icon: '/media/brand-icons/ollama-color.svg',

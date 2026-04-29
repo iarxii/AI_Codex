@@ -112,7 +112,14 @@ const Chat: React.FC = () => {
               ...lastMsg, 
               content: data.content, 
               status: 'typing',
-              metadata: lastMsg.metadata || { provider: activeProvider, model: activeModel }
+              metadata: { 
+                ...lastMsg.metadata,
+                provider: activeProvider, 
+                model: activeModel,
+                latency: data.duration || lastMsg.metadata?.latency,
+                tokens: data.tokens || lastMsg.metadata?.tokens,
+                timestamp: lastMsg.metadata?.timestamp || Date.now()
+              }
             };
             if (data.duration) setCurrentLatency(data.duration);
             return updated;
@@ -123,7 +130,13 @@ const Chat: React.FC = () => {
               sender: 'bot', 
               content: data.content, 
               status: 'typing',
-              metadata: { provider: activeProvider, model: activeModel }
+              metadata: { 
+                provider: activeProvider, 
+                model: activeModel,
+                latency: data.duration,
+                tokens: data.tokens,
+                timestamp: Date.now()
+              }
             }];
           }
         });
@@ -178,7 +191,17 @@ const Chat: React.FC = () => {
         setMessages(prev => {
           const updated = [...prev];
           if (updated.length > 0 && updated[updated.length - 1].sender === 'bot') {
-            updated[updated.length - 1].status = 'done';
+            const lastMsg = updated[updated.length - 1];
+            updated[updated.length - 1] = {
+              ...lastMsg,
+              status: 'done',
+              metadata: {
+                ...lastMsg.metadata,
+                latency: data.duration || lastMsg.metadata?.latency,
+                tokens: data.tokens || lastMsg.metadata?.tokens,
+                timestamp: lastMsg.metadata?.timestamp || Date.now()
+              }
+            };
           }
           return updated;
         });
@@ -356,6 +379,8 @@ const Chat: React.FC = () => {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
+
+      {/* lets create a floating / fab button that wull be position on the top-left 20px down from the height of the ChatHeader so that we have an option to start new workspaces when the sidebar is hidden. */}
 
       <div className="flex-1 flex flex-col min-w-0 relative">
         <ChatHeader 

@@ -14,30 +14,18 @@ type SettingsModalProps = {
 };
 
 /** Inline SVG icons for providers without image assets */
-const GroqIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#FF6600" stroke="#FF6600" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-const OpenRouterIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="12" r="9" stroke="#06B6D4" strokeWidth="1.5"/>
-    <path d="M2 12h20M12 2c-3 3-4.5 6-4.5 10s1.5 7 4.5 10c3-3 4.5-6 4.5-10S15 5 12 2z" stroke="#06B6D4" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-);
-
 /** Map provider ID to its icon component */
 const ProviderIcon: React.FC<{ providerId: string; size?: number }> = ({ providerId, size = 28 }) => {
   switch (providerId) {
     case 'local':
+    case 'ollama_cloud':
       return <img src={OllamaLogo} alt="Ollama" style={{ width: size, height: size }} />;
     case 'groq':
-      return <GroqIcon />;
+      return <img src="/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg" alt="Groq" style={{ width: size, height: size }} className="object-contain drop-shadow-sm" />;
     case 'openrouter':
-      return <OpenRouterIcon />;
+      return <img src="/media/brand-icons/openrouter.webp" alt="OpenRouter" style={{ width: size, height: size }} className="object-contain" />;
     case 'gemini':
-      return <img src={GeminiLogo} alt="Gemini" style={{ width: size, height: size }} />;
+      return <img src="/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg" alt="Gemini" style={{ width: size, height: size }} className="object-contain" />;
     default:
       return <span style={{ fontSize: size * 0.7 }}>🤖</span>;
   }

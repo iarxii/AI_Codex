@@ -3,10 +3,12 @@ import { Listbox, Transition } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { useAI } from '../contexts/AIContext';
 import { config } from '../config';
+import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
+import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 
 const providers = [
-  { id: 'local', name: 'Local (Ollama GPU)', icon: <img src="/media/brand-icons/ollama-color.svg" alt="Local Logo" className="w-6 h-6 object-contain" /> },
-  { id: 'ollama_cloud', name: 'Ollama (Remote Cloud)', icon: <img src="/media/brand-icons/ollama-color.svg" alt="Ollama Cloud Logo" className="w-6 h-6 object-contain" /> },
+  { id: 'local', name: 'OllamaOpt (Local LLM)', icon: <img src={OllamaLogo} alt="Local Logo" className="w-6 h-6 object-contain" /> },
+  { id: 'ollama_cloud', name: 'Ollama (Remote Cloud)', icon: <img src={OllamaLogo} alt="Ollama Cloud Logo" className="w-6 h-6 object-contain" /> },
   { id: 'groq', name: 'Groq (Cloud)', icon: <img src="/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg" alt="Groq Logo" className="w-6 h-6 object-contain drop-shadow-md" /> },
   { id: 'openrouter', name: 'OpenRouter (Cloud)', icon: <img src="/media/brand-icons/openrouter.webp" alt="OpenRouter Logo" className="w-6 h-6 object-contain" /> },
   { id: 'gemini', name: 'Gemini (Cloud)', icon: <img src="/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg" alt="Gemini Logo" className="w-6 h-6 object-contain" /> },

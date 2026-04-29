@@ -41,7 +41,7 @@ const Register: React.FC = () => {
               />
             </div>
             <h1 className="text-4xl font-black tracking-tight text-[var(--text-primary)] mb-2">
-              Join AICodex
+              Join AI<span className="text-[var(--accent)]">Codex</span>
             </h1>
             <p className="text-[var(--text-secondary)] font-medium">
               Create your architect profile.
