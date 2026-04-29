@@ -1,1 +1,1 @@
-[04/29 16:15] Goal: Optimizing local LLM inference pipeline | Decision: Using NativeLocalClient with Llama-3 templates and SSE streaming for llama.cpp parity
+[04/29 21:00] | Goal: Tell me a bit more about Data Science

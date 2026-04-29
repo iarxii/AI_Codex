@@ -56,7 +56,7 @@ const Login: React.FC = () => {
               <img src="/media/aicodex_logo_2_transp.png" alt="AICodex Logo" className="w-full h-full object-contain rounded-3xl border-2 border-[var(--accent)]" />
             </div>
             <h1 className="text-4xl font-black tracking-tight text-[var(--text-primary)] mb-2">
-              AICodex
+              AI<span className="text-[var(--accent)]">Codex</span>
             </h1>
             <p className="text-[var(--text-secondary)] font-medium">Welcome back, Architect.</p>
           </div>
