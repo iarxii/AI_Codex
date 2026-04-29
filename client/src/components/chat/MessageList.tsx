@@ -15,6 +15,7 @@ interface MessageListProps {
   activeProvider: ProviderId;
   activeModel: string;
   onCancel: () => void;
+  onViewInCanvas: (artifactId: string) => void;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -28,7 +29,8 @@ const MessageList: React.FC<MessageListProps> = ({
   currentConvId,
   activeProvider,
   activeModel,
-  onCancel
+  onCancel,
+  onViewInCanvas
 }) => {
   const lastUserIndex = [...messages].reverse().findIndex(m => m.sender === 'user');
 
@@ -88,6 +90,7 @@ const MessageList: React.FC<MessageListProps> = ({
             currentToolCalls={currentToolCalls}
             currentContext={currentContext}
             onCancel={onCancel}
+            onViewInCanvas={onViewInCanvas}
           />
         ))}
       </div>

@@ -21,4 +21,5 @@ export interface Artifact {
   content: string;
   language?: string;
   timestamp: number;
+  messageId?: string; // Link to the message that generated this artifact
 }

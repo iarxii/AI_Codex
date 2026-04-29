@@ -43,3 +43,33 @@ def upload_db_to_gcs():
         print(f"Successfully uploaded {settings.DATABASE_FILE} to GCS bucket {settings.GCS_BUCKET_NAME}")
     except Exception as e:
         print(f"Failed to upload database to GCS: {e}")
+def save_scratchpad_file(session_id: str, filename: str, content: str):
+    """
+    Saves content to a local workspace file and syncs to GCS if enabled.
+    Path: data/workspaces/{session_id}/scratch/{filename}
+    """
+    # 1. Local Write
+    workspace_dir = os.path.join("data", "workspaces", session_id, "scratch")
+    os.makedirs(workspace_dir, exist_ok=True)
+    
+    local_path = os.path.join(workspace_dir, filename)
+    with open(local_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    
+    print(f"Saved scratchpad locally: {local_path}")
+
+    # 2. GCS Sync (Production)
+    if settings.GCS_BUCKET_NAME:
+        try:
+            storage_client = storage.Client()
+            bucket = storage_client.bucket(settings.GCS_BUCKET_NAME)
+            
+            # GCS path: workspaces/{session_id}/scratch/{filename}
+            gcs_path = f"workspaces/{session_id}/scratch/{filename}"
+            blob = bucket.blob(gcs_path)
+            blob.upload_from_string(content)
+            print(f"Synced scratchpad to GCS: gs://{settings.GCS_BUCKET_NAME}/{gcs_path}")
+        except Exception as e:
+            print(f"Failed to sync scratchpad to GCS: {e}")
+    
+    return local_path

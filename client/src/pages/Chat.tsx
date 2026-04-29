@@ -44,6 +44,8 @@ const Chat: React.FC = () => {
   const [showTelemetry, setShowTelemetry] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string>(Date.now().toString()); // Simple ID for now
   
   // Global AI State
   const { provider: activeProvider, model: activeModel, getApiKey } = useAI();
@@ -60,6 +62,34 @@ const Chat: React.FC = () => {
   }, [isCanvasOpen]);
 
   // 1. Initial Auth Check
+  const handleViewInCanvas = (artifactId: string) => {
+    setSelectedArtifactId(artifactId);
+    setIsCanvasOpen(true);
+  };
+
+  const saveToScratchpad = async (artifact: Artifact) => {
+    const token = localStorage.getItem('token');
+    if (!token || !artifact.content) return;
+
+    try {
+      await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/workspace/scratchpad`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          conversation_id: activeConversationId,
+          filename: artifact.title || 'scratchpad.py',
+          content: artifact.content
+        })
+      });
+      console.log('Scratchpad synced to filesystem.');
+    } catch (err) {
+      console.error('Failed to sync scratchpad:', err);
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -212,7 +242,7 @@ const Chat: React.FC = () => {
             };
 
             // Parse artifacts from final response (once, not on every token)
-            const finalArtifacts = parseArtifacts(lastMsg.content);
+            const finalArtifacts = parseArtifacts(lastMsg.content, lastMsg.id);
             if (finalArtifacts.length > 0) {
               setArtifacts(prev => {
                 const merged = [...prev];
@@ -223,6 +253,11 @@ const Chat: React.FC = () => {
                 });
                 return merged;
               });
+
+              // Auto-sync code artifacts to scratchpad
+              const codeArt = finalArtifacts.find(a => a.type === 'code');
+              if (codeArt) saveToScratchpad(codeArt);
+
               if (!isCanvasOpenRef.current) setIsCanvasOpen(true);
             }
           }
@@ -461,6 +496,7 @@ const Chat: React.FC = () => {
           activeProvider={activeProvider}
           activeModel={activeModel}
           onCancel={handleCancel}
+          onViewInCanvas={handleViewInCanvas}
         />
 
         <ChatInput 
@@ -478,6 +514,8 @@ const Chat: React.FC = () => {
         isOpen={isCanvasOpen} 
         onClose={() => setIsCanvasOpen(false)} 
         artifacts={artifacts}
+        externalSelectedId={selectedArtifactId}
+        onSaveToScratchpad={saveToScratchpad}
       />
       <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
       
