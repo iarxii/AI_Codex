@@ -39,7 +39,9 @@ const Chat: React.FC = () => {
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, npu_available: false, igpu: 0, igpu_available: false, latency: '0ms' });
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
   const [isChartExpanded, setIsChartExpanded] = useState(false);
+  const [showTelemetry, setShowTelemetry] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   
   // Global AI State
   const { provider: activeProvider, model: activeModel, getApiKey } = useAI();
@@ -107,12 +109,23 @@ const Chat: React.FC = () => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg && lastMsg.sender === 'bot') {
             const updated = [...prev];
-            updated[updated.length - 1] = { ...lastMsg, content: data.content, status: 'typing' };
+            updated[updated.length - 1] = { 
+              ...lastMsg, 
+              content: data.content, 
+              status: 'typing',
+              metadata: lastMsg.metadata || { provider: activeProvider, model: activeModel }
+            };
             if (data.duration) setCurrentLatency(data.duration);
             return updated;
           } else {
             if (data.duration) setCurrentLatency(data.duration);
-            return [...prev, { id: Date.now().toString(), sender: 'bot', content: data.content, status: 'typing' }];
+            return [...prev, { 
+              id: Date.now().toString(), 
+              sender: 'bot', 
+              content: data.content, 
+              status: 'typing',
+              metadata: { provider: activeProvider, model: activeModel }
+            }];
           }
         });
         
@@ -315,6 +328,26 @@ const Chat: React.FC = () => {
       isProcessing.current = false;
     }
   };
+  const handleCancel = () => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN || !loading) return;
+    
+    setIsCancelling(true);
+    ws.current.send(JSON.stringify({ type: 'cancel' }));
+    
+    // Optimistic UI update
+    setLoading(false);
+    isProcessing.current = false;
+    setMessages(prev => {
+      const updated = [...prev];
+      if (updated.length > 0 && updated[updated.length - 1].sender === 'bot') {
+        updated[updated.length - 1].status = 'done';
+        updated[updated.length - 1].content += '\n\n*(Operation cancelled by user)*';
+      }
+      return updated;
+    });
+    
+    setTimeout(() => setIsCancelling(false), 1000);
+  };
 
   return (
     <div className="flex h-screen bg-transparent text-[#1A1D2E] font-[Poppins] overflow-hidden relative">
@@ -346,7 +379,7 @@ const Chat: React.FC = () => {
         
         {/* Floating Hardware Telemetry — Moved to Top to prevent input obstruction */}
         <div className="absolute top-16 left-0 right-0 pointer-events-none flex justify-center z-30">
-          <div className="pointer-events-auto">
+          <div className={`pointer-events-auto transition-all duration-300 transform ${showTelemetry ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-4 opacity-0 scale-95 pointer-events-none'}`}>
             <MetricsStrip 
               metrics={metrics}
               metricsHistory={metricsHistory}
@@ -367,6 +400,7 @@ const Chat: React.FC = () => {
           currentConvId={currentConvId}
           activeProvider={activeProvider}
           activeModel={activeModel}
+          onCancel={handleCancel}
         />
 
         <ChatInput 
@@ -375,6 +409,8 @@ const Chat: React.FC = () => {
           onSend={handleSend}
           loading={loading}
           currentConvId={currentConvId}
+          showTelemetry={showTelemetry}
+          setShowTelemetry={setShowTelemetry}
         />
       </div>
 

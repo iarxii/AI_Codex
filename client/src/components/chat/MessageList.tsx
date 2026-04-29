@@ -14,6 +14,7 @@ interface MessageListProps {
   currentConvId: number | null;
   activeProvider: ProviderId;
   activeModel: string;
+  onCancel: () => void;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -26,7 +27,8 @@ const MessageList: React.FC<MessageListProps> = ({
   scrollRef,
   currentConvId,
   activeProvider,
-  activeModel
+  activeModel,
+  onCancel
 }) => {
   const lastUserIndex = [...messages].reverse().findIndex(m => m.sender === 'user');
 
@@ -85,6 +87,7 @@ const MessageList: React.FC<MessageListProps> = ({
             thoughtStartTime={thoughtStartTime}
             currentToolCalls={currentToolCalls}
             currentContext={currentContext}
+            onCancel={onCancel}
           />
         ))}
       </div>

@@ -12,7 +12,12 @@ const providers = [
   { id: 'gemini', name: 'Gemini (Cloud)', icon: <img src="/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg" alt="Gemini Logo" className="w-6 h-6 object-contain" /> },
 ];
 
-const ProviderSelector: React.FC = () => {
+interface ProviderSelectorProps {
+  showTelemetry: boolean;
+  setShowTelemetry: (val: boolean) => void;
+}
+
+const ProviderSelector: React.FC<ProviderSelectorProps> = ({ showTelemetry, setShowTelemetry }) => {
   const { provider, setProvider, model, setModel } = useAI();
   const [availableModels, setAvailableModels] = useState<{ id: string, name: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -74,6 +79,26 @@ const ProviderSelector: React.FC = () => {
 
   return (
     <div className="mb-2 flex gap-3">
+      <div className="flex-none flex flex-col justify-end">
+        <span className="block text-[10px] font-bold uppercase tracking-widest text-[#4A4D5E] mb-1.5 ml-1">
+          Stats
+        </span>
+        <button
+          type="button"
+          onClick={() => setShowTelemetry(!showTelemetry)}
+          className={`h-[42px] px-3 rounded-xl border transition-all active:scale-95 flex items-center justify-center ${
+            showTelemetry 
+              ? 'bg-[#FF6600]/10 border-[#FF6600]/30 text-[#FF6600] shadow-sm shadow-[#FF6600]/10' 
+              : 'bg-[#E2E6EC] border-black/[0.08] text-[#7A7D8E] hover:bg-[#D8DCE4] hover:text-[#4A4D5E]'
+          }`}
+          title={showTelemetry ? "Hide Hardware Telemetry" : "Show Hardware Telemetry"}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </button>
+      </div>
+
       <div className="flex-1">
         <Listbox value={provider} onChange={setProvider}>
           <div className="relative mt-1">
