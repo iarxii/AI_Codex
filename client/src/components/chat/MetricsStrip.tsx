@@ -7,7 +7,9 @@ interface MetricsStripProps {
     cpu: number;
     ram: number;
     npu?: number;
+    npu_available?: boolean;
     igpu?: number;
+    igpu_available?: boolean;
     latency: string | number;
   };
   metricsHistory: any[];
@@ -37,12 +39,16 @@ const MetricsStrip: React.FC<MetricsStripProps> = ({
           <span className="text-black/10">|</span>
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
-            <span className={metrics.igpu && metrics.igpu > 80 ? 'text-red-500' : ''}>GPU {Math.round(metrics.igpu || 0)}%</span>
+            <span className={metrics.igpu && metrics.igpu > 80 ? 'text-red-500' : ''}>
+              GPU {metrics.igpu_available ? `${Math.round(metrics.igpu || 0)}%` : 'N/A'}
+            </span>
           </div>
           <span className="text-black/10">|</span>
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
-            <span className={metrics.npu && metrics.npu > 80 ? 'text-red-500' : ''}>NPU {Math.round(metrics.npu || 0)}%</span>
+            <span className={metrics.npu && metrics.npu > 80 ? 'text-red-500' : ''}>
+              NPU {metrics.npu_available ? `${Math.round(metrics.npu || 0)}%` : 'N/A'}
+            </span>
           </div>
           <span className="text-black/10">|</span>
           <div className="flex items-center gap-1.5">

@@ -36,7 +36,7 @@ const Chat: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const isProcessing = useRef(false);
-  const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, igpu: 0, latency: '0ms' });
+  const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, npu_available: false, igpu: 0, igpu_available: false, latency: '0ms' });
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
   const [isChartExpanded, setIsChartExpanded] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -120,12 +120,16 @@ const Chat: React.FC = () => {
           if (prev.length === 0) return prev;
           const updated = [...prev];
           const lastLog = { ...updated[updated.length - 1] };
+          
+          // Ensure content is a string for regex matching (safety check for multimodal/malformed data)
+          const contentStr = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
+          
           if (lastLog.text.includes('reason')) {
-            const thinkMatch = data.content.match(/<think>([\s\S]*?)(<\/think>|$)/);
+            const thinkMatch = contentStr.match(/<think>([\s\S]*?)(<\/think>|$)/);
             if (thinkMatch) {
               lastLog.details = thinkMatch[1].trim();
-            } else if (data.content.length > 0) {
-              lastLog.details = data.content.length > 500 ? '...' + data.content.substring(data.content.length - 500) : data.content;
+            } else if (contentStr.length > 0) {
+              lastLog.details = contentStr.length > 500 ? '...' + contentStr.substring(contentStr.length - 500) : contentStr;
             }
           }
           updated[updated.length - 1] = lastLog;
@@ -186,7 +190,12 @@ const Chat: React.FC = () => {
 
     mSocket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      setMetrics(data);
+      // Pass through availability flags from backend
+      setMetrics({
+        ...data,
+        npu_available: data.npu_available ?? false,
+        igpu_available: data.igpu_available ?? false,
+      });
       setMetricsHistory(prev => {
         const newEntry = {
           time: new Date().toLocaleTimeString(),

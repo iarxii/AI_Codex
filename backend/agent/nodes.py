@@ -75,9 +75,30 @@ def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
             # Note: llama-server.exe (turboquant) is often OpenAI compatible at the root or /v1
             if not base_url.endswith("/v1"):
                 base_url = f"{base_url.rstrip('/')}/v1"
-                
+            
+            # Normalize model name: SHA256 blob digests from llama-server's /api/tags
+            # are not valid model names for /v1/chat/completions — use "default"
             local_model = target_model if target_model and target_model != "local" else "default"
+            if local_model.startswith("sha256-") or local_model.startswith("sha256:"):
+                print(f"DEBUG: Detected blob digest model name '{local_model[:20]}...', normalizing to 'default'")
+                local_model = "default"
+                
             print(f"DEBUG: Local Neural Core at {base_url} (Model: {local_model})")
+            
+            # Pre-flight connection check — fail fast with a clear error
+            import httpx
+            try:
+                probe_url = base_url.replace("/v1", "")
+                resp = httpx.get(f"{probe_url}/api/tags", timeout=3.0)
+                if resp.status_code != 200:
+                    # Try /v1/models as fallback (pure OpenAI-compat servers)
+                    resp2 = httpx.get(f"{base_url}/models", timeout=3.0)
+                    if resp2.status_code != 200:
+                        raise ConnectionError(f"Local LLM server at {probe_url} returned status {resp.status_code}")
+            except httpx.ConnectError:
+                raise ConnectionError(f"Cannot reach local LLM server at {base_url}. Is Ollama or llama-server running?")
+            except httpx.TimeoutException:
+                raise ConnectionError(f"Local LLM server at {base_url} timed out. The server may be overloaded.")
                 
             llm = ChatOpenAI(
                 model=local_model, 
@@ -89,6 +110,13 @@ def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
             )
             
         if bind_tools:
+            # Skip tool binding for local/ollama_cloud providers:
+            # llama-server (turboquant) doesn't support OpenAI-compatible function calling.
+            # The tools parameter causes the streaming response parser to hang waiting for 
+            # structured tool_calls chunks that never arrive in the expected format.
+            if provider in ("local", "ollama_cloud"):
+                print(f"DEBUG: Skipping tool binding for provider '{provider}' (not supported by llama-server)")
+                return llm
             try:
                 tools = get_agent_tools()
                 # Try to bind tools, but catch if the model/provider doesn't support it
@@ -137,22 +165,64 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
 
     system_prompt = build_system_prompt()
     
+    # Initialize context builder with provider-aware budget
+    # This ensures cloud providers get larger context windows than local models
+    provider = config.get("configurable", {}).get("provider", "local")
+    print(f"PIPELINE: Building context for provider={provider}...")
+    context_builder = get_context_builder(provider=provider)
+    print(f"PIPELINE: Context builder ready. Initializing LLM...")
+    
     # Use the dynamic LLM with tools bound
-    llm = get_dynamic_llm(config, bind_tools=True)
+    try:
+        llm = get_dynamic_llm(config, bind_tools=True)
+    except Exception as init_err:
+        print(f"PIPELINE ERROR: LLM init failed — {init_err}")
+        from langchain_core.messages import AIMessage
+        return {
+            "messages": [AIMessage(content=f"❌ LLM initialization failed: {init_err}")],
+            "current_tool_calls": [],
+            "context_data": {"error": str(init_err)}
+        }
     
     # First turn: check if it's just a greeting or simple request
     # To save tokens and latency, we don't do RAG here.
     # The agent can call 'codebase_search' if it needs more info.
     
     start_time = time.perf_counter()
-    response = await llm.ainvoke(messages)
+    print("PIPELINE: Invoking LLM...")
+    try:
+        import asyncio as _asyncio
+        response = await _asyncio.wait_for(llm.ainvoke(messages), timeout=60.0)
+    except (TimeoutError, Exception) as invoke_err:
+        is_timeout = isinstance(invoke_err, (TimeoutError,)) or "TimeoutError" in type(invoke_err).__name__
+        if is_timeout:
+            print(f"PIPELINE ERROR: LLM call timed out after 60s")
+            error_msg = "Request timed out after 60s. The model server may be overloaded. Please try again."
+        else:
+            print(f"PIPELINE ERROR: LLM invocation failed — {invoke_err}")
+            error_msg = str(invoke_err)
+            # Parse common API errors
+            if "429" in error_msg:
+                error_msg = "Rate limited by provider. Please wait and retry, or switch models."
+            elif "401" in error_msg or "API key" in error_msg:
+                error_msg = "Authentication failed. Check your API key in Settings."
+            elif "Could not find model" in error_msg or "404" in error_msg:
+                error_msg = "Model not found. Please select a different model."
+        from langchain_core.messages import AIMessage
+        return {
+            "messages": [AIMessage(content=f"❌ {error_msg}")],
+            "current_tool_calls": [],
+            "context_data": {"error": str(invoke_err)}
+        }
     duration = time.perf_counter() - start_time
     
     provider = config.get("configurable", {}).get("provider", "local")
     model = config.get("configurable", {}).get("model", "default")
     log_performance("LLM_REASONING", duration, {"provider": provider, "model": model})
+    print(f"PIPELINE: LLM responded in {duration:.2f}s, content length={len(str(response.content))}")
     
     tool_calls = getattr(response, "tool_calls", [])
+    print(f"PIPELINE: Tool calls: {len(tool_calls)}")
     
     return {
         "messages": [response],

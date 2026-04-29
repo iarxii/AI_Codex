@@ -166,7 +166,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                     "duration": time.perf_counter() - request_start
                                 })
                         
-                        # Tool Calls
+                        # Tool Calls or Final Response
                         elif kind == "on_chat_model_end":
                             msg = event["data"]["output"]
                             if hasattr(msg, "tool_calls") and msg.tool_calls:
@@ -174,6 +174,17 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                 await websocket.send_json({
                                     "type": "tool_call",
                                     "tool_calls": msg.tool_calls,
+                                    "node": node_name,
+                                    "duration": time.perf_counter() - request_start
+                                })
+                            # Fallback: if no streaming tokens were captured but model returned content,
+                            # send the full response as a single token (handles providers that don't stream)
+                            elif hasattr(msg, "content") and msg.content and not full_ai_response:
+                                full_ai_response = msg.content
+                                print(f"\nPIPELINE: Non-streaming response captured ({len(msg.content)} chars)")
+                                await websocket.send_json({
+                                    "type": "token",
+                                    "content": full_ai_response,
                                     "node": node_name,
                                     "duration": time.perf_counter() - request_start
                                 })
@@ -192,9 +203,58 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             error_obj = event.get("data", {}).get("error")
                             print(f"PIPELINE ERROR: {error_obj}")
                             await websocket.send_json({"type": "error", "message": f"Graph Error: {str(error_obj)}"})
+                        
+                        # Capture final response from graph chain_end state
+                        # This is the most reliable way to get the AI response when
+                        # on_chat_model_stream events don't fire (e.g., local provider)
+                        elif kind == "on_chain_end" and not full_ai_response:
+                            output = event.get("data", {}).get("output", {})
+                            if isinstance(output, dict):
+                                msgs = output.get("messages", [])
+                                for m in reversed(msgs):
+                                    if hasattr(m, "content") and m.content and getattr(m, "type", "") == "ai":
+                                        content = m.content
+                                        if isinstance(content, list):
+                                            # Extract text from content blocks (common with Gemini/Multimodal)
+                                            text_parts = []
+                                            for part in content:
+                                                if isinstance(part, dict):
+                                                    text_parts.append(part.get("text", ""))
+                                                else:
+                                                    text_parts.append(str(part))
+                                            content = "".join(text_parts)
+                                        
+                                        full_ai_response = str(content)
+                                        print(f"\nPIPELINE: Captured response from chain_end ({len(full_ai_response)} chars)")
+                                        await websocket.send_json({
+                                            "type": "token",
+                                            "content": full_ai_response,
+                                            "node": node_name,
+                                            "duration": time.perf_counter() - request_start
+                                        })
+                                        break
+
                 except Exception as e:
+                    error_str = str(e)
                     log_error(f"PIPELINE EXCEPTION for conv {conversation_id}", e)
-                    await websocket.send_json({"type": "error", "message": f"Execution Error: {str(e)}"})
+                    
+                    # Parse common error patterns into user-friendly messages
+                    friendly_msg = error_str
+                    if "429" in error_str or "rate" in error_str.lower():
+                        friendly_msg = "Rate limited by provider. Please wait a moment and try again, or switch to a different model."
+                    elif "401" in error_str or "unauthorized" in error_str.lower() or "invalid api key" in error_str.lower():
+                        friendly_msg = "Authentication failed. Please check your API key in Settings."
+                    elif "Cannot reach" in error_str or "ConnectError" in error_str or isinstance(e, ConnectionError):
+                        friendly_msg = f"Cannot connect to LLM server. {error_str}"
+                    elif "timed out" in error_str.lower() or "timeout" in error_str.lower():
+                        friendly_msg = "Request timed out. The model server may be overloaded or offline."
+                    elif "404" in error_str:
+                        friendly_msg = "Model not found on the provider. Please select a different model."
+                    elif len(error_str) > 300:
+                        # Truncate very long error messages
+                        friendly_msg = error_str[:250] + "..."
+                    
+                    await websocket.send_json({"type": "error", "message": f"Execution Error: {friendly_msg}"})
                 finally:
                     # 5. Persist AI Response
                     if full_ai_response:

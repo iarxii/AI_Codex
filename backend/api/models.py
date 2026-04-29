@@ -27,9 +27,32 @@ async def list_models(
                         name = m["name"].lower()
                         if any(x in name for x in ["embed", "minilm", "nomic", "bert", "ranker"]):
                             continue
-                        models.append({"id": m["name"], "name": m["name"]})
+                        model_id = m["name"]
+                        display_name = m["name"]
+                        # llama-server (turboquant) returns SHA256 blob digests
+                        # Normalize to "default" since it only serves one model
+                        if model_id.startswith("sha256-") or model_id.startswith("sha256:"):
+                            model_id = "default"
+                            display_name = f"Local Model (llama-server)"
+                        models.append({"id": model_id, "name": display_name})
+                    # If llama-server returned no models via /api/tags, add a default entry
+                    if not models:
+                        # Try /v1/models endpoint for pure OpenAI-compat servers
+                        try:
+                            base_v1 = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/v1"
+                            r2 = await client.get(f"{base_v1}/models")
+                            if r2.status_code == 200:
+                                v1_data = r2.json()
+                                for m in v1_data.get("data", []):
+                                    models.append({"id": m.get("id", "default"), "name": m.get("id", "Local Model")})
+                        except Exception:
+                            pass
+                        if not models:
+                            models.append({"id": "default", "name": "Local Model (auto-detect)"})
                     return models
-                return []
+                # Server is running but /api/tags returned non-200
+                # Still provide a default entry so the user can attempt chat
+                return [{"id": "default", "name": "Local Model (auto-detect)"}]
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Ollama error: {str(e)}")
 
