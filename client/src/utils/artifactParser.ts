@@ -7,7 +7,7 @@ import type { Artifact } from '../types/chat';
  * Format: [CANVAS:TYPE:TITLE:LANGUAGE] CONTENT [/CANVAS]
  * Example: [CANVAS:CODE:main.ts:typescript] console.log("hi") [/CANVAS]
  */
-export const parseArtifacts = (content: string): Artifact[] => {
+export const parseArtifacts = (content: string, messageId?: string): Artifact[] => {
   const artifacts: Artifact[] = [];
   
   // Regex to match closed canvas tags
@@ -43,7 +43,8 @@ export const parseArtifacts = (content: string): Artifact[] => {
       title,
       content: artifactContent,
       language: language || (artifactType === 'code' ? 'text' : undefined),
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      messageId
     });
   }
 

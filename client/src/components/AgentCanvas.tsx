@@ -6,13 +6,29 @@ interface AgentCanvasProps {
   isOpen: boolean;
   onClose: () => void;
   artifacts: Artifact[];
+  externalSelectedId?: string | null;
+  onSaveToScratchpad?: (artifact: Artifact) => Promise<void>;
 }
 
 type TabType = 'Code' | 'Docs' | 'Research';
 
-const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts }) => {
+const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, externalSelectedId, onSaveToScratchpad }) => {
   const [activeTab, setActiveTab] = useState<TabType>('Code');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Sync with external selection
+  useEffect(() => {
+    if (externalSelectedId) {
+      const art = artifacts.find(a => a.id === externalSelectedId);
+      if (art) {
+        setSelectedId(externalSelectedId);
+        // Switch tab automatically
+        if (art.type === 'code') setActiveTab('Code');
+        else if (art.type === 'docs') setActiveTab('Docs');
+        else if (art.type === 'research') setActiveTab('Research');
+      }
+    }
+  }, [externalSelectedId, artifacts]);
 
   // Filter artifacts based on active tab
   const filteredArtifacts = artifacts.filter(art => {

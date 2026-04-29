@@ -13,6 +13,7 @@ interface MessageItemProps {
   currentToolCalls: any[];
   currentContext: any[];
   onCancel: () => void;
+  onViewInCanvas: (artifactId: string) => void;
 }
 
 const CodeBlock = ({ language, value }: { language: string; value: string }) => {
@@ -96,10 +97,32 @@ const MessageItem: React.FC<MessageItemProps> = ({
   thoughtStartTime,
   currentToolCalls,
   currentContext,
-  onCancel
+  onCancel,
+  onViewInCanvas
 }) => {
   const isUser = msg.sender === 'user';
   const isError = msg.content.startsWith('❌ Error:');
+
+  const getFirstArtifactId = (content: string) => {
+    const regex = /\[CANVAS:(\w+):([^:\]]+)/i;
+    const match = regex.exec(content);
+    if (!match) return null;
+    
+    const type = match[1].toLowerCase();
+    const title = match[2];
+    
+    const typeNormMap: Record<string, string> = {
+      'code': 'code',
+      'docs': 'docs',
+      'doc': 'docs',
+      'documentation': 'docs',
+      'research': 'research',
+    };
+    const artifactType = typeNormMap[type] || 'docs';
+    return `${artifactType}-${title.replace(/\s+/g, '-').toLowerCase()}`;
+  };
+
+  const firstArtifactId = getFirstArtifactId(msg.content);
 
   return (
     <div className="space-y-4">
@@ -204,6 +227,18 @@ const MessageItem: React.FC<MessageItemProps> = ({
                     </svg>
                     <span>{typeof msg.metadata.latency === 'number' ? msg.metadata.latency.toFixed(2) : msg.metadata.latency}s</span>
                   </div>
+                )}
+
+                {firstArtifactId && (
+                  <button 
+                    onClick={() => onViewInCanvas(firstArtifactId)}
+                    className="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#FF6600]/10 hover:bg-[#FF6600]/20 text-[#FF6600] border border-[#FF6600]/20 transition-all group/canvas"
+                  >
+                    <svg className="w-3 h-3 group-hover/canvas:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
+                    </svg>
+                    <span>View in Canvas</span>
+                  </button>
                 )}
               </div>
             )}
