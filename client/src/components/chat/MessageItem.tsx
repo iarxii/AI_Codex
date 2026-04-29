@@ -15,6 +15,79 @@ interface MessageItemProps {
   onCancel: () => void;
 }
 
+const CodeBlock = ({ language, value }: { language: string; value: string }) => {
+  const [copied, setCopied] = React.useState(false);
+  const [showLineNumbers, setShowLineNumbers] = React.useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const lines = value.split('\n');
+
+  return (
+    <div className="relative group/code my-5 rounded-xl border border-white/10 bg-[#1A1D2E] shadow-2xl overflow-hidden">
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-2 opacity-0 group-hover/code:opacity-100 transition-all duration-200">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setShowLineNumbers(!showLineNumbers);
+          }}
+          className={`p-1.5 rounded-md transition-all backdrop-blur-md border border-white/10 shadow-lg ${
+            showLineNumbers ? 'bg-[#FF6600] text-white border-[#FF6600]/20' : 'bg-white/10 text-white/70 hover:bg-white/20'
+          }`}
+          title="Toggle line numbers"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h7" />
+          </svg>
+        </button>
+
+        <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest bg-black/20 px-2 py-1 rounded-md backdrop-blur-sm border border-white/5">
+          {language || 'code'}
+        </span>
+        
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            handleCopy();
+          }}
+          className="p-1.5 rounded-md bg-white/10 hover:bg-[#FF6600] text-white/70 hover:text-white transition-all backdrop-blur-md border border-white/10 shadow-lg"
+          title="Copy to clipboard"
+        >
+          {copied ? (
+            <svg className="w-3.5 h-3.5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+            </svg>
+          )}
+        </button>
+      </div>
+      <pre className="!m-0 !p-4 !bg-transparent overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+        <code className="text-[11px] font-mono leading-relaxed text-[#E2E8F0]">
+          {showLineNumbers ? (
+            lines.map((line, i) => (
+              <div key={i} className="flex gap-4 min-w-fit">
+                <span className="shrink-0 w-6 text-right text-white/20 select-none tabular-nums border-r border-white/5 pr-2">{i + 1}</span>
+                <span className="whitespace-pre">{line || ' '}</span>
+              </div>
+            ))
+          ) : (
+            value
+          )}
+        </code>
+      </pre>
+    </div>
+  );
+};
+
 const MessageItem: React.FC<MessageItemProps> = ({
   msg,
   isLastUserMsg,
@@ -81,7 +154,28 @@ const MessageItem: React.FC<MessageItemProps> = ({
             )}
 
             <div className="prose-chat max-w-none text-[#1A1D2E] font-medium">
-              <ReactMarkdown>{msg.content}</ReactMarkdown>
+              {React.useMemo(() => (
+                <ReactMarkdown
+                  components={{
+                    pre: ({ children }) => <React.Fragment>{children}</React.Fragment>,
+                    code({ node, inline, className, children, ...props }: any) {
+                      const match = /language-(\w+)/.exec(className || '');
+                      return !inline ? (
+                        <CodeBlock 
+                          language={match ? match[1] : ''} 
+                          value={String(children).replace(/\n$/, '')} 
+                        />
+                      ) : (
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      );
+                    }
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              ), [msg.content])}
             </div>
 
             {/* Response Metadata Footer */}
