@@ -10,8 +10,6 @@ import P5Background from './components/P5Background';
 import './App.css';
 
 const App: React.FC = () => {
-  const isAuthenticated = !!localStorage.getItem('token');
-
   return (
     <AIProvider>
       <P5Background />
@@ -20,10 +18,7 @@ const App: React.FC = () => {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route 
-            path="/chat" 
-            element={isAuthenticated ? <Chat /> : <Navigate to="/login" />} 
-          />
+          <Route path="/chat" element={<Chat />} />
           {/* Fallback to login */}
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
