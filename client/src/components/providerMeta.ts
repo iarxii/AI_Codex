@@ -3,9 +3,6 @@
  * Used by Chat.tsx header badge, SettingsModal radio group, and ProviderSelector.
  */
 
-// SVG icon imports
-import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
-import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 
 export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud';
 

@@ -1,0 +1,10 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '--build-arg', 'VITE_API_URL=$_VITE_API_URL',
+      '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/aicodex-repo/frontend',
+      '.'
+    ]
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/aicodex-repo/frontend'

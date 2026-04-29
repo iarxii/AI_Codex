@@ -6,20 +6,19 @@ SET IMAGE_NAME=us-central1-docker.pkg.dev/aicodex-lab/aicodex-repo/backend
 
 echo [1/2] Submitting Build to Google Cloud...
 cd backend
-%GCLOUD% builds submit --tag %IMAGE_NAME% --project %PROJECT_ID%
+call %GCLOUD% builds submit --tag %IMAGE_NAME% --project %PROJECT_ID%
 if %ERRORLEVEL% NEQ 0 (
     echo Build failed. Exiting.
-    pause
     exit /b %ERRORLEVEL%
 )
 
 echo [2/2] Deploying to Cloud Run...
-%GCLOUD% run deploy backend ^
+call %GCLOUD% run deploy backend ^
     --image %IMAGE_NAME% ^
     --platform managed ^
     --region %REGION% ^
     --project %PROJECT_ID% ^
-    --allow-unauthenticated
+    --allow-unauthenticated ^
+    --set-env-vars "SECRET_KEY=AICODEX_SUPER_SECRET_KEY_CHANGEME,DB_TYPE=sqlite,CORS_ORIGINS=*"
 
 echo Deployment complete!
-pause
