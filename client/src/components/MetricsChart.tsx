@@ -104,7 +104,6 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
             y1={0} 
             y2={100} 
             fill="url(#heatGradient)" 
-            isFront={false} 
           />
           <Line
             yAxisId="percentage"

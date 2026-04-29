@@ -41,7 +41,6 @@ const Chat: React.FC = () => {
   const [isChartExpanded, setIsChartExpanded] = useState(false);
   const [showTelemetry, setShowTelemetry] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
   
   // Global AI State
   const { provider: activeProvider, model: activeModel, getApiKey } = useAI();
@@ -331,7 +330,6 @@ const Chat: React.FC = () => {
   const handleCancel = () => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN || !loading) return;
     
-    setIsCancelling(true);
     ws.current.send(JSON.stringify({ type: 'cancel' }));
     
     // Optimistic UI update
@@ -345,8 +343,6 @@ const Chat: React.FC = () => {
       }
       return updated;
     });
-    
-    setTimeout(() => setIsCancelling(false), 1000);
   };
 
   return (

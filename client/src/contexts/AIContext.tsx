@@ -42,9 +42,6 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     ollama_cloud: localStorage.getItem('ai_model_ollama_cloud') || '',
   });
 
-  const [ollamaCloudKey, setOllamaCloudKey] = useState<string>(localStorage.getItem('ollama_cloud_key') || '');
-  const [ollamaCloudUrl, setOllamaCloudUrl] = useState<string>(localStorage.getItem('ollama_cloud_url') || 'https://ollama.com');
-  const [ollamaCloudModels, setOllamaCloudModels] = useState<any[]>([]);
 
   const [visualSettings, setVisualSettings] = useState<VisualSettings>(() => {
     const saved = localStorage.getItem('ai_visual_settings');
