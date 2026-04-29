@@ -1,52 +1,81 @@
 import json
 import logging
 import httpx
-from typing import List, Dict, Any, Optional
-from langchain_core.messages import BaseMessage, AIMessage
+from typing import List, Dict, Any, Optional, AsyncIterator
+from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage
 
 logger = logging.getLogger(__name__)
 
 class NativeLocalClient:
     """
-    A lightweight client for llama-server (turboquant) that bypasses LangChain's 
-    OpenAI wrapper to provide better stability and support for native parameters.
+    Optimized client for llama-server (turboquant) with native streaming 
+    and Llama-3 prompt templating for maximum parity with the native portal.
     """
     def __init__(self, base_url: str, model: str = "default", temperature: float = 0.0):
+        # Strip /v1 to access native llama.cpp endpoints (/completion, /tokenize)
         self.base_url = base_url.replace("/v1", "") if "/v1" in base_url else base_url
         self.model = model
         self.temperature = temperature
 
-    async def ainvoke(self, messages: List[BaseMessage]) -> AIMessage:
-        """
-        Invokes the model using the native /completion endpoint for better prompt caching.
-        """
-        # Convert messages to a single prompt string (simple template)
-        prompt = ""
+    def _apply_llama3_template(self, messages: List[BaseMessage]) -> str:
+        """Applies the Llama-3 instruction format for better logic and termination."""
+        prompt = "<|begin_of_text|>"
         for msg in messages:
-            role = "USER" if msg.type == "human" else "ASSISTANT"
-            if msg.type == "system":
-                prompt += f"SYSTEM: {msg.content}\n"
-            else:
-                prompt += f"{role}: {msg.content}\n"
-        prompt += "ASSISTANT:"
+            role = "user"
+            if isinstance(msg, SystemMessage): role = "system"
+            elif isinstance(msg, AIMessage): role = "assistant"
+            
+            prompt += f"<|start_header_id|>{role}<|end_header_id|>\n\n{msg.content}<|eot_id|>"
+        
+        prompt += "<|start_header_id|>assistant<|end_header_id|>\n\n"
+        return prompt
 
+    async def ainvoke(self, messages: List[BaseMessage]) -> AIMessage:
+        """Non-streaming invocation (fallback)."""
+        prompt = self._apply_llama3_template(messages)
         payload = {
             "prompt": prompt,
             "temperature": self.temperature,
-            "stream": False, # Maximum stability for local GPU
+            "stream": False,
             "n_predict": 1024,
-            "stop": ["USER:", "SYSTEM:", "</s>"],
-            "cache_prompt": True # Native llama-server param
+            "stop": ["<|eot_id|>", "<|end_of_text|>", "<|start_header_id|>"],
+            "cache_prompt": True,
+            "slot_id": -1 # Allow server to pick/reuse slot
         }
 
         async with httpx.AsyncClient(timeout=120.0) as client:
-            try:
-                response = await client.post(f"{self.base_url}/completion", json=payload)
+            response = await client.post(f"{self.base_url}/completion", json=payload)
+            if response.status_code != 200:
+                raise Exception(f"Local server error: {response.text}")
+            data = response.json()
+            return AIMessage(content=data.get("content", ""))
+
+    async def astream(self, messages: List[BaseMessage]) -> AsyncIterator[Dict[str, Any]]:
+        """Streaming invocation for 'blazing fast' UI feedback."""
+        prompt = self._apply_llama3_template(messages)
+        payload = {
+            "prompt": prompt,
+            "temperature": self.temperature,
+            "stream": True,
+            "n_predict": 1024,
+            "stop": ["<|eot_id|>", "<|end_of_text|>", "<|start_header_id|>"],
+            "cache_prompt": True,
+            "slot_id": -1
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream("POST", f"{self.base_url}/completion", json=payload) as response:
                 if response.status_code != 200:
-                    raise Exception(f"Native server error: {response.text}")
+                    raise Exception(f"Local server streaming error: {await response.aread()}")
                 
-                data = response.json()
-                return AIMessage(content=data.get("content", ""))
-            except Exception as e:
-                logger.error(f"NativeLocalClient failed: {e}")
-                raise e
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        try:
+                            data = json.loads(line[6:])
+                            content = data.get("content", "")
+                            if content:
+                                yield {"content": content}
+                            if data.get("stop"):
+                                break
+                        except json.JSONDecodeError:
+                            continue

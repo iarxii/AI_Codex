@@ -200,18 +200,33 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             "context_data": {"error": str(init_err)}
         }
     
-    # First turn: check if it's just a greeting or simple request
-    # To save tokens and latency, we don't do RAG here.
-    # The agent can call 'codebase_search' if it needs more info.
-    
     # Increase timeout for local providers to handle high-load prefilling
     request_timeout = 120.0 if provider == "local" else 60.0
     
     start_time = time.perf_counter()
     print(f"PIPELINE: Invoking LLM (timeout={request_timeout}s)...")
+    
+    # For local providers: use native streaming via callback for instant UI feedback
+    token_callback = config.get("configurable", {}).get("token_callback")
+    
     try:
         import asyncio as _asyncio
-        response = await _asyncio.wait_for(llm.ainvoke(messages), timeout=request_timeout)
+        
+        if provider == "local" and isinstance(llm, NativeLocalClient) and token_callback:
+            # STREAMING PATH: Push tokens to WebSocket as they arrive
+            full_content = ""
+            async for chunk in llm.astream(messages):
+                token = chunk.get("content", "")
+                full_content += token
+                print(token, end="", flush=True)  # Terminal monitoring
+                await token_callback(full_content)  # Push to WebSocket
+            
+            from langchain_core.messages import AIMessage as _AIMsg
+            response = _AIMsg(content=full_content)
+        else:
+            # STANDARD PATH: LangChain providers with native streaming support
+            response = await _asyncio.wait_for(llm.ainvoke(messages), timeout=request_timeout)
+            
     except (TimeoutError, Exception) as invoke_err:
         is_timeout = isinstance(invoke_err, (_asyncio.TimeoutError, TimeoutError)) or "TimeoutError" in type(invoke_err).__name__
         if is_timeout:
@@ -238,7 +253,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     provider = config.get("configurable", {}).get("provider", "local")
     model = config.get("configurable", {}).get("model", "default")
     log_performance("LLM_REASONING", duration, {"provider": provider, "model": model})
-    print(f"PIPELINE: LLM responded in {duration:.2f}s, content length={len(str(response.content))}")
+    print(f"\nPIPELINE: LLM responded in {duration:.2f}s, content length={len(str(response.content))}")
     
     tool_calls = getattr(response, "tool_calls", [])
     print(f"PIPELINE: Tool calls: {len(tool_calls)}")

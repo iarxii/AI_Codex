@@ -133,6 +133,21 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     },
                     "recursion_limit": 10 # Prevent runaway loops
                 }
+                
+                # For local providers: inject a streaming callback so reason_node
+                # can push tokens directly to the WebSocket as they arrive
+                if provider == "local":
+                    async def _token_callback(accumulated_content: str):
+                        nonlocal full_ai_response
+                        full_ai_response = accumulated_content
+                        await websocket.send_json({
+                            "type": "token",
+                            "content": accumulated_content,
+                            "node": "reason",
+                            "duration": time.perf_counter() - request_start
+                        })
+                    config["configurable"]["token_callback"] = _token_callback
+                
                 request_start = time.perf_counter()
                 
                 try:
