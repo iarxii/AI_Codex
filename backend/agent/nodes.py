@@ -12,6 +12,7 @@ from backend.config import settings
 from backend.skills.registry import registry
 from backend.integrations.ollamaopt_bridge import get_context_builder, get_retriever
 from .profile import build_system_prompt
+from .local_client import NativeLocalClient
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ def log_performance(event: str, duration: float, metadata: dict = None):
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {event}: {duration:.4f}s{meta_str}\n")
 
-def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
+async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
     """
     Retrieves and configures the LLM provider based on the provided configuration.
     Includes robustness fixes for tool binding and connection failures.
@@ -89,24 +90,23 @@ def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
             import httpx
             try:
                 probe_url = base_url.replace("/v1", "")
-                resp = httpx.get(f"{probe_url}/api/tags", timeout=3.0)
-                if resp.status_code != 200:
-                    # Try /v1/models as fallback (pure OpenAI-compat servers)
-                    resp2 = httpx.get(f"{base_url}/models", timeout=3.0)
-                    if resp2.status_code != 200:
-                        raise ConnectionError(f"Local LLM server at {probe_url} returned status {resp.status_code}")
-            except httpx.ConnectError:
+                async with httpx.AsyncClient(timeout=3.0) as client:
+                    resp = await client.get(f"{probe_url}/api/tags")
+                    if resp.status_code != 200:
+                        # Try /v1/models as fallback (pure OpenAI-compat servers)
+                        resp2 = await client.get(f"{base_url}/models")
+                        if resp2.status_code != 200:
+                            raise ConnectionError(f"Local LLM server at {probe_url} returned status {resp.status_code}")
+            except (httpx.ConnectError, httpx.RequestError):
                 raise ConnectionError(f"Cannot reach local LLM server at {base_url}. Is Ollama or llama-server running?")
             except httpx.TimeoutException:
                 raise ConnectionError(f"Local LLM server at {base_url} timed out. The server may be overloaded.")
                 
-            llm = ChatOpenAI(
-                model=local_model, 
+            # Use NativeLocalClient for local for better stability and caching
+            return NativeLocalClient(
                 base_url=base_url, 
-                api_key="sk-local",
-                temperature=0, 
-                streaming=True,
-                max_retries=1
+                model=local_model, 
+                temperature=0.0
             )
             
         if bind_tools:
@@ -142,7 +142,7 @@ async def summarize_history(messages: List[BaseMessage], config: RunnableConfig)
     if not to_summarize:
         return ""
         
-    llm = get_dynamic_llm(config, bind_tools=False)
+    llm = await get_dynamic_llm(config, bind_tools=False)
     summary_prompt = "Summarize the key points of the preceding conversation history concisely. Focus on technical decisions and user goals."
     response = await llm.ainvoke([HumanMessage(content=f"{str(to_summarize)}\n\n{summary_prompt}")])
     return response.content
@@ -166,15 +166,31 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     system_prompt = build_system_prompt()
     
     # Initialize context builder with provider-aware budget
-    # This ensures cloud providers get larger context windows than local models
     provider = config.get("configurable", {}).get("provider", "local")
+    
+    # Early Auth Check for Cloud
+    if provider == "ollama_cloud":
+        api_key = config.get("configurable", {}).get("api_key")
+        if not api_key or api_key == "sk-ollama":
+            from langchain_core.messages import AIMessage
+            return {
+                "messages": [AIMessage(content="❌ **Ollama Cloud API Key Missing**\nPlease open the **Settings** (gear icon) and add your remote API key to enable Cloud Neural core.")],
+                "current_tool_calls": [],
+                "context_data": {"error": "auth_missing"}
+            }
+
     print(f"PIPELINE: Building context for provider={provider}...")
     context_builder = get_context_builder(provider=provider)
-    print(f"PIPELINE: Context builder ready. Initializing LLM...")
+    
+    # Wire the budget! 
+    # This transforms the raw message list into a budget-aware prompt
+    messages = context_builder.build_context(messages)
+    
+    print(f"PIPELINE: Context built (len={len(messages)}). Initializing LLM...")
     
     # Use the dynamic LLM with tools bound
     try:
-        llm = get_dynamic_llm(config, bind_tools=True)
+        llm = await get_dynamic_llm(config, bind_tools=True)
     except Exception as init_err:
         print(f"PIPELINE ERROR: LLM init failed — {init_err}")
         from langchain_core.messages import AIMessage
@@ -188,24 +204,27 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     # To save tokens and latency, we don't do RAG here.
     # The agent can call 'codebase_search' if it needs more info.
     
+    # Increase timeout for local providers to handle high-load prefilling
+    request_timeout = 120.0 if provider == "local" else 60.0
+    
     start_time = time.perf_counter()
-    print("PIPELINE: Invoking LLM...")
+    print(f"PIPELINE: Invoking LLM (timeout={request_timeout}s)...")
     try:
         import asyncio as _asyncio
-        response = await _asyncio.wait_for(llm.ainvoke(messages), timeout=60.0)
+        response = await _asyncio.wait_for(llm.ainvoke(messages), timeout=request_timeout)
     except (TimeoutError, Exception) as invoke_err:
-        is_timeout = isinstance(invoke_err, (TimeoutError,)) or "TimeoutError" in type(invoke_err).__name__
+        is_timeout = isinstance(invoke_err, (_asyncio.TimeoutError, TimeoutError)) or "TimeoutError" in type(invoke_err).__name__
         if is_timeout:
-            print(f"PIPELINE ERROR: LLM call timed out after 60s")
-            error_msg = "Request timed out after 60s. The model server may be overloaded. Please try again."
+            print(f"PIPELINE ERROR: LLM call timed out after {request_timeout}s")
+            error_msg = f"Request timed out after {request_timeout}s. The model server may be overloaded or prefilling context. Please try again."
         else:
             print(f"PIPELINE ERROR: LLM invocation failed — {invoke_err}")
             error_msg = str(invoke_err)
             # Parse common API errors
             if "429" in error_msg:
                 error_msg = "Rate limited by provider. Please wait and retry, or switch models."
-            elif "401" in error_msg or "API key" in error_msg:
-                error_msg = "Authentication failed. Check your API key in Settings."
+            elif "401" in error_msg or "API key" in error_msg or "unauthorized" in error_msg.lower():
+                error_msg = f"Authentication failed for {provider}. Please check your API key in Settings."
             elif "Could not find model" in error_msg or "404" in error_msg:
                 error_msg = "Model not found. Please select a different model."
         from langchain_core.messages import AIMessage
