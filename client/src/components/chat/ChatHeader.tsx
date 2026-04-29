@@ -117,6 +117,18 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           Canvas
         </button>
 
+        {/* llama.cpp Portal Shortcut */}
+        <a
+          href="http://127.0.0.1:11434"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border bg-black/[0.04] border-black/[0.08] text-[#4A4D5E] hover:text-[#1A1D2E] hover:border-black/[0.15] text-xs font-semibold transition-all"
+          title="Open llama.cpp server portal"
+        >
+          <img src={OllamaLogo} alt="" className="w-3.5 h-3.5" />
+          llama.cpp
+        </a>
+
         {/* Provider Badge — clickable, opens SettingsModal */}
         <button
           onClick={() => setIsSettingsOpen(true)}

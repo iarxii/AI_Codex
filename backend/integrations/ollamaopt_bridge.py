@@ -208,9 +208,25 @@ def get_retriever():
             logger.error(f"Failed to initialize Retriever: {e}")
             return None
 
-def get_context_builder():
-    """Returns an initialized ContextBuilder instance."""
+def get_context_builder(provider: str = "local"):
+    """Returns an initialized ContextBuilder instance with provider-aware budget."""
     global _initialized_context_builder
+    
+    # Re-initialize if provider tier changed (local vs cloud have different budgets)
+    budget_module = get_ollamaopt_module("context.model")
+    if budget_module:
+        get_budget = getattr(budget_module, "get_budget_for_provider", None)
+        if get_budget:
+            new_budget = get_budget(provider)
+            if _initialized_context_builder:
+                current_cap = getattr(
+                    getattr(_initialized_context_builder, '_policy', None),
+                    'budget', None
+                )
+                if current_cap and getattr(current_cap, 'total_hard_cap_chars', 0) != new_budget.total_hard_cap_chars:
+                    # Budget tier changed — rebuild
+                    _initialized_context_builder = None
+    
     if _initialized_context_builder:
         return _initialized_context_builder
     
@@ -221,8 +237,13 @@ def get_context_builder():
         
         ContextBuilder = getattr(context_module, "ContextBuilder")
         ContextPolicy = getattr(policy_module, "ContextPolicy")
+        get_budget_fn = getattr(policy_module, "get_budget_for_provider", None)
         
-        policy = ContextPolicy()
+        budget = get_budget_fn(provider) if get_budget_fn else None
+        policy = ContextPolicy(budget=budget) if budget else ContextPolicy()
+        
+        logger.info(f"ContextBuilder initialized with {provider} budget (cap={policy.budget.total_hard_cap_chars} chars)")
+        
         _initialized_context_builder = ContextBuilder(policy=policy)
         _initialized_context_builder.set_system_prompt(
             "You are AICodex, an intelligent coding agent. "
