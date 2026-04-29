@@ -250,6 +250,44 @@ def get_context_builder(provider: str = "local"):
             "Use the provided context to ground your answers. "
             "If the context is insufficient, use your tools."
         )
+
+        # Non-destructive refactor: Add a build_context helper to the instance
+        def build_context_wrapper(messages: list):
+            """Translates LangChain messages into budget-aware context."""
+            from langchain_core.messages import BaseMessage
+            
+            # Extract query (last human message) and history
+            user_query = ""
+            history_dicts = []
+            
+            for m in messages:
+                role = "assistant" if m.type == "ai" else "user"
+                if m.type == "system":
+                    continue # Already set in builder
+                if m.type == "human":
+                    user_query = m.content
+                history_dicts.append({"role": role, "content": str(m.content)})
+            
+            # Build using OllamaOpt logic
+            assembled = _initialized_context_builder.build(
+                user_query=user_query,
+                chat_history=history_dicts,
+                retrieved_chunks=[], # Will be populated by future RAG nodes
+                tool_results=[],
+                memory_items=[]
+            )
+            
+            # Re-construct as LangChain messages
+            from langchain_core.messages import SystemMessage, HumanMessage
+            new_msgs = [SystemMessage(content=assembled.system_prompt)]
+            
+            if assembled.history_context:
+                new_msgs.append(HumanMessage(content=f"Context and History:\n{assembled.history_context}"))
+            
+            new_msgs.append(HumanMessage(content=user_query))
+            return new_msgs
+
+        _initialized_context_builder.build_context = build_context_wrapper
         return _initialized_context_builder
     except Exception as e:
         logger.error(f"Failed to initialize ContextBuilder: {e}")
