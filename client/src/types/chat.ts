@@ -13,3 +13,12 @@ export interface ThoughtLogEntry {
   details?: string;
   type?: string;
 }
+
+export interface Artifact {
+  id: string;
+  type: 'code' | 'docs' | 'research';
+  title: string;
+  content: string;
+  language?: string;
+  timestamp: number;
+}

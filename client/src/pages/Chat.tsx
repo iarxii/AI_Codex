@@ -16,7 +16,8 @@ import ChatInput from '../components/chat/ChatInput';
 import MetricsStrip from '../components/chat/MetricsStrip';
 
 // Types
-import type { Message, ThoughtLogEntry } from '../types/chat';
+import type { Message, ThoughtLogEntry, Artifact } from '../types/chat';
+import { parseArtifacts } from '../utils/artifactParser';
 
 const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -36,11 +37,13 @@ const Chat: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const isProcessing = useRef(false);
+  const isCanvasOpenRef = useRef(false);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, npu_available: false, igpu: 0, igpu_available: false, latency: '0ms' });
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
   const [isChartExpanded, setIsChartExpanded] = useState(false);
   const [showTelemetry, setShowTelemetry] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   
   // Global AI State
   const { provider: activeProvider, model: activeModel, getApiKey } = useAI();
@@ -50,6 +53,11 @@ const Chat: React.FC = () => {
   const metricsWs = useRef<WebSocket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  // Sync canvas-open state to ref for use inside closures
+  useEffect(() => {
+    isCanvasOpenRef.current = isCanvasOpen;
+  }, [isCanvasOpen]);
 
   // 1. Initial Auth Check
   useEffect(() => {
@@ -202,6 +210,21 @@ const Chat: React.FC = () => {
                 timestamp: lastMsg.metadata?.timestamp || Date.now()
               }
             };
+
+            // Parse artifacts from final response (once, not on every token)
+            const finalArtifacts = parseArtifacts(lastMsg.content);
+            if (finalArtifacts.length > 0) {
+              setArtifacts(prev => {
+                const merged = [...prev];
+                finalArtifacts.forEach(art => {
+                  const idx = merged.findIndex(a => a.id === art.id);
+                  if (idx >= 0) merged[idx] = art;
+                  else merged.push(art);
+                });
+                return merged;
+              });
+              if (!isCanvasOpenRef.current) setIsCanvasOpen(true);
+            }
           }
           return updated;
         });
@@ -277,6 +300,20 @@ const Chat: React.FC = () => {
           status: 'done'
         }));
         setMessages(mappedMsgs);
+        
+        // Re-parse artifacts from history
+        const allArtifacts: Artifact[] = [];
+        data.messages.forEach((m: any) => {
+          if (m.role === 'assistant') {
+            const found = parseArtifacts(m.content);
+            found.forEach(art => {
+              const index = allArtifacts.findIndex(a => a.id === art.id);
+              if (index >= 0) allArtifacts[index] = art;
+              else allArtifacts.push(art);
+            });
+          }
+        });
+        setArtifacts(allArtifacts);
       }
     } catch (error) {
       console.error('Failed to load history:', error);
@@ -299,6 +336,7 @@ const Chat: React.FC = () => {
         const data = await response.json();
         setCurrentConvId(data.id);
         setMessages([]);
+        setArtifacts([]);
         setCurrentLatency(null);
         setIsOnboardingOpen(true);
       }
@@ -396,6 +434,7 @@ const Chat: React.FC = () => {
           activeProviderInfo={activeProviderInfo}
           currentLatency={currentLatency}
           loading={loading}
+          artifactCount={artifacts.length}
         />
         
         {/* Floating Hardware Telemetry — Moved to Top to prevent input obstruction */}
@@ -435,7 +474,11 @@ const Chat: React.FC = () => {
         />
       </div>
 
-      <AgentCanvas isOpen={isCanvasOpen} onClose={() => setIsCanvasOpen(false)} />
+      <AgentCanvas 
+        isOpen={isCanvasOpen} 
+        onClose={() => setIsCanvasOpen(false)} 
+        artifacts={artifacts}
+      />
       <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
       
       <WorkspaceOnboardingModal 

@@ -51,6 +51,7 @@ interface ChatHeaderProps {
   activeProviderInfo: any;
   currentLatency: number | null;
   loading: boolean;
+  artifactCount?: number;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -66,6 +67,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   activeProviderInfo,
   currentLatency,
   loading,
+  artifactCount = 0,
 }) => {
   const navigate = useNavigate();
 
@@ -161,6 +163,11 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             <path d="M3 9h18M9 21V9" />
           </svg>
           Canvas
+          {artifactCount > 0 && (
+            <span className="flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-[#FF6600] text-white text-[8px] font-black animate-in zoom-in">
+              {artifactCount}
+            </span>
+          )}
         </button>
 
         {/* Agent Pulse Status */}
