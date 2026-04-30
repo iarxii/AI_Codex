@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { config } from "../config";
 import ExternalNavbar from "../components/layout/ExternalNavbar";
 import ExternalFooter from "../components/layout/ExternalFooter";
 
@@ -16,9 +17,23 @@ const Register: React.FC = () => {
     setLoading(true);
 
     try {
-      // Registration is currently restricted
-      alert("Registration is currently restricted to invited architects. Please use the seeded admin account.");
-      navigate("/login");
+      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || "Registration failed");
+      }
+
+      const { access_token } = await response.json();
+      localStorage.setItem("token", access_token);
+      localStorage.setItem("username", username);
+      navigate("/chat");
     } catch (err: any) {
       setError(err.message);
     } finally {
