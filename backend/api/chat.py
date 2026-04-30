@@ -116,9 +116,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "provider": provider, 
                         "model": model, 
                         "api_key": api_key,
-                        "base_url": base_url
+                        "base_url": base_url,
+                        "conversation_id": str(conversation_id)
                     },
-                    "recursion_limit": 10
+                    "recursion_limit": 25
                 }
                 
                 if provider == "local":
@@ -129,6 +130,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             "type": "token",
                             "content": accumulated_content,
                             "node": "reason",
+                            "provider": provider,
+                            "model": model,
                             "duration": time.perf_counter() - request_start
                         })
                     config["configurable"]["token_callback"] = _token_callback
@@ -156,6 +159,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                 "type": "token",
                                 "content": full_ai_response,
                                 "node": node_name,
+                                "provider": provider,
+                                "model": model,
                                 "duration": time.perf_counter() - request_start
                             })
                     
@@ -178,6 +183,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                 "type": "token",
                                 "content": full_ai_response,
                                 "node": node_name,
+                                "provider": provider,
+                                "model": model,
                                 "duration": time.perf_counter() - request_start
                             })
                             
@@ -222,6 +229,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                         "type": "token",
                                         "content": full_ai_response,
                                         "node": node_name,
+                                        "provider": provider,
+                                        "model": model,
                                         "duration": time.perf_counter() - request_start
                                     })
                                     break

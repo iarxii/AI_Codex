@@ -152,25 +152,36 @@ const Chat: React.FC = () => {
               status: 'typing',
               metadata: { 
                 ...lastMsg.metadata,
-                provider: activeProvider, 
-                model: activeModel,
+                provider: data.provider || lastMsg.metadata?.provider || activeProvider, 
+                model: data.model || lastMsg.metadata?.model || activeModel,
                 latency: data.duration || lastMsg.metadata?.latency,
                 tokens: data.tokens || lastMsg.metadata?.tokens,
                 timestamp: lastMsg.metadata?.timestamp || Date.now()
               }
             };
+            // Real-time Canvas Toggle: Open if [CANVAS: is detected in the stream
+            if (typeof data.content === 'string' && data.content.includes('[CANVAS:') && !isCanvasOpenRef.current) {
+              setIsCanvasOpen(true);
+            }
+
             if (data.duration) setCurrentLatency(data.duration);
             return updated;
           } else {
             if (data.duration) setCurrentLatency(data.duration);
+            
+            // Real-time Canvas Toggle for new message
+            if (typeof data.content === 'string' && data.content.includes('[CANVAS:') && !isCanvasOpenRef.current) {
+              setIsCanvasOpen(true);
+            }
+
             return [...prev, { 
               id: Date.now().toString(), 
               sender: 'bot', 
               content: data.content, 
               status: 'typing',
               metadata: { 
-                provider: activeProvider, 
-                model: activeModel,
+                provider: data.provider || activeProvider, 
+                model: data.model || activeModel,
                 latency: data.duration,
                 tokens: data.tokens,
                 timestamp: Date.now()

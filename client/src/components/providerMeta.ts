@@ -37,7 +37,7 @@ export const PROVIDERS: ProviderInfo[] = [
     label: 'Groq',
     description: 'Ultra-fast cloud inference',
     color: '#FF6600',
-    icon: '/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg',
+    icon: '/media/brand-icons/groq.webp',
     iconType: 'svg-file',
   },
   {

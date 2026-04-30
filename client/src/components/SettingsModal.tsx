@@ -20,7 +20,7 @@ const ProviderIcon: React.FC<{ providerId: string; size?: number }> = ({ provide
     case 'ollama_cloud':
       return <img src={OllamaLogo} alt="Ollama" style={{ width: size, height: size }} />;
     case 'groq':
-      return <img src="/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg" alt="Groq" style={{ width: size, height: size }} className="object-contain drop-shadow-sm" />;
+      return <img src="/media/brand-icons/groq.webp" alt="Groq" style={{ width: size, height: size }} className="object-contain drop-shadow-sm" />;
     case 'openrouter':
       return <img src="/media/brand-icons/openrouter.webp" alt="OpenRouter" style={{ width: size, height: size }} className="object-contain" />;
     case 'gemini':

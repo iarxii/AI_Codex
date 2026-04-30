@@ -1,1 +1,1 @@
-[04/29 21:00] | Goal: Tell me a bit more about Data Science
+[04/30 15:13] | Goal: Generate a simple timer script in Python and use the Agent Canvas.

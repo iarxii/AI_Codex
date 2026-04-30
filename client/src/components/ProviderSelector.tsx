@@ -7,8 +7,8 @@ import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
 
 const providers = [
   { id: 'local', name: 'OllamaOpt (Local LLM)', icon: <img src={OllamaLogo} alt="Local Logo" className="w-6 h-6 object-contain" /> },
-  { id: 'ollama_cloud', name: 'Ollama (Remote Cloud)', icon: <img src={OllamaLogo} alt="Ollama Cloud Logo" className="w-6 h-6 object-contain" /> },
-  { id: 'groq', name: 'Groq (Cloud)', icon: <img src="/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg" alt="Groq Logo" className="w-6 h-6 object-contain drop-shadow-md" /> },
+  { id: 'ollama_cloud', name: 'Ollama (Cloud)', icon: <img src={OllamaLogo} alt="Ollama Cloud Logo" className="w-6 h-6 object-contain" /> },
+  { id: 'groq', name: 'Groq (Cloud)', icon: <img src="/media/brand-icons/groq.webp" alt="Groq Logo" className="w-6 h-6 object-contain drop-shadow-md" /> },
   { id: 'openrouter', name: 'OpenRouter (Cloud)', icon: <img src="/media/brand-icons/openrouter.webp" alt="OpenRouter Logo" className="w-6 h-6 object-contain" /> },
   { id: 'gemini', name: 'Gemini (Cloud)', icon: <img src="/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg" alt="Gemini Logo" className="w-6 h-6 object-contain" /> },
 ];
@@ -82,7 +82,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({ showTelemetry, setS
     <div className="mb-2 flex gap-3">
       <div className="flex-none flex flex-col justify-end">
         <span className="block text-[10px] font-bold uppercase tracking-widest text-[#4A4D5E] mb-1.5 ml-1">
-          Stats
+          Neuro
         </span>
         <button
           type="button"
@@ -101,6 +101,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({ showTelemetry, setS
       </div>
 
       <div className="flex-1">
+        {/* AI Provider selector */}
         <Listbox value={provider} onChange={setProvider}>
           <div className="relative mt-1">
             <Listbox.Label className="block text-[10px] font-bold uppercase tracking-widest text-[#4A4D5E] mb-1.5 ml-1">
@@ -145,6 +146,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({ showTelemetry, setS
       </div>
 
       <div className="flex-1">
+        {/* model selection list */}
         <Listbox value={model} onChange={setModel}>
           <div className="relative mt-1">
             <Listbox.Label className="block text-[10px] font-bold uppercase tracking-widest text-[#4A4D5E] mb-1.5 ml-1">
@@ -159,15 +161,33 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({ showTelemetry, setS
             <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0" afterLeave={() => setModelSearch('')}>
               <Listbox.Options className="absolute z-50 bottom-full mb-2 max-h-72 w-full overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide">
                 <div className="sticky top-0 z-20 px-2 py-2 bg-[#E2E6EC] border-b border-black/[0.05]">
-                  <input
-                    type="text"
-                    className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-lg px-3 py-1.5 text-xs text-[#1A1D2E] placeholder:text-[#7A7D8E] focus:outline-none focus:ring-1 focus:ring-[#FF6600]/40"
-                    placeholder="Search models..."
-                    value={modelSearch}
-                    onChange={(e) => setModelSearch(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  />
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      type="text"
+                      className="flex-1 bg-[#D8DCE4] border border-black/[0.08] rounded-lg px-3 py-1.5 text-xs text-[#1A1D2E] placeholder:text-[#7A7D8E] focus:outline-none focus:ring-1 focus:ring-[#FF6600]/40"
+                      placeholder="Search models..."
+                      value={modelSearch}
+                      onChange={(e) => setModelSearch(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                    {provider === 'openrouter' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const isFree = modelSearch.toLowerCase() === 'free';
+                          setModelSearch(isFree ? '' : 'free');
+                        }}
+                        className={`px-2 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-tight transition-all active:scale-95 whitespace-nowrap ${
+                          modelSearch.toLowerCase() === 'free'
+                            ? 'bg-[#FF6600] border-[#FF6600] text-white shadow-sm'
+                            : 'bg-[#D8DCE4] border-black/[0.08] text-[#7A7D8E] hover:text-[#4A4D5E]'
+                        }`}
+                      >
+                        Free Only
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {loading ? (
                   <div className="py-4 px-4 text-center text-xs text-[#7A7D8E] animate-pulse">
@@ -187,7 +207,20 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({ showTelemetry, setS
                       {({ selected }) => (
                         <>
                           <span className={`block truncate ${selected ? 'font-bold' : 'font-medium'}`}>
-                            {m.name}
+                            <div className="flex items-center justify-between">
+                              <span>{m.name}</span>
+                              {(provider === 'groq' || provider === 'ollama_cloud' || provider === 'local') && (
+                                <span className={`ml-2 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter ${
+                                  provider === 'groq' 
+                                    ? (m.id.includes('compound') || m.id.includes('instant') ? 'bg-green-100 text-green-600 border border-green-200' : 'bg-blue-100 text-blue-600 border border-blue-200')
+                                    : 'bg-green-100 text-green-600 border border-green-200'
+                                }`}>
+                                  {provider === 'groq' 
+                                    ? (m.id.includes('compound') || m.id.includes('instant') ? 'Free' : 'Charged')
+                                    : 'Free'}
+                                </span>
+                              )}
+                            </div>
                             <span className="ml-2 text-[10px] opacity-40 block font-mono">{m.id}</span>
                           </span>
                           {selected ? (
