@@ -7,12 +7,11 @@ interface AgentCanvasProps {
   onClose: () => void;
   artifacts: Artifact[];
   externalSelectedId?: string | null;
-  onSaveToScratchpad?: (artifact: Artifact) => Promise<void>;
 }
 
 type TabType = 'Code' | 'Docs' | 'Research';
 
-const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, externalSelectedId, onSaveToScratchpad }) => {
+const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, externalSelectedId }) => {
   const [activeTab, setActiveTab] = useState<TabType>('Code');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
