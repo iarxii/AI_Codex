@@ -1,42 +1,8 @@
 import React from "react";
-import OllamaLogo from "../../assets/ai_online_services/ollama-color.svg";
-import GeminiLogo from "../../assets/ai_online_services/gemini-color.svg";
 import AgentPulse from "../AgentPulse";
 import { useNavigate } from "react-router-dom";
+import ProviderIcon from "../ProviderIcon";
 
-/** Inline provider icons for the header badge */
-const ProviderBadgeIcon: React.FC<{ providerId: string }> = ({
-  providerId,
-}) => {
-  switch (providerId) {
-    case "local":
-      return <img src={OllamaLogo} alt="Ollama" className="w-4 h-4" />;
-    case "groq":
-      return (
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#FF6600" />
-        </svg>
-      );
-    case "openrouter":
-      return (
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke="#06B6D4" strokeWidth="1.5" />
-          <path
-            d="M2 12h20M12 2c-3 3-4.5 6-4.5 10s1.5 7 4.5 10c3-3 4.5-6 4.5-10S15 5 12 2z"
-            stroke="#06B6D4"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      );
-    case "gemini":
-      return <img src={GeminiLogo} alt="Gemini" className="w-4 h-4" />;
-    case "ollama_cloud":
-      return <img src={OllamaLogo} alt="Ollama Cloud" className="w-4 h-4" />;
-    default:
-      return <span className="text-xs">🤖</span>;
-  }
-};
 
 interface ChatHeaderProps {
   isSidebarOpen: boolean;
@@ -137,7 +103,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border bg-black/[0.04] border-black/[0.08] text-[#4A4D5E] hover:text-[#1A1D2E] hover:border-black/[0.15] text-xs font-semibold transition-all"
           title="Open llama.cpp server portal"
         >
-          <img src={OllamaLogo} alt="" className="w-3.5 h-3.5" />
+          <ProviderIcon provider={activeProviderInfo} size={14} />
           llama.cpp
         </a>
 
@@ -194,7 +160,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           }`}
           title={`Provider: ${activeProviderInfo.label} — Click to change`}
         >
-          <ProviderBadgeIcon providerId={activeProvider} />
+          <ProviderIcon provider={activeProviderInfo} size={16} />
           <span
             className={`hidden md:flex text-[10px] font-bold uppercase tracking-tight ${
               connected ? "text-[#FF6600]" : "text-red-600"

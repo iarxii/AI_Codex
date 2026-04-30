@@ -1,0 +1,7 @@
+{
+  "project": "aicodex-lab",
+  "region": "us-central1",
+  "backend_url": "https://aicodex-be-5yrzhangwq-uc.a.run.app",
+  "frontend_url": "https://aicodex-lab-5yrzhangwq-uc.a.run.app",
+  "last_deployed": "2026/04/30 22:16:41,59"
+}

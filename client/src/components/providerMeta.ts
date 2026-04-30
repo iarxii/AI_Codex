@@ -13,6 +13,7 @@ export interface ProviderInfo {
   color: string;
   icon: string | null;  // SVG import path, or null for inline SVG
   iconType: 'svg-file' | 'inline';
+  brand?: string; // Brand name for @lobehub/icons
 }
 
 export const PROVIDERS: ProviderInfo[] = [
@@ -23,6 +24,7 @@ export const PROVIDERS: ProviderInfo[] = [
     color: '#A3E635',
     icon: '/media/brand-icons/ollama-color.svg',
     iconType: 'svg-file',
+    brand: 'Ollama',
   },
   {
     id: 'ollama_cloud',
@@ -31,6 +33,7 @@ export const PROVIDERS: ProviderInfo[] = [
     color: '#34D399',
     icon: '/media/brand-icons/ollama-color.svg',
     iconType: 'svg-file',
+    brand: 'Ollama',
   },
   {
     id: 'groq',
@@ -39,6 +42,7 @@ export const PROVIDERS: ProviderInfo[] = [
     color: '#FF6600',
     icon: '/media/brand-icons/groq.webp',
     iconType: 'svg-file',
+    brand: 'Groq',
   },
   {
     id: 'openrouter',
@@ -47,6 +51,7 @@ export const PROVIDERS: ProviderInfo[] = [
     color: '#06B6D4',
     icon: '/media/brand-icons/openrouter.webp',
     iconType: 'svg-file',
+    brand: 'OpenRouter',
   },
   {
     id: 'gemini',
@@ -55,6 +60,7 @@ export const PROVIDERS: ProviderInfo[] = [
     color: '#4285F4',
     icon: '/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg',
     iconType: 'svg-file',
+    brand: 'Gemini',
   },
 ];
 

@@ -1,5 +1,6 @@
 @echo off
-SET GCLOUD="C:\Users\28523971\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd"
+SETLOCAL EnableDelayedExpansion
+SET GCLOUD=gcloud
 SET PROJECT_ID=aicodex-lab
 SET REGION=us-central1
 SET BACKEND_IMAGE=us-central1-docker.pkg.dev/%PROJECT_ID%/aicodex-repo/backend
@@ -48,25 +49,26 @@ if "%DEPLOY_BE%"=="true" (
 
 if "%DEPLOY_FE%"=="true" (
     echo Retrieving Backend URL for Frontend build...
-    for /f "tokens=*" %%i in ('call %GCLOUD% run services describe aicodex-be --platform managed --region %REGION% --project %PROJECT_ID% --format="value(status.url)"') do set BACKEND_URL=%%i
+    for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-be --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set BACKEND_URL=%%i
     
-    if "%BACKEND_URL%"=="" (
+    if "!BACKEND_URL!"=="" (
         echo ERROR: Could not retrieve Backend URL. Is 'aicodex-be' deployed?
+        echo Check manual: %GCLOUD% run services describe aicodex-be --project %PROJECT_ID%
         exit /b 1
     )
-    echo Backend URL detected: %BACKEND_URL%
+    echo Backend URL detected: !BACKEND_URL!
 
     echo [3/4] Submitting Frontend Build to Google Cloud...
     pushd client
-    call %GCLOUD% builds submit --config cloudbuild.yaml --project %PROJECT_ID% --substitutions=_VITE_API_URL=%BACKEND_URL%
+    call %GCLOUD% builds submit --config cloudbuild.yaml --project %PROJECT_ID% --substitutions=_VITE_API_URL=!BACKEND_URL!
     popd
     if %ERRORLEVEL% NEQ 0 (
         echo Frontend build failed. Exiting.
         exit /b %ERRORLEVEL%
     )
 
-    echo [4/4] Deploying Frontend to Cloud Run as 'aicodex-fe'...
-    call %GCLOUD% run deploy aicodex-fe ^
+    echo [4/4] Deploying Frontend to Cloud Run as 'aicodex-lab'...
+    call %GCLOUD% run deploy aicodex-lab ^
         --image %FRONTEND_IMAGE% ^
         --platform managed ^
         --region %REGION% ^
@@ -76,6 +78,21 @@ if "%DEPLOY_FE%"=="true" (
         echo Frontend deployment failed. Exiting.
         exit /b %ERRORLEVEL%
     )
+
+    echo [5/5] Generating Route Map JSON...
+    for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-lab --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set FRONTEND_URL=%%i
+    
+    SET ROUTE_MAP_PATH=..\..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-react\src\data\route_map.json
+    (
+        echo {
+        echo   "project": "%PROJECT_ID%",
+        echo   "region": "%REGION%",
+        echo   "backend_url": "!BACKEND_URL!",
+        echo   "frontend_url": "!FRONTEND_URL!",
+        echo   "last_deployed": "%DATE% %TIME%"
+        echo }
+    ) > !ROUTE_MAP_PATH!
+    echo Route map generated: !ROUTE_MAP_PATH!
 ) else (
     echo [SKIP] Skipping frontend deployment steps.
 )
