@@ -1,9 +1,9 @@
 import React, { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { PROVIDERS, type ProviderId } from './providerMeta';
+import { PROVIDERS, type ProviderId, PROVIDER_MAP } from './providerMeta';
 import { useAI, type VisualSettings } from '../contexts/AIContext';
-import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
+import ProviderIcon from './ProviderIcon';
 import { config } from '../config';
 import { CheckCircleIcon, ExclamationCircleIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 
@@ -12,23 +12,6 @@ type SettingsModalProps = {
   setIsOpen: (val: boolean) => void;
 };
 
-/** Inline SVG icons for providers without image assets */
-/** Map provider ID to its icon component */
-const ProviderIcon: React.FC<{ providerId: string; size?: number }> = ({ providerId, size = 28 }) => {
-  switch (providerId) {
-    case 'local':
-    case 'ollama_cloud':
-      return <img src={OllamaLogo} alt="Ollama" style={{ width: size, height: size }} />;
-    case 'groq':
-      return <img src="/media/brand-icons/groq.webp" alt="Groq" style={{ width: size, height: size }} className="object-contain drop-shadow-sm" />;
-    case 'openrouter':
-      return <img src="/media/brand-icons/openrouter.webp" alt="OpenRouter" style={{ width: size, height: size }} className="object-contain" />;
-    case 'gemini':
-      return <img src="/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg" alt="Gemini" style={{ width: size, height: size }} className="object-contain" />;
-    default:
-      return <span style={{ fontSize: size * 0.7 }}>🤖</span>;
-  }
-};
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const { provider, setProvider, visualSettings, updateVisualSetting } = useAI();
@@ -161,7 +144,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                           {isActive && (
                             <div className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#FF6600] shadow-[0_0_6px_rgba(255,102,0,0.7)]" />
                           )}
-                          <ProviderIcon providerId={provider.id} size={28} />
+                          <ProviderIcon provider={provider} size={28} />
                           <span className={`text-[11px] font-semibold ${isActive ? 'text-[#FF6600]' : 'text-[#4A4D5E]'}`}>
                             {provider.label}
                           </span>
