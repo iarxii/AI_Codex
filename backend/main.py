@@ -18,6 +18,7 @@ async def lifespan(app: FastAPI):
         download_db_from_gcs()
 
     # Initialize DB on startup
+    print(f"[DB_DEBUG] Using database: {settings.async_database_url}")
     await init_db()
     
     # Initialize OllamaOpt bridge

@@ -49,7 +49,11 @@ class Settings(BaseSettings):
     # OllamaOpt Integration
     OLLAMAOPT_PATH: str = "../../OllamaOpt"
     
-    model_config = SettingsConfigDict(extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=env_path,
+        env_file_encoding='utf-8',
+        extra="ignore"
+    )
 
     @property
     def async_database_url(self) -> str:
