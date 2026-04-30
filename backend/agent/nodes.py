@@ -118,7 +118,8 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
                 print(f"DEBUG: Skipping tool binding for provider '{provider}' (not supported by llama-server)")
                 return llm
             try:
-                tools = get_agent_tools()
+                conv_id = config.get("configurable", {}).get("conversation_id")
+                tools = get_agent_tools(conversation_id=conv_id)
                 # Try to bind tools, but catch if the model/provider doesn't support it
                 return llm.bind_tools(tools)
             except Exception as e:
@@ -195,13 +196,30 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     
     # Wire the budget! 
     # This transforms the raw message list into a budget-aware prompt
-    messages = context_builder.build_context(messages)
+    messages = context_builder.build_context(messages, system_prompt=system_prompt)
     
     print(f"PIPELINE: Context built (len={len(messages)}). Initializing LLM...")
     
+    # Initialize tools and binding logic
+    conversation_id = config.get("configurable", {}).get("conversation_id")
+    tools = get_agent_tools(conversation_id)
+    
     # Use the dynamic LLM with tools bound
     try:
-        llm = await get_dynamic_llm(config, bind_tools=True)
+        # get_dynamic_llm is defined in this file
+        llm = await get_dynamic_llm(config, bind_tools=False) 
+        
+        # Sanity check tools before binding
+        valid_tools = []
+        for t in tools:
+            if not getattr(t, "name", None):
+                print(f"PIPELINE WARNING: Found tool without name, skipping: {t}")
+                continue
+            valid_tools.append(t)
+            
+        if valid_tools:
+            print(f"PIPELINE: Binding {len(valid_tools)} tools to LLM...")
+            llm = llm.bind_tools(valid_tools)
     except Exception as init_err:
         print(f"PIPELINE ERROR: LLM init failed — {init_err}")
         from langchain_core.messages import AIMessage
@@ -311,7 +329,8 @@ async def execute_tool_node(state: AgentState) -> Dict[str, Any]:
         tool_messages.append(
             ToolMessage(
                 content=str(tool_result),
-                tool_call_id=tool_id
+                tool_call_id=tool_id,
+                name=tool_name
             )
         )
         

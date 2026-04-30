@@ -18,7 +18,7 @@ def skill_to_langchain_tool(skill: BaseSkill) -> StructuredTool:
         description=skill.description,
     )
 
-def get_agent_tools() -> List[StructuredTool]:
+def get_agent_tools(conversation_id: str = None) -> List[StructuredTool]:
     """
     Discovers all skills and returns them as a list of LangChain tools.
     """
@@ -30,7 +30,25 @@ def get_agent_tools() -> List[StructuredTool]:
     
     for skill in skills:
         try:
-            tools.append(skill_to_langchain_tool(skill))
+            # We must preserve the signature for StructuredTool.from_function to work.
+            # For the workspace_writer, we know its specific signature.
+            if skill.name == "workspace_writer":
+                async def wrapped_workspace_writer(filename: str, content: str, type: str = "code"):
+                    return await skill.execute(filename=filename, content=content, type=type, conversation_id=conversation_id)
+                
+                tool = StructuredTool.from_function(
+                    coroutine=wrapped_workspace_writer,
+                    name=skill.name,
+                    description=skill.description,
+                )
+            else:
+                # Generic fallback for other skills (can be expanded)
+                tool = StructuredTool.from_function(
+                    coroutine=skill.execute,
+                    name=skill.name,
+                    description=skill.description,
+                )
+            tools.append(tool)
             logger.info(f"Converted skill to tool: {skill.name}")
         except Exception as e:
             logger.error(f"Failed to convert skill {skill.name} to tool: {e}")

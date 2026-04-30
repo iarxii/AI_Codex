@@ -245,16 +245,14 @@ def get_context_builder(provider: str = "local"):
         logger.info(f"ContextBuilder initialized with {provider} budget (cap={policy.budget.total_hard_cap_chars} chars)")
         
         _initialized_context_builder = ContextBuilder(policy=policy)
-        _initialized_context_builder.set_system_prompt(
-            "You are AICodex, an intelligent coding agent. "
-            "Use the provided context to ground your answers. "
-            "If the context is insufficient, use your tools."
-        )
-
+        
         # Non-destructive refactor: Add a build_context helper to the instance
-        def build_context_wrapper(messages: list):
+        def build_context_wrapper(messages: list, system_prompt: str = None):
             """Translates LangChain messages into budget-aware context."""
             from langchain_core.messages import BaseMessage
+            
+            # Use provided system prompt or fallback to builder's default
+            final_system_prompt = system_prompt or "You are AICodex, an elite agentic assistant."
             
             # Extract query (last human message) and history
             user_query = ""
@@ -263,27 +261,47 @@ def get_context_builder(provider: str = "local"):
             for m in messages:
                 role = "assistant" if m.type == "ai" else "user"
                 if m.type == "system":
-                    continue # Already set in builder
+                    # If we found a system message in the list, it might be more specific
+                    final_system_prompt = m.content
+                    continue 
                 if m.type == "human":
                     user_query = m.content
                 history_dicts.append({"role": role, "content": str(m.content)})
             
-            # Build using OllamaOpt logic
+            # Update builder state for this turn
+            _initialized_context_builder.set_system_prompt(final_system_prompt)
+            
+            # Build using OllamaOpt logic to determine budget/truncation
             assembled = _initialized_context_builder.build(
                 user_query=user_query,
                 chat_history=history_dicts,
-                retrieved_chunks=[], # Will be populated by future RAG nodes
+                retrieved_chunks=[],
                 tool_results=[],
                 memory_items=[]
             )
             
-            # Re-construct as LangChain messages
-            from langchain_core.messages import SystemMessage, HumanMessage
+            # Re-construct as structured LangChain messages instead of collapsing to strings
+            from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
+            
             new_msgs = [SystemMessage(content=assembled.system_prompt)]
             
-            if assembled.history_context:
-                new_msgs.append(HumanMessage(content=f"Context and History:\n{assembled.history_context}"))
+            # We filter the original messages to only include those that fit in the budget
+            # OllamaOpt's assembled.history_context is useful for local LLMs, 
+            # but for cloud providers we want the original objects.
             
+            # Simple heuristic: if history was truncated by OllamaOpt, we should trim our list
+            if assembled.was_truncated:
+                # We'll take the last N messages that likely fit
+                # (OllamaOpt uses a char-based cap, we'll follow its lead)
+                trimmed_history = messages[-6:] # Keep last 3 turns if truncated
+            else:
+                trimmed_history = messages[:-1] # All except current query
+            
+            for m in trimmed_history:
+                if m.type == "system": continue
+                new_msgs.append(m)
+            
+            # Finally append the clean user query
             new_msgs.append(HumanMessage(content=user_query))
             return new_msgs
 
