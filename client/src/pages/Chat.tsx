@@ -45,7 +45,7 @@ const Chat: React.FC = () => {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
-  const [activeConversationId, setActiveConversationId] = useState<string>(Date.now().toString()); // Simple ID for now
+  const [activeConversationId] = useState<string>(Date.now().toString()); // Simple ID for now
   
   // Global AI State
   const { provider: activeProvider, model: activeModel, getApiKey } = useAI();
@@ -515,7 +515,6 @@ const Chat: React.FC = () => {
         onClose={() => setIsCanvasOpen(false)} 
         artifacts={artifacts}
         externalSelectedId={selectedArtifactId}
-        onSaveToScratchpad={saveToScratchpad}
       />
       <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
       

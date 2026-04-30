@@ -4,7 +4,6 @@ import { Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { PROVIDERS, type ProviderId } from './providerMeta';
 import { useAI, type VisualSettings } from '../contexts/AIContext';
 import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
-import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 import { config } from '../config';
 import { CheckCircleIcon, ExclamationCircleIcon, ArrowPathIcon } from '@heroicons/react/24/solid';
 

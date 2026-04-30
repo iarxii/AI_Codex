@@ -4,7 +4,6 @@ import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { useAI } from '../contexts/AIContext';
 import { config } from '../config';
 import OllamaLogo from '../assets/ai_online_services/ollama-color.svg';
-import GeminiLogo from '../assets/ai_online_services/gemini-color.svg';
 
 const providers = [
   { id: 'local', name: 'OllamaOpt (Local LLM)', icon: <img src={OllamaLogo} alt="Local Logo" className="w-6 h-6 object-contain" /> },
