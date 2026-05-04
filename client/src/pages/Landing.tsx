@@ -11,7 +11,7 @@ const Landing: React.FC = () => (
       <div className="relative z-10 bg-[var(--bg-surface)]/60 backdrop-blur-2xl rounded-2xl border border-black/[0.05] p-12 max-w-2xl w-full text-center shadow-2xl">
         <div className="w-24 h-24 mx-auto mb-8 flex items-center justify-center drop-shadow-2xl">
           <img
-            src="/media/aicodex_logo_2_transp.png"
+            src="/media/aicodex_logo_2_transp_spirit_bird.png"
             alt="AICodex Logo"
             className="w-full h-full object-contain rounded-3xl border-2 border-[var(--accent)]"
           />

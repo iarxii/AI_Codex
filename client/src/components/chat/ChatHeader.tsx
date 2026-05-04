@@ -3,7 +3,6 @@ import AgentPulse from "../AgentPulse";
 import { useNavigate } from "react-router-dom";
 import ProviderIcon from "../ProviderIcon";
 
-
 interface ChatHeaderProps {
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
@@ -63,7 +62,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           className={`flex items-center gap-2 animate-in fade-in slide-in-from-left-4 duration-300 ${isSidebarOpen ? "lg:hidden" : ""}`}
         >
           <img
-            src="/media/aicodex_logo_2_transp.png"
+            src="/media/aicodex_logo_2_transp_spirit_bird.png"
             alt="AICodex Logo"
             className="w-7 h-7 shrink-0 object-contain rounded-lg border border-[var(--accent)]"
           />
@@ -141,7 +140,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
           {/* Latency */}
           {currentLatency && (
-            <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold transition-all ${loading ? "bg-red-100 border-red-300" : "bg-black/[0.04] border-black/[0.06]"}`}>
+            <div
+              className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold transition-all ${loading ? "bg-red-100 border-red-300" : "bg-black/[0.04] border-black/[0.06]"}`}
+            >
               <span className="text-[10px] font-semibold text-[#4A4D5E] uppercase tracking-tight">
                 {currentLatency.toFixed(2)}s
               </span>
