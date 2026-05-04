@@ -35,9 +35,13 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
     provider = config.get("configurable", {}).get("provider", "local")
     model = config.get("configurable", {}).get("model")
     api_key = config.get("configurable", {}).get("api_key")
+    agent_mode = config.get("configurable", {}).get("agent_mode", True)
     
+    if not agent_mode:
+        bind_tools = False
+
     # Debug logging for model initialization
-    print(f"DEBUG: Initializing LLM Provider: {provider} | Model: {model}")
+    print(f"DEBUG: Initializing LLM Provider: {provider} | Model: {model} | Agent Mode: {agent_mode}")
 
     try:
         if provider == "groq":

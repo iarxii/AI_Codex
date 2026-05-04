@@ -110,26 +110,34 @@ const MessageItem: React.FC<MessageItemProps> = ({
     setTimeout(() => setMessageCopied(false), 2000);
   }, [msg.content]);
 
-  const getFirstArtifactId = (content: string) => {
+  const getFirstArtifactId = (content: string, msgId?: string) => {
     const regex = /\[CANVAS:(\w+):([^:\]]+)/i;
     const match = regex.exec(content);
-    if (!match) return null;
     
-    const type = match[1].toLowerCase();
-    const title = match[2];
+    if (match) {
+      const type = match[1].toLowerCase();
+      const title = match[2];
+      
+      const typeNormMap: Record<string, string> = {
+        'code': 'code',
+        'docs': 'docs',
+        'doc': 'docs',
+        'documentation': 'docs',
+        'research': 'research',
+      };
+      const artifactType = typeNormMap[type] || 'docs';
+      return `${artifactType}-${title.replace(/\s+/g, '-').toLowerCase()}`;
+    }
+
+    // Fallback: match the logic in artifactParser.ts for standard code blocks
+    if (content.includes('```')) {
+      return `code-gen-${msgId || 'anon'}-1`;
+    }
     
-    const typeNormMap: Record<string, string> = {
-      'code': 'code',
-      'docs': 'docs',
-      'doc': 'docs',
-      'documentation': 'docs',
-      'research': 'research',
-    };
-    const artifactType = typeNormMap[type] || 'docs';
-    return `${artifactType}-${title.replace(/\s+/g, '-').toLowerCase()}`;
+    return null;
   };
 
-  const firstArtifactId = getFirstArtifactId(msg.content);
+  const firstArtifactId = getFirstArtifactId(msg.content, msg.id);
 
   return (
     <div className="space-y-4">

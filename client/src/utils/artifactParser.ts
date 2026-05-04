@@ -47,6 +47,31 @@ export const parseArtifacts = (content: string, messageId?: string): Artifact[] 
       messageId
     });
   }
+  // Fallback: If no CANVAS tags found, check for standard markdown code blocks
+  if (artifacts.length === 0) {
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/gi;
+    let cbMatch;
+    let count = 1;
+    while ((cbMatch = codeBlockRegex.exec(content)) !== null) {
+      const language = (cbMatch[1] || 'text').toLowerCase();
+      const artifactContent = cbMatch[2].trim();
+      
+      // Basic heuristic for title
+      const title = `Generated Code ${count > 1 ? `(${count})` : ''}`;
+      const id = `code-gen-${messageId || 'anon'}-${count}`;
+
+      artifacts.push({
+        id,
+        type: 'code',
+        title,
+        content: artifactContent,
+        language,
+        timestamp: Date.now(),
+        messageId
+      });
+      count++;
+    }
+  }
 
   return artifacts;
 };
