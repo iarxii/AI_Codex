@@ -124,6 +124,8 @@ const Chat: React.FC = () => {
         role: msg.sender === 'user' ? "user" : "model",
         content: msg.content,
         metadata: {
+          provider: msg.metadata?.provider || activeProvider,
+          model: msg.metadata?.model || activeModel,
           latencyMs: msg.metadata?.latency || 0,
           tokenCount: msg.metadata?.tokens || 0,
           thinkingPath: msg.metadata?.thinking || undefined,

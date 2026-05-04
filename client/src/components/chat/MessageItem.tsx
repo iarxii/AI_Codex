@@ -186,18 +186,20 @@ const MessageItem: React.FC<MessageItemProps> = ({
             <div className="absolute -left-1 top-2 w-1 h-10 bg-[#FF6600]/20 rounded-full"></div>
             
             {/* Attribution Row */}
-            {!isUser && msg.metadata && (
+            {!isUser && (
               <div className="flex items-center gap-2 mb-3 text-[10px] font-bold text-[#4A4D5E]/50 uppercase tracking-widest border-b border-black/[0.03] pb-2">
                 {(() => {
-                  const pInfo = PROVIDER_MAP[msg.metadata.provider];
+                  const providerId = msg.metadata?.provider || 'ollama_cloud'; // Fallback
+                  const modelName = msg.metadata?.model || 'Neural Core';
+                  const pInfo = PROVIDER_MAP[providerId as any];
                   return (
                     <>
                       {pInfo?.icon && (
                         <img src={pInfo.icon} alt="" className="w-3.5 h-3.5 object-contain opacity-70 grayscale hover:grayscale-0 transition-all" />
                       )}
-                      <span>{pInfo?.label || msg.metadata.provider}</span>
+                      <span>{pInfo?.label || providerId}</span>
                       <span className="text-[#FF6600]/30 font-light">|</span>
-                      <span className="text-[#1A1D2E]/60">{msg.metadata.model}</span>
+                      <span className="text-[#1A1D2E]/60">{modelName}</span>
                     </>
                   );
                 })()}
@@ -205,29 +207,62 @@ const MessageItem: React.FC<MessageItemProps> = ({
             )}
 
             <div className="prose-chat max-w-none text-[#1A1D2E] font-medium">
-              {React.useMemo(() => (
-                <ReactMarkdown
-                  components={{
-                    pre: ({ children }) => <React.Fragment>{children}</React.Fragment>,
-                    p: ({ children }) => <div className="mb-4 last:mb-0">{children}</div>,
-                    code({ node, inline, className, children, ...props }: any) {
-                      const match = /language-(\w+)/.exec(className || '');
-                      return !inline ? (
-                        <CodeBlock 
-                          language={match ? match[1] : ''} 
-                          value={String(children).replace(/\n$/, '')} 
-                        />
-                      ) : (
-                        <code className={className} {...props}>
-                          {children}
-                        </code>
-                      );
-                    }
-                  }}
-                >
-                  {msg.content}
-                </ReactMarkdown>
-              ), [msg.content])}
+              {React.useMemo(() => {
+                // Try to parse tool call from content
+                const toolMatch = msg.content.match(/^({[\s\S]*?})\n?<\/tool_call>/);
+                let displayContent = msg.content;
+                let toolHeader = null;
+
+                if (toolMatch) {
+                  try {
+                    const parsed = JSON.parse(toolMatch[1]);
+                    displayContent = parsed.arguments?.content || msg.content;
+                    toolHeader = (
+                      <div className="mb-4 flex items-center gap-2 p-2 rounded-lg bg-[#FF6600]/5 border border-[#FF6600]/10 text-[10px] font-bold text-[#FF6600] uppercase tracking-wider">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span>Agentic Action: {parsed.name}</span>
+                        {parsed.arguments?.filename && (
+                          <>
+                            <span className="opacity-30">|</span>
+                            <span className="text-[#1A1D2E]/60 lowercase font-mono tracking-normal">{parsed.arguments.filename}</span>
+                          </>
+                        )}
+                      </div>
+                    );
+                  } catch (e) {
+                    console.error("Failed to parse tool call JSON:", e);
+                  }
+                }
+
+                return (
+                  <>
+                    {toolHeader}
+                    <ReactMarkdown
+                      components={{
+                        pre: ({ children }) => <React.Fragment>{children}</React.Fragment>,
+                        p: ({ children }) => <div className="mb-4 last:mb-0">{children}</div>,
+                        code({ node, inline, className, children, ...props }: any) {
+                          const match = /language-(\w+)/.exec(className || '');
+                          return !inline ? (
+                            <CodeBlock 
+                              language={match ? match[1] : ''} 
+                              value={String(children).replace(/\n$/, '')} 
+                            />
+                          ) : (
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          );
+                        }
+                      }}
+                    >
+                      {displayContent}
+                    </ReactMarkdown>
+                  </>
+                );
+              }, [msg.content])}
             </div>
 
             {/* Response Metadata Footer */}
