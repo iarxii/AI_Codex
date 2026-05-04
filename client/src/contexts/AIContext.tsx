@@ -16,13 +16,31 @@ export interface VisualSettings {
   showStillBackground: boolean;
 }
 
+export interface ModelConfig {
+  temperature: number;
+  top_k: number;
+  top_p: number;
+  max_tokens: number;
+  thinking: boolean;
+}
+
+const DEFAULT_MODEL_CONFIG: ModelConfig = {
+  temperature: 0.7,
+  top_k: 40,
+  top_p: 0.9,
+  max_tokens: 1024,
+  thinking: false,
+};
+
 interface AIContextType {
   provider: ProviderId;
   model: string;
   visualSettings: VisualSettings;
+  modelConfig: ModelConfig;
   setProvider: (p: ProviderId) => void;
   setModel: (m: string) => void;
   updateVisualSetting: <K extends keyof VisualSettings>(key: K, value: VisualSettings[K]) => void;
+  updateModelConfig: <K extends keyof ModelConfig>(key: K, value: ModelConfig[K]) => void;
   getApiKey: (p: ProviderId) => string | null;
 }
 
@@ -67,6 +85,16 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     };
   });
 
+  const [modelConfigs, setModelConfigs] = useState<Record<string, ModelConfig>>(() => {
+    const saved = localStorage.getItem('ai_model_configs');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {};
+  });
+
   const activeModel = models[provider];
 
   const setProvider = (p: ProviderId) => {
@@ -98,6 +126,22 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     // Notify components not using context if necessary
     window.dispatchEvent(new Event('ai-settings-changed'));
   };
+
+  const updateModelConfig = <K extends keyof ModelConfig>(key: K, value: ModelConfig[K]) => {
+    setModelConfigs(prev => {
+      const currentModelKey = `${provider}:${activeModel || 'default'}`;
+      const currentConfig = prev[currentModelKey] || DEFAULT_MODEL_CONFIG;
+      const next = { 
+        ...prev, 
+        [currentModelKey]: { ...currentConfig, [key]: value } 
+      };
+      localStorage.setItem('ai_model_configs', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const currentModelKey = `${provider}:${activeModel || 'default'}`;
+  const activeModelConfig = modelConfigs[currentModelKey] || DEFAULT_MODEL_CONFIG;
 
   const getApiKey = (p: ProviderId) => {
     switch (p) {
@@ -145,9 +189,11 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       provider, 
       model: activeModel, 
       visualSettings,
+      modelConfig: activeModelConfig,
       setProvider, 
       setModel, 
       updateVisualSetting,
+      updateModelConfig,
       getApiKey 
     }}>
       {children}

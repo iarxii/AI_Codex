@@ -14,9 +14,10 @@ import ChatHeader from '../components/chat/ChatHeader';
 import MessageList from '../components/chat/MessageList';
 import ChatInput from '../components/chat/ChatInput';
 import MetricsStrip from '../components/chat/MetricsStrip';
+import ModelTelemetryHUD from '../components/chat/ModelTelemetryHUD';
 
 // Types
-import type { Message, ThoughtLogEntry, Artifact } from '../types/chat';
+import type { Message, ThoughtLogEntry, Artifact, ModelTelemetry } from '../types/chat';
 import { parseArtifacts } from '../utils/artifactParser';
 
 const Chat: React.FC = () => {
@@ -39,6 +40,7 @@ const Chat: React.FC = () => {
   const isProcessing = useRef(false);
   const isCanvasOpenRef = useRef(false);
   const currentToolCallsRef = useRef<any[]>([]);
+  const [telemetry, setTelemetry] = useState<ModelTelemetry | null>(null);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, npu_available: false, igpu: 0, igpu_available: false, latency: '0ms' });
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
   const [isChartExpanded, setIsChartExpanded] = useState(false);
@@ -49,7 +51,7 @@ const Chat: React.FC = () => {
   const [agentMode, setAgentMode] = useState(true);
   
   // Global AI State
-  const { provider: activeProvider, model: activeModel, getApiKey } = useAI();
+  const { provider: activeProvider, model: activeModel, modelConfig, getApiKey } = useAI();
   const activeProviderInfo = PROVIDER_MAP[activeProvider] || PROVIDER_MAP['local'];
 
   const ws = useRef<WebSocket | null>(null);
@@ -99,6 +101,47 @@ const Chat: React.FC = () => {
     }
   }, [navigate]);
 
+  const handleExport = () => {
+    const sessionData = {
+      sessionId: currentConvId?.toString() || 'unsaved-session',
+      timestamp: new Date().toISOString(),
+      provider: {
+        name: activeProvider,
+        class: activeProviderInfo?.class || "standard",
+      },
+      telemetry: {
+        totalTokens: telemetry?.total_tokens || 0,
+        avgLatencyMs: telemetry?.ttft || 0,
+        peakLatencyMs: telemetry?.ttft || 0,
+      },
+      config: {
+        temperature: modelConfig.temperature,
+        topK: modelConfig.top_k,
+        topP: modelConfig.top_p,
+        maxOutputTokens: modelConfig.max_tokens,
+      },
+      turns: messages.map(msg => ({
+        role: msg.sender === 'user' ? "user" : "model",
+        content: msg.content,
+        metadata: {
+          latencyMs: msg.metadata?.latency || 0,
+          tokenCount: msg.metadata?.tokens || 0,
+          thinkingPath: msg.metadata?.thinking || undefined,
+        }
+      }))
+    };
+
+    const blob = new Blob([JSON.stringify(sessionData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aicodex-session-${sessionData.sessionId}-${new Date().getTime()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // 2. WebSockets management
   const [reconnectCount, setReconnectCount] = useState(0);
 
@@ -142,7 +185,9 @@ const Chat: React.FC = () => {
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.type === 'token') {
+      if (data.type === 'telemetry') {
+        setTelemetry(data.data);
+      } else if (data.type === 'token') {
         setMessages(prev => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg && lastMsg.sender === 'bot') {
@@ -448,6 +493,7 @@ const Chat: React.FC = () => {
     currentToolCallsRef.current = [];
     setThoughtStartTime(Date.now());
     setThoughtLog([]);
+    setTelemetry(null); // Reset telemetry for new request
     
     const apiKey = getApiKey(activeProvider) || '';
 
@@ -463,6 +509,7 @@ const Chat: React.FC = () => {
         model: activeModel,
         api_key: apiKey,
         agent_mode: agentMode,
+        config: modelConfig,
         base_url: localStorage.getItem('ollama_cloud_url') || ''
       };
       ws.current.send(JSON.stringify(payload));
@@ -525,7 +572,7 @@ const Chat: React.FC = () => {
         />
         
         {/* Floating Hardware Telemetry — Moved to Top to prevent input obstruction */}
-        <div className="absolute top-16 left-0 right-0 pointer-events-none flex justify-center z-30">
+        <div className="absolute top-16 left-0 right-0 pointer-events-none flex flex-col items-center gap-2 z-30">
           <div className={`pointer-events-auto transition-all duration-300 transform ${showTelemetry ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-4 opacity-0 scale-95 pointer-events-none'}`}>
             <MetricsStrip 
               metrics={metrics}
@@ -533,6 +580,10 @@ const Chat: React.FC = () => {
               isChartExpanded={isChartExpanded}
               setIsChartExpanded={setIsChartExpanded}
             />
+          </div>
+          
+          <div className="pointer-events-auto">
+            <ModelTelemetryHUD telemetry={telemetry} isVisible={showTelemetry} />
           </div>
         </div>
 
@@ -561,6 +612,7 @@ const Chat: React.FC = () => {
           setShowTelemetry={setShowTelemetry}
           agentMode={agentMode}
           setAgentMode={setAgentMode}
+          onExport={handleExport}
         />
       </div>
 

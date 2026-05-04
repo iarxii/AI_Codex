@@ -23,3 +23,17 @@ export interface Artifact {
   timestamp: number;
   messageId?: string; // Link to the message that generated this artifact
 }
+
+export interface ModelTelemetry {
+  request_id: string;
+  ttft: number;
+  total_tokens: number;
+  usage: {
+    input: number;
+    output: number;
+  };
+  latencies: Record<string, number>;
+  capabilities: string[];
+  provider: string;
+  model: string;
+}

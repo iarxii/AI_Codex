@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
 from .state import AgentState
-from .nodes import reason_node, execute_tool_node
+from .nodes import reason_node, execute_tool_node, init_node
 
 def should_continue(state: AgentState):
     """
@@ -18,11 +18,15 @@ def create_agent_graph():
     workflow = StateGraph(AgentState)
     
     # Add nodes
+    workflow.add_node("init", init_node)
     workflow.add_node("reason", reason_node)
     workflow.add_node("execute_tool", execute_tool_node)
     
     # Set entry point
-    workflow.set_entry_point("reason")
+    workflow.set_entry_point("init")
+    
+    # Add edges
+    workflow.add_edge("init", "reason")
     
     # Add conditional edges
     workflow.add_conditional_edges(

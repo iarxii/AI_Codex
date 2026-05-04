@@ -29,7 +29,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   setIsCanvasOpen,
   setIsSettingsOpen,
   connected,
-  activeProvider,
   activeProviderInfo,
   currentLatency,
   loading,
