@@ -17,13 +17,16 @@ const Register: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `${config.API_BASE_URL}${config.API_V1_STR}/auth/register`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ username, password }),
         },
-        body: JSON.stringify({ username, password }),
-      });
+      );
 
       if (!response.ok) {
         const data = await response.json();
@@ -44,13 +47,13 @@ const Register: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-transparent text-[var(--text-primary)] font-[Poppins] relative z-10">
       <ExternalNavbar />
-      
+
       <div className="flex-1 flex items-center justify-center p-6 mt-20">
         <div className="relative z-10 w-full max-w-md p-10 bg-[var(--bg-surface)]/90 backdrop-blur-xl rounded-3xl border border-white/40 shadow-2xl">
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center w-24 h-24 mb-6 drop-shadow-2xl">
               <img
-                src="/media/aicodex_logo_2_transp.png"
+                src="/media/aicodex_logo_2_transp_spirit_bird.png"
                 alt="AICodex Logo"
                 className="w-full h-full object-contain rounded-3xl border-2 border-[var(--accent)]"
               />
@@ -65,8 +68,18 @@ const Register: React.FC = () => {
 
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 text-xs font-semibold rounded-xl flex items-center gap-3 animate-in fade-in zoom-in-95">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               {error}
             </div>
@@ -111,7 +124,10 @@ const Register: React.FC = () => {
 
             <div className="text-center text-xs font-medium text-[var(--text-secondary)]">
               Already have an account?{" "}
-              <Link to="/login" className="text-[var(--accent)] hover:underline font-bold">
+              <Link
+                to="/login"
+                className="text-[var(--accent)] hover:underline font-bold"
+              >
                 Sign In
               </Link>
             </div>

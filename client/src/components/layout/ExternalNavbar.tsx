@@ -36,7 +36,7 @@ const ExternalNavbar: React.FC = () => {
         >
           <img
             // src="/media/adaptiv_media_logo.png"
-            src="/media/aicodex_logo_2_transp.png"
+            src="/media/aicodex_logo_2_transp_spirit_bird.png"
             alt="Adaptivconcept FL Logo"
             className="navbar-logo cursor-pointer object-contain rounded-2xl border-2 border-[var(--accent)]"
             title="AdaptivConcept FL"

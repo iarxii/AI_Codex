@@ -94,17 +94,19 @@ const Sidebar: React.FC<SidebarProps> = ({
     <>
       {/* Mobile Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-500"
           onClick={onClose}
         />
       )}
 
-      <aside className={`
+      <aside
+        className={`
         fixed lg:static top-0 left-0 h-full w-72 flex flex-col bg-[var(--bg-surface)]/40 backdrop-blur-2xl border-r border-black/[0.06] z-50 
         transition-all duration-500 ease-in-out
-        ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full lg:hidden lg:opacity-0'}
-      `}>
+        ${isOpen ? "translate-x-0 opacity-100" : "-translate-x-full lg:hidden lg:opacity-0"}
+      `}
+      >
         <div className="px-6 py-8 flex flex-col items-center justify-center text-center group">
           <div className="relative mb-1">
             {/* <img 
@@ -113,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               className="w-18 h-18 object-contain transition-all duration-500 group-hover:scale-105"
             /> */}
             <img
-              src="/media/aicodex_logo_2_transp.png"
+              src="/media/aicodex_logo_2_transp_spirit_bird.png"
               alt="Adaptivconcept FL Logo"
               className="w-20 h-20 cursor-pointer object-contain rounded-3xl border-2 border-[var(--accent)]"
               title="AdaptivConcept FL"
@@ -255,19 +257,20 @@ const Sidebar: React.FC<SidebarProps> = ({
                       {new Date(conv.updated_at).toLocaleDateString()}
                     </p>
                   </div>
-                  {currentConversationId === conv.id && editingId !== conv.id && (
-                    <div
-                      role="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditValue(conv.title);
-                        setEditingId(conv.id);
-                      }}
-                      className="opacity-0 group-hover/item:opacity-100 p-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-all cursor-pointer"
-                    >
-                      <PencilSquareIcon className="w-4 h-4" />
-                    </div>
-                  )}
+                  {currentConversationId === conv.id &&
+                    editingId !== conv.id && (
+                      <div
+                        role="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditValue(conv.title);
+                          setEditingId(conv.id);
+                        }}
+                        className="opacity-0 group-hover/item:opacity-100 p-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-all cursor-pointer"
+                      >
+                        <PencilSquareIcon className="w-4 h-4" />
+                      </div>
+                    )}
                 </div>
               </div>
             </button>
