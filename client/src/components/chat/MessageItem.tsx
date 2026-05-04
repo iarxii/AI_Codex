@@ -102,6 +102,13 @@ const MessageItem: React.FC<MessageItemProps> = ({
 }) => {
   const isUser = msg.sender === 'user';
   const isError = msg.content.startsWith('❌ Error:');
+  const [messageCopied, setMessageCopied] = React.useState(false);
+
+  const handleCopyMessage = React.useCallback(() => {
+    navigator.clipboard.writeText(msg.content);
+    setMessageCopied(true);
+    setTimeout(() => setMessageCopied(false), 2000);
+  }, [msg.content]);
 
   const getFirstArtifactId = (content: string) => {
     const regex = /\[CANVAS:(\w+):([^:\]]+)/i;
@@ -142,9 +149,22 @@ const MessageItem: React.FC<MessageItemProps> = ({
       ) : isUser ? (
         <div className="flex justify-end animate-in fade-in slide-in-from-right-4">
           <div className="flex flex-col items-end gap-1.5 max-w-[80%]">
-            <span className="text-[9px] font-bold text-[#FF6600] uppercase tracking-widest bg-white/10 px-2 py-0.5 rounded-md border border-white/20 backdrop-blur-sm mr-0.5">
-              @{localStorage.getItem('username') || 'Architect'}
-            </span>
+            <div className="flex items-center gap-2 mr-0.5">
+              <button
+                onClick={handleCopyMessage}
+                className="p-1 rounded-md bg-white/5 hover:bg-white/10 text-[#FF6600]/70 hover:text-[#FF6600] transition-colors border border-transparent hover:border-[#FF6600]/20"
+                title="Copy message text"
+              >
+                {messageCopied ? (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                )}
+              </button>
+              <span className="text-[9px] font-bold text-[#FF6600] uppercase tracking-widest bg-white/10 px-2 py-0.5 rounded-md border border-white/20 backdrop-blur-sm">
+                @{localStorage.getItem('username') || 'Architect'}
+              </span>
+            </div>
             <div className="bg-[#FF6600] text-white px-5 py-3 rounded-2xl rounded-tr-none shadow-md shadow-[#FF6600]/10 relative user-corner-glow w-full">
               <p className="text-[12px] leading-relaxed font-medium whitespace-pre-wrap">{msg.content}</p>
             </div>
@@ -181,6 +201,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
                 <ReactMarkdown
                   components={{
                     pre: ({ children }) => <React.Fragment>{children}</React.Fragment>,
+                    p: ({ children }) => <div className="mb-4 last:mb-0">{children}</div>,
                     code({ node, inline, className, children, ...props }: any) {
                       const match = /language-(\w+)/.exec(className || '');
                       return !inline ? (
@@ -203,7 +224,25 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
             {/* Response Metadata Footer */}
             {!isUser && msg.metadata && (
-              <div className="mt-3 pt-2 border-t border-black/[0.03] flex items-center justify-end gap-3 text-[9px] font-bold text-[#4A4D5E]/40 uppercase tracking-tight">
+              <div className="mt-3 pt-2 border-t border-black/[0.03] flex items-center gap-3 text-[9px] font-bold text-[#4A4D5E]/40 uppercase tracking-tight">
+                <button
+                  onClick={handleCopyMessage}
+                  className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-black/5 hover:text-[#4A4D5E]/80 transition-colors"
+                  title="Copy full response"
+                >
+                  {messageCopied ? (
+                    <>
+                      <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                      <span className="text-green-600/80">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+                <div className="flex-grow"></div>
                 <div className="flex items-center gap-1">
                   <svg className="w-2.5 h-2.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

@@ -110,12 +110,10 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
             )
             
         if bind_tools:
-            # Skip tool binding for local/ollama_cloud providers:
+            # Skip tool binding for local NativeLocalClient:
             # llama-server (turboquant) doesn't support OpenAI-compatible function calling.
-            # The tools parameter causes the streaming response parser to hang waiting for 
-            # structured tool_calls chunks that never arrive in the expected format.
-            if provider in ("local", "ollama_cloud"):
-                print(f"DEBUG: Skipping tool binding for provider '{provider}' (not supported by llama-server)")
+            if provider == "local" and isinstance(llm, NativeLocalClient):
+                print(f"DEBUG: Skipping tool binding for provider '{provider}' (not supported by native client)")
                 return llm
             try:
                 conv_id = config.get("configurable", {}).get("conversation_id")
@@ -229,9 +227,13 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             "context_data": {"error": str(init_err)}
         }
     
-    # Increase timeout for local providers to handle high-load prefilling
-    request_timeout = 120.0 if provider == "local" else 60.0
+    # Base timeout: local and ollama_cloud are typically heavier on prefill latency
+    base_timeout = 120.0 if provider in ("local", "ollama_cloud") else 60.0
     
+    # Dynamically scale timeout based on context complexity (tool executions)
+    from langchain_core.messages import ToolMessage
+    tool_turns = sum(1 for m in messages if getattr(m, "type", "") == "tool" or isinstance(m, ToolMessage))
+    request_timeout = base_timeout + (tool_turns * 30.0)
     start_time = time.perf_counter()
     print(f"PIPELINE: Invoking LLM (timeout={request_timeout}s)...")
     
@@ -293,15 +295,19 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         "context_data": {"history_len": len(messages), "summarized": bool(summary)}
     }
 
-async def execute_tool_node(state: AgentState) -> Dict[str, Any]:
+async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
-    Tool execution node. Dispatches to the SkillRegistry.
+    Tool execution node. Dispatches to the compiled LangChain tools.
     """
     last_message = state["messages"][-1]
     tool_messages = []
     
     if not hasattr(last_message, "tool_calls"):
         return {"messages": [], "current_tool_calls": []}
+
+    conversation_id = config.get("configurable", {}).get("conversation_id")
+    tools = get_agent_tools(conversation_id)
+    tool_map = {t.name: t for t in tools}
 
     for tool_call in last_message.tool_calls:
         tool_name = tool_call["name"]
@@ -311,20 +317,25 @@ async def execute_tool_node(state: AgentState) -> Dict[str, Any]:
         logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
         
         start_time = time.perf_counter()
-        skill = registry.get_skill(tool_name)
-        if skill:
+        tool = tool_map.get(tool_name)
+        if tool:
             try:
-                result = await skill.execute(**tool_args)
+                # Use the compiled LangChain tool which safely handles async
+                result = await tool.ainvoke(tool_args)
                 duration = time.perf_counter() - start_time
                 log_performance("TOOL_CALL", duration, {"tool": tool_name})
                 
-                tool_result = result.output or result.error or "Success (no output)"
-                if not result.success and not result.error:
-                    tool_result = f"Error: {tool_result}"
+                # result is usually the output string or a SkillResult if duck-typing applies
+                if hasattr(result, "success"):
+                    tool_result = result.output or result.error or "Success (no output)"
+                    if not result.success and not result.error:
+                        tool_result = f"Error: {tool_result}"
+                else:
+                    tool_result = str(result)
             except Exception as e:
                 tool_result = f"Exception during tool execution: {str(e)}"
         else:
-            tool_result = f"Error: Tool '{tool_name}' not found in registry."
+            tool_result = f"Error: Tool '{tool_name}' not found."
         
         tool_messages.append(
             ToolMessage(

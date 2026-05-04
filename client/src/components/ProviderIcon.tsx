@@ -1,6 +1,6 @@
 import React from 'react';
 import * as Icons from '@lobehub/icons';
-import { ProviderInfo } from './providerMeta';
+import type { ProviderInfo } from './providerMeta';
 
 interface ProviderIconProps {
   provider: ProviderInfo;
