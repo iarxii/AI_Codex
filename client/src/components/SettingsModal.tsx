@@ -1,7 +1,7 @@
 import React, { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { PROVIDERS, type ProviderId, PROVIDER_MAP } from './providerMeta';
+import { PROVIDERS, type ProviderId } from './providerMeta';
 import { useAI, type VisualSettings } from '../contexts/AIContext';
 import ProviderIcon from './ProviderIcon';
 import { config } from '../config';

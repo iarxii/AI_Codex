@@ -23,3 +23,6 @@ class AgentState(TypedDict):
     
     # Error state if any
     error: Optional[str]
+
+    # Model Telemetry & Capability Data
+    telemetry: dict

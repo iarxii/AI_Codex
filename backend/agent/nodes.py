@@ -43,17 +43,21 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
     # Debug logging for model initialization
     print(f"DEBUG: Initializing LLM Provider: {provider} | Model: {model} | Agent Mode: {agent_mode}")
 
+    model_config = config.get("configurable", {}).get("model_config", {})
+    temp = model_config.get("temperature", 0.0)
+    max_toks = model_config.get("max_tokens", 1024)
+
     try:
         if provider == "groq":
             from langchain_groq import ChatGroq
-            llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=0, streaming=True)
+            llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=temp, max_tokens=max_toks, streaming=True)
         elif provider == "ollama_cloud":
             from langchain_openai import ChatOpenAI
             target_model = model or "llama3"
             base_url = config.get("configurable", {}).get("base_url") or "https://ollama.com"
             if not base_url.endswith("/v1"):
                 base_url = f"{base_url.rstrip('/')}/v1"
-            llm = ChatOpenAI(model=target_model, base_url=base_url, api_key=api_key or "sk-ollama", temperature=0, streaming=True)
+            llm = ChatOpenAI(model=target_model, base_url=base_url, api_key=api_key or "sk-ollama", temperature=temp, max_tokens=max_toks, streaming=True)
         elif provider == "openrouter":
             from langchain_openai import ChatOpenAI
             target_model = model or "openrouter/free"
@@ -61,7 +65,8 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
                 base_url="https://openrouter.ai/api/v1",
                 api_key=api_key,
                 model=target_model,
-                temperature=0,
+                temperature=temp,
+                max_tokens=max_toks,
                 streaming=True,
                 default_headers={"HTTP-Referer": "https://aicodex.ai", "X-Title": "AICodex Agentic IDE"}
             )
@@ -70,7 +75,7 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
             target_model = model or "gemini-1.5-flash"
             if target_model.startswith("models/"):
                 target_model = target_model.replace("models/", "")
-            llm = ChatGoogleGenerativeAI(model=target_model, api_key=api_key, temperature=0, streaming=True)
+            llm = ChatGoogleGenerativeAI(model=target_model, api_key=api_key, temperature=temp, max_output_tokens=max_toks, streaming=True)
         else:
             # Local provider (llama-server.exe or Ollama)
             from langchain_openai import ChatOpenAI
@@ -110,7 +115,7 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
             return NativeLocalClient(
                 base_url=base_url, 
                 model=local_model, 
-                temperature=0.0
+                temperature=temp
             )
             
         if bind_tools:
@@ -132,6 +137,31 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
     except Exception as e:
         print(f"ERROR: Failed to initialize LLM for provider {provider}: {e}")
         raise e
+
+async def init_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Tier 1 & 2: Metadata Handshake and "Canary" Probes.
+    Verifies model health and capabilities before reasoning.
+    """
+    start_time = time.perf_counter()
+    provider = config.get("configurable", {}).get("provider", "local")
+    model = config.get("configurable", {}).get("model", "default")
+    
+    # Telemetry initialization (if not already done by chat.py)
+    telemetry = state.get("telemetry", {
+        "ttft": 0, "total_tokens": 0, "usage": {"input": 0, "output": 0},
+        "latencies": {}, "capabilities": [], "provider": provider, "model": model
+    })
+    
+    # Tier 1: Metadata Handshake
+    from backend.utils.telemetry import get_model_capabilities
+    telemetry["capabilities"] = get_model_capabilities(provider, model)
+    
+    # Tier 2: Latency Benchmark (Initial probe)
+    # For now, we'll just mark the init node duration
+    telemetry["latencies"]["init_node"] = time.perf_counter() - start_time
+    
+    return {"telemetry": telemetry}
 
 async def summarize_history(messages: List[BaseMessage], config: RunnableConfig) -> str:
     """
@@ -295,16 +325,23 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     tool_calls = getattr(response, "tool_calls", [])
     print(f"PIPELINE: Tool calls: {len(tool_calls)}")
     
+    # Telemetry Update
+    telemetry = state.get("telemetry", {})
+    if "latencies" not in telemetry: telemetry["latencies"] = {}
+    telemetry["latencies"]["reason_node"] = duration
+    
     return {
         "messages": [response],
         "current_tool_calls": tool_calls,
-        "context_data": {"history_len": len(messages), "summarized": bool(summary)}
+        "context_data": {"history_len": len(messages), "summarized": bool(summary)},
+        "telemetry": telemetry
     }
 
 async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
     Tool execution node. Dispatches to the compiled LangChain tools.
     """
+    node_start = time.perf_counter()
     last_message = state["messages"][-1]
     tool_messages = []
     
@@ -351,4 +388,9 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
             )
         )
         
-    return {"messages": tool_messages, "current_tool_calls": []}
+    # Telemetry Update
+    telemetry = state.get("telemetry", {})
+    if "latencies" not in telemetry: telemetry["latencies"] = {}
+    telemetry["latencies"]["tool_execution"] = time.perf_counter() - node_start
+
+    return {"messages": tool_messages, "current_tool_calls": [], "telemetry": telemetry}

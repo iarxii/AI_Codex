@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from backend.utils.logger import log_debug, log_error
 from backend.api.auth import get_user_from_token
+from backend.utils.telemetry import get_model_capabilities, estimate_tokens
 
 from datetime import datetime
 from backend.db.session import get_db, AsyncSessionLocal
@@ -58,6 +59,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         model = payload_data.get("model")
         api_key = payload_data.get("api_key")
         base_url = payload_data.get("base_url")
+        model_config = payload_data.get("config", {})
         agent_mode = payload_data.get("agent_mode", True)
         
         if not conversation_id:
@@ -106,7 +108,17 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     "current_tool_calls": [],
                     "context_data": {},
                     "routing_decision": {},
-                    "is_complete": False
+                    "is_complete": False,
+                    "telemetry": {
+                        "request_id": str(datetime.utcnow().timestamp()),
+                        "ttft": 0,
+                        "total_tokens": 0,
+                        "usage": {"input": 0, "output": 0},
+                        "latencies": {},
+                        "capabilities": get_model_capabilities(provider, model),
+                        "provider": provider,
+                        "model": model
+                    }
                 }
                 
                 # 4. Execute graph with event streaming
@@ -118,6 +130,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "model": model, 
                         "api_key": api_key,
                         "base_url": base_url,
+                        "model_config": model_config,
                         "conversation_id": str(conversation_id),
                         "agent_mode": agent_mode
                     },
@@ -125,16 +138,27 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 }
                 
                 if provider == "local":
+                    first_token_received = False
                     async def _token_callback(accumulated_content: str):
-                        nonlocal full_ai_response
+                        nonlocal full_ai_response, first_token_received
                         full_ai_response = accumulated_content
+                        
+                        now = time.perf_counter()
+                        if not first_token_received:
+                            first_token_received = True
+                            initial_state["telemetry"]["ttft"] = now - request_start
+                            await websocket.send_json({
+                                "type": "telemetry",
+                                "data": initial_state["telemetry"]
+                            })
+
                         await websocket.send_json({
                             "type": "token",
                             "content": accumulated_content,
                             "node": "reason",
                             "provider": provider,
                             "model": model,
-                            "duration": time.perf_counter() - request_start
+                            "duration": now - request_start
                         })
                     config["configurable"]["token_callback"] = _token_callback
                 
@@ -156,6 +180,15 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         content = event["data"]["chunk"].content
                         if content:
                             full_ai_response += content
+                            
+                            now = time.perf_counter()
+                            if initial_state["telemetry"]["ttft"] == 0:
+                                initial_state["telemetry"]["ttft"] = now - request_start
+                                await websocket.send_json({
+                                    "type": "telemetry",
+                                    "data": initial_state["telemetry"]
+                                })
+
                             print(content, end="", flush=True)
                             await websocket.send_json({
                                 "type": "token",
@@ -163,7 +196,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                 "node": node_name,
                                 "provider": provider,
                                 "model": model,
-                                "duration": time.perf_counter() - request_start
+                                "duration": now - request_start
                             })
                     
                     elif kind == "on_chat_model_end":
@@ -273,9 +306,17 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     db.add(new_ai_msg)
                     await db.commit()
                     
-                duration = time.perf_counter() - request_start
-                print(f"\nPIPELINE: Finished in {duration:.2f}s")
-                print(f"PIPELINE: Agent Thought Result: {full_ai_response[:100]}...")
+                # Send final telemetry
+                initial_state["telemetry"]["latencies"]["total"] = time.perf_counter() - request_start
+                if full_ai_response:
+                    # Use utility for token estimation if not provided by model
+                    initial_state["telemetry"]["usage"]["output"] = estimate_tokens(full_ai_response)
+                    initial_state["telemetry"]["total_tokens"] = initial_state["telemetry"]["usage"]["input"] + initial_state["telemetry"]["usage"]["output"]
+
+                await websocket.send_json({
+                    "type": "telemetry",
+                    "data": initial_state["telemetry"]
+                })
                 
                 # Reset status in UI
                 await websocket.send_json({
