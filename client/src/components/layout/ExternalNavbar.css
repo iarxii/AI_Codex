@@ -55,7 +55,8 @@
     right: -18px;
     width: 30px;
     height: 30px;
-    background-color: #FF6600;
+    /* background-color: #fd3b12; */
+    background-color: #fd3b12;
     clip-path: polygon(0 40%, 40% 40%, 40% 0);
     transition: background-color 0.3s ease;
     z-index: 0;
@@ -64,6 +65,7 @@
 .navbar-logo {
     height: 40px;
     width: auto;
+    background-color: #fd3b12;
     filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.1));
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: transform, filter;
