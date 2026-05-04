@@ -32,7 +32,7 @@ def compress_markdown(text: str) -> str:
     text = re.sub(r' {2,}', ' ', text)
     return text.strip()
 
-def build_system_prompt() -> str:
+def build_system_prompt(conversation_id: str = "default") -> str:
     """
     Assembles the System Prompt from modular markdown files (SOUL, USER, MEMORY, AGENTS).
     Applies programmatic compression to strike a balance between load and performance.
@@ -45,7 +45,7 @@ def build_system_prompt() -> str:
     
     # Workspace Sentinel: inject live session context
     from backend.agent.workspace_sentinel import read_workspace_status
-    workspace_status = read_workspace_status()
+    workspace_status = read_workspace_status(conversation_id)
     status_block = f"\n[STATUS]\n{workspace_status}" if workspace_status else ""
     
     prompt = f"""[SOUL]

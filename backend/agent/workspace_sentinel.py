@@ -19,8 +19,8 @@ from langchain_core.messages import BaseMessage
 
 logger = logging.getLogger(__name__)
 
-# Where the status file lives (alongside aicodex.db in data/)
-STATUS_FILE = Path("./data/workspace_status.md")
+def get_status_file(conversation_id: str) -> Path:
+    return Path(f"./data/workspaces/{conversation_id}/workspace_status.md")
 
 # How often (in conversation turns) to trigger a status update
 SENTINEL_INTERVAL = 5
@@ -28,15 +28,15 @@ SENTINEL_INTERVAL = 5
 # Maximum chars for the status content (fits in the 200-char Workspace Meta budget)
 MAX_STATUS_CHARS = 200
 
-
-def read_workspace_status() -> str:
+def read_workspace_status(conversation_id: str) -> str:
     """
     Reads the current workspace status. Returns empty string if no status exists.
     This is called on every prompt to inject into the system message.
     """
-    if STATUS_FILE.exists():
+    status_file = get_status_file(conversation_id)
+    if status_file.exists():
         try:
-            content = STATUS_FILE.read_text(encoding="utf-8").strip()
+            content = status_file.read_text(encoding="utf-8").strip()
             # Enforce budget ceiling
             if len(content) > MAX_STATUS_CHARS:
                 content = content[:MAX_STATUS_CHARS - 3] + "..."
@@ -46,18 +46,19 @@ def read_workspace_status() -> str:
     return ""
 
 
-def write_workspace_status(status: str) -> None:
+def write_workspace_status(conversation_id: str, status: str) -> None:
     """
     Writes a new workspace status. Enforces the character budget.
     """
-    STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    status_file = get_status_file(conversation_id)
+    status_file.parent.mkdir(parents=True, exist_ok=True)
     
     # Enforce budget
     if len(status) > MAX_STATUS_CHARS:
         status = status[:MAX_STATUS_CHARS - 3] + "..."
     
     try:
-        STATUS_FILE.write_text(status, encoding="utf-8")
+        status_file.write_text(status, encoding="utf-8")
         logger.info(f"Sentinel: Status updated ({len(status)} chars)")
     except Exception as e:
         logger.error(f"Sentinel: Failed to write status file: {e}")

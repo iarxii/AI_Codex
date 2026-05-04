@@ -161,7 +161,8 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     if should_update_status(turn_count):
         status = extract_status_from_history(messages)
         if status:
-            write_workspace_status(status)
+            conversation_id = config.get("configurable", {}).get("conversation_id", "default")
+            write_workspace_status(conversation_id, status)
             print(f"SENTINEL: Status updated at turn {turn_count} ({len(status)} chars)")
     
     # Context Budgeting: If history is long, summarize older parts
@@ -172,8 +173,8 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         system_msg = messages[0]
         recent_msgs = messages[-5:]
         messages = [system_msg, HumanMessage(content=f"Summary of previous turns: {summary}")] + recent_msgs
-
-    system_prompt = build_system_prompt()
+    conversation_id = config.get("configurable", {}).get("conversation_id", "default")
+    system_prompt = build_system_prompt(conversation_id)
     
     # Initialize context builder with provider-aware budget
     provider = config.get("configurable", {}).get("provider", "local")
