@@ -42,7 +42,7 @@ export const PROVIDERS: ProviderInfo[] = [
     id: 'groq',
     label: 'Groq',
     description: 'Ultra-fast cloud inference',
-    color: '#FF6600',
+    color: '#fd3b12',
     icon: '/media/brand-icons/groq.webp',
     iconType: 'svg-file',
     brand: 'Groq',

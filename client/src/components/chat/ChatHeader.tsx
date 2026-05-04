@@ -42,7 +42,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         {/* Sidebar Toggle */}
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="p-1.5 text-[#4A4D5E] hover:text-[#FF6600] hover:bg-black/5 rounded-lg transition-all active:scale-95"
+          className="p-1.5 text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95"
           title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
         >
           <svg
@@ -62,7 +62,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           className={`flex items-center gap-2 animate-in fade-in slide-in-from-left-4 duration-300 ${isSidebarOpen ? "lg:hidden" : ""}`}
         >
           <img
-            src="/media/aicodex_logo_2_transp_spirit_bird.png"
+            src="/media/aicodex-spirit-bird.png"
             alt="AICodex Logo"
             className="w-7 h-7 shrink-0 object-contain rounded-lg border border-[var(--accent)]"
           />
@@ -80,10 +80,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           }}
           className="text-left group/card hover:bg-black/5 p-1.5 rounded-lg transition-colors"
         >
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-[#4A4D5E] group-hover/card:text-[#FF6600] flex items-center gap-2">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-[#4A4D5E] group-hover/card:text-[#fd3b12] flex items-center gap-2">
             {currentConvId ? `Workspace #${currentConvId}` : "No Workspace"}
             {currentConvId && (
-              <span className="opacity-0 group-hover/card:opacity-100 text-[9px] font-bold tracking-widest bg-[#FF6600]/10 text-[#FF6600] px-1.5 py-0.5 rounded transition-opacity">
+              <span className="opacity-0 group-hover/card:opacity-100 text-[9px] font-bold tracking-widest bg-[#fd3b12]/10 text-[#fd3b12] px-1.5 py-0.5 rounded transition-opacity">
                 PROFILE
               </span>
             )}
@@ -110,7 +110,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onClick={() => setIsCanvasOpen(!isCanvasOpen)}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
             isCanvasOpen
-              ? "bg-[#FF6600]/10 border-[#FF6600]/30 text-[#FF6600]"
+              ? "bg-[#fd3b12]/10 border-[#fd3b12]/30 text-[#fd3b12]"
               : "bg-black/[0.04] border-black/[0.08] text-[#4A4D5E] hover:text-[#1A1D2E] hover:border-black/[0.15]"
           }`}
         >
@@ -128,7 +128,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </svg>
           Canvas
           {artifactCount > 0 && (
-            <span className="flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-[#FF6600] text-white text-[8px] font-black animate-in zoom-in">
+            <span className="flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-[#fd3b12] text-white text-[8px] font-black animate-in zoom-in">
               {artifactCount}
             </span>
           )}
@@ -155,7 +155,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onClick={() => setIsSettingsOpen(true)}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
             connected
-              ? "bg-[#FF6600]/10 border-[#FF6600]/25 hover:bg-[#FF6600]/20 hover:border-[#FF6600]/40"
+              ? "bg-[#fd3b12]/10 border-[#fd3b12]/25 hover:bg-[#fd3b12]/20 hover:border-[#fd3b12]/40"
               : "bg-red-100 border-red-300"
           }`}
           title={`Provider: ${activeProviderInfo.label} — Click to change`}
@@ -163,7 +163,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           <ProviderIcon provider={activeProviderInfo} size={16} />
           <span
             className={`hidden md:flex text-[10px] font-bold uppercase tracking-tight ${
-              connected ? "text-[#FF6600]" : "text-red-600"
+              connected ? "text-[#fd3b12]" : "text-red-600"
             }`}
           >
             {activeProviderInfo.label} API

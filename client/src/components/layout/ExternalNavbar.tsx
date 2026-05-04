@@ -36,7 +36,8 @@ const ExternalNavbar: React.FC = () => {
         >
           <img
             // src="/media/adaptiv_media_logo.png"
-            src="/media/aicodex_logo_2_transp_spirit_bird.png"
+            // src="/media/aicodex_logo_2_white_spirit_bird.png"
+            src="/media/aicodex-spirit-bird-white.png"
             alt="Adaptivconcept FL Logo"
             className="navbar-logo cursor-pointer object-contain rounded-2xl border-2 border-[var(--accent)]"
             title="AdaptivConcept FL"
@@ -91,7 +92,7 @@ const ExternalNavbar: React.FC = () => {
           <ul className="flex flex-col lg:flex-row items-center gap-8 m-0 p-0">
             <li>
               <Link
-                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-[#FF6600] ${isActive("/") ? "font-bold text-[#FF6600]" : "text-[#4A4D5E]"}`}
+                className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-[#fd3b12] ${isActive("/") ? "font-bold text-[#fd3b12]" : "text-[#4A4D5E]"}`}
                 to="/"
                 onClick={() => setIsMenuOpen(false)}
               >
@@ -101,7 +102,7 @@ const ExternalNavbar: React.FC = () => {
             <li>
               <a
                 href={`${PORTFOLIO_URL}/projects`}
-                className="flex items-center gap-2 text-sm font-medium transition-colors hover:text-[#FF6600] text-[#4A4D5E]"
+                className="flex items-center gap-2 text-sm font-medium transition-colors hover:text-[#fd3b12] text-[#4A4D5E]"
                 onClick={() => setIsMenuOpen(false)}
               >
                 <FolderKanban size={18} /> <p className="truncate">Projects</p>
@@ -110,7 +111,7 @@ const ExternalNavbar: React.FC = () => {
             <li>
               <a
                 href={`${PORTFOLIO_URL}/blog`}
-                className="flex items-center gap-2 text-sm font-medium transition-colors hover:text-[#FF6600] text-[#4A4D5E]"
+                className="flex items-center gap-2 text-sm font-medium transition-colors hover:text-[#fd3b12] text-[#4A4D5E]"
                 onClick={() => setIsMenuOpen(false)}
               >
                 <Newspaper size={18} /> <p className="truncate">Insights</p>
@@ -149,7 +150,7 @@ const ExternalNavbar: React.FC = () => {
                   display: "flex",
                   gap: 10,
                   alignItems: "center",
-                  backgroundColor: "#FF6600",
+                  backgroundColor: "#fd3b12",
                   color: "#fff",
                   fontSize: "0.9rem",
                   position: "relative",

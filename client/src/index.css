@@ -12,7 +12,7 @@
   --text: #4A4D5E;
   --text-primary: #1A1D2E;
   --text-muted: #7A7D8E;
-  --accent: #FF6600;
+  --accent: #fd3b12;
 }
 
 body {
@@ -83,8 +83,8 @@ body {
   left: -1px;
   width: 50%;
   height: 4px;
-  background: linear-gradient(to right, #FF6600, transparent);
-  border-radius: 2px 0 0 0;
+  background: linear-gradient(to right, #fd3b12, transparent);
+  border-radius: 0;
   z-index: 10;
 }
 .bot-corner-glow::after {
@@ -94,8 +94,32 @@ body {
   left: -1px;
   width: 4px;
   height: 50%;
-  background: linear-gradient(to bottom, #FF6600, transparent);
-  border-radius: 2px 0 0 0;
+  background: linear-gradient(to bottom, #fd3b12, transparent);
+  border-radius: 0;
+  z-index: 10;
+}
+
+/* Opposite corners for bot bubble */
+.bot-corner-glow-secondary::before {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 50%;
+  height: 4px;
+  background: linear-gradient(to left, #000000, transparent);
+  border-radius: 0 0 1rem 0;
+  z-index: 10;
+}
+.bot-corner-glow-secondary::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 4px;
+  height: 50%;
+  background: linear-gradient(to top, #000000, transparent);
+  border-radius: 0 0 1rem 0;
   z-index: 10;
 }
 
@@ -106,8 +130,8 @@ body {
   right: -1px;
   width: 50%;
   height: 4px;
-  background: linear-gradient(to left, rgba(255, 255, 255, 0.8), transparent);
-  border-radius: 0 2px 0 0;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.8), transparent);
+  border-radius: 0;
   z-index: 10;
 }
 .user-corner-glow::after {
@@ -117,8 +141,32 @@ body {
   right: -1px;
   width: 4px;
   height: 50%;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.8), transparent);
-  border-radius: 0 2px 0 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+  border-radius: 0;
+  z-index: 10;
+}
+
+/* Opposite corners for user bubble */
+.user-corner-glow-secondary::before {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: -1px;
+  width: 50%;
+  height: 4px;
+  background: linear-gradient(to right, #ffffff, transparent);
+  border-radius: 0 0 0 1rem;
+  z-index: 10;
+}
+.user-corner-glow-secondary::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: -1px;
+  width: 4px;
+  height: 50%;
+  background: linear-gradient(to top, #ffffff, transparent);
+  border-radius: 0 0 0 1rem;
   z-index: 10;
 }
 
@@ -191,7 +239,7 @@ body {
   top: 0.65em;
   width: 4px;
   height: 4px;
-  background-color: #FF6600;
+  background-color: #fd3b12;
   border-radius: 50%;
   opacity: 0.6;
 }
@@ -214,7 +262,7 @@ body {
 }
 
 .prose-chat blockquote {
-  border-left: 3px solid #FF6600;
+  border-left: 3px solid #fd3b12;
   padding-left: 1.25em;
   font-style: italic;
   color: #64748B;
