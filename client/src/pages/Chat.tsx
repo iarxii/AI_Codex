@@ -38,6 +38,7 @@ const Chat: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const isProcessing = useRef(false);
   const isCanvasOpenRef = useRef(false);
+  const currentToolCallsRef = useRef<any[]>([]);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, npu_available: false, igpu: 0, igpu_available: false, latency: '0ms' });
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
   const [isChartExpanded, setIsChartExpanded] = useState(false);
@@ -213,6 +214,7 @@ const Chat: React.FC = () => {
         setThoughtLog(prev => [...prev, { text: data.status, timestamp: Date.now(), type: data.node }]);
       } else if (data.type === 'tool_call') {
         setCurrentToolCalls(data.tool_calls);
+        currentToolCallsRef.current = data.tool_calls;
         setThoughtLog(prev => {
           if (prev.length === 0) return prev;
           const updated = [...prev];
@@ -222,9 +224,11 @@ const Chat: React.FC = () => {
           return updated;
         });
       } else if (data.type === 'tool_result') {
-        setCurrentToolCalls(prev => prev.map(tc => 
+        const updated = currentToolCallsRef.current.map(tc => 
           tc.id === data.tool_call_id ? { ...tc, result: data.content } : tc
-        ));
+        );
+        setCurrentToolCalls(updated);
+        currentToolCallsRef.current = updated;
         setThoughtLog(prev => {
           if (prev.length === 0) return prev;
           const updated = [...prev];
@@ -254,6 +258,27 @@ const Chat: React.FC = () => {
 
             // Parse artifacts from final response (once, not on every token)
             const finalArtifacts = parseArtifacts(lastMsg.content, lastMsg.id);
+
+            // Extract artifacts from tool calls
+            currentToolCallsRef.current.forEach(tc => {
+              if (tc.name === 'workspace_writer' && tc.args) {
+                const type = (tc.args.type || 'code').toLowerCase();
+                const typeNormMap: Record<string, Artifact['type']> = { 'code': 'code', 'docs': 'docs', 'doc': 'docs', 'research': 'research' };
+                const artifactType = typeNormMap[type] || 'docs';
+                const title = tc.args.filename || 'scratchpad';
+                
+                finalArtifacts.push({
+                  id: `${artifactType}-${title.replace(/\\s+/g, '-').toLowerCase()}`,
+                  type: artifactType,
+                  title: title,
+                  content: tc.args.content || '',
+                  language: artifactType === 'code' ? 'text' : undefined,
+                  timestamp: Date.now(),
+                  messageId: lastMsg.id
+                });
+              }
+            });
+
             if (finalArtifacts.length > 0) {
               setArtifacts(prev => {
                 const merged = [...prev];
@@ -407,6 +432,7 @@ const Chat: React.FC = () => {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
     setCurrentToolCalls([]);
+    currentToolCallsRef.current = [];
     setThoughtStartTime(Date.now());
     setThoughtLog([]);
     
