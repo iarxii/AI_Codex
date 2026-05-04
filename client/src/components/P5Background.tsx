@@ -1,23 +1,34 @@
-import React, { useEffect, useRef } from 'react';
-import p5 from 'p5';
-import { useAI } from '../contexts/AIContext';
+import React, { useEffect, useRef } from "react";
+import p5 from "p5";
+import { useAI } from "../contexts/AIContext";
 
 interface P5BackgroundProps {
   isDynamic?: boolean;
 }
 
-const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic }) => {
+const P5Background: React.FC<P5BackgroundProps> = ({
+  isDynamic: propIsDynamic,
+}) => {
   const { visualSettings } = useAI();
   const isDynamic = propIsDynamic ?? visualSettings.isDynamic;
-  const { showTraces, showScanlines, showGlitches, showGrain, showVideo, showWaves, showNeuralStrings, stringColor } = visualSettings;
-  
+  const {
+    showTraces,
+    showScanlines,
+    showGlitches,
+    showGrain,
+    showVideo,
+    showWaves,
+    showNeuralStrings,
+    stringColor,
+  } = visualSettings;
+
   // PENDING: isDynamic prop will eventually be wired to user preferences / low-power mode toggle.
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (videoRef.current) {
-      videoRef.current.playbackRate =1.3; // Atmospheric slow-mo
+      videoRef.current.playbackRate = 1.3; // Atmospheric slow-mo
     }
   }, []);
 
@@ -30,14 +41,14 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
       let glitches: Glitch[] = [];
       let grainTexture: p5.Graphics;
       const GRID_SIZE = 40;
-      const MAX_TRACES = 9; 
+      const MAX_TRACES = 9;
       const MAX_CURVES = 4;
 
       p.setup = () => {
         const canvas = p.createCanvas(p.windowWidth, p.windowHeight);
         canvas.parent(containerRef.current!);
         p.frameRate(30); // Performance optimization
-        
+
         for (let i = 0; i < MAX_TRACES; i++) {
           traces.push(new Trace(p));
         }
@@ -65,24 +76,24 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
 
       p.draw = () => {
         // Clear with slight alpha for trails
-        p.clear(0,0,0,0);
-        
+        p.clear(0, 0, 0, 0);
+
         if (showTraces) {
-          traces.forEach(t => {
+          traces.forEach((t) => {
             if (isDynamic) t.update();
             t.display();
           });
         }
 
         if (showNeuralStrings) {
-          curves.forEach(c => {
+          curves.forEach((c) => {
             if (isDynamic) c.update();
             c.display();
           });
         }
 
         if (showGlitches && isDynamic) {
-          glitches.forEach(g => {
+          glitches.forEach((g) => {
             g.update();
             g.display();
           });
@@ -111,11 +122,11 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
         prevX!: number;
         prevY!: number;
         dir!: p5.Vector;
-        history!: {x: number, y: number}[];
+        history!: { x: number; y: number }[];
         life!: number;
         maxLife!: number;
         speed!: number;
-        color!: {r: number, g: number, b: number};
+        color!: { r: number; g: number; b: number };
 
         constructor(p: p5) {
           this.p = p;
@@ -123,8 +134,10 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
         }
 
         init() {
-          this.x = Math.floor(this.p.random(this.p.width) / GRID_SIZE) * GRID_SIZE;
-          this.y = Math.floor(this.p.random(this.p.height) / GRID_SIZE) * GRID_SIZE;
+          this.x =
+            Math.floor(this.p.random(this.p.width) / GRID_SIZE) * GRID_SIZE;
+          this.y =
+            Math.floor(this.p.random(this.p.height) / GRID_SIZE) * GRID_SIZE;
           this.prevX = this.x;
           this.prevY = this.y;
           this.dir = this.getRandomDir();
@@ -154,19 +167,19 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
             this.p.createVector(1, 0),
             this.p.createVector(-1, 0),
             this.p.createVector(0, 1),
-            this.p.createVector(0, -1)
+            this.p.createVector(0, -1),
           ];
           return dirs[Math.floor(this.p.random(dirs.length))];
         }
 
         update() {
-          this.history.push({x: this.x, y: this.y});
+          this.history.push({ x: this.x, y: this.y });
           // Keep a longer tail to look more like a circuit trace
           if (this.history.length > 40) this.history.shift();
 
           this.prevX = this.x;
           this.prevY = this.y;
-          
+
           this.x += this.dir.x * this.speed;
           this.y += this.dir.y * this.speed;
 
@@ -183,7 +196,13 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
           }
 
           this.life--;
-          if (this.life <= 0 || this.x < 0 || this.x > this.p.width || this.y < 0 || this.y > this.p.height) {
+          if (
+            this.life <= 0 ||
+            this.x < 0 ||
+            this.x > this.p.width ||
+            this.y < 0 ||
+            this.y > this.p.height
+          ) {
             this.init();
           }
         }
@@ -191,12 +210,18 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
         display() {
           this.p.noFill();
           this.p.strokeWeight(2.5);
-          
+
           // Calculate lifecycle fade (spawn/die transitions)
           let fadeMultiplier = 1;
           const FADE_DUR = 30; // Frames to fade in/out
           if (this.maxLife - this.life < FADE_DUR) {
-            fadeMultiplier = this.p.map(this.maxLife - this.life, 0, FADE_DUR, 0, 1);
+            fadeMultiplier = this.p.map(
+              this.maxLife - this.life,
+              0,
+              FADE_DUR,
+              0,
+              1,
+            );
           } else if (this.life < FADE_DUR) {
             fadeMultiplier = this.p.map(this.life, 0, FADE_DUR, 0, 1);
           }
@@ -205,21 +230,37 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
           for (let i = 0; i < this.history.length - 1; i++) {
             const pos = this.history[i];
             const nextPos = this.history[i + 1];
-            const segmentAlpha = this.p.map(i, 0, this.history.length, 0, 220) * fadeMultiplier;
-            this.p.stroke(this.color.r, this.color.g, this.color.b, segmentAlpha);
+            const segmentAlpha =
+              this.p.map(i, 0, this.history.length, 0, 220) * fadeMultiplier;
+            this.p.stroke(
+              this.color.r,
+              this.color.g,
+              this.color.b,
+              segmentAlpha,
+            );
             this.p.line(pos.x, pos.y, nextPos.x, nextPos.y);
           }
 
           // Draw the final segment from history to current head
           if (this.history.length > 0) {
             const lastPos = this.history[this.history.length - 1];
-            this.p.stroke(this.color.r, this.color.g, this.color.b, 220 * fadeMultiplier);
+            this.p.stroke(
+              this.color.r,
+              this.color.g,
+              this.color.b,
+              220 * fadeMultiplier,
+            );
             this.p.line(lastPos.x, lastPos.y, this.x, this.y);
           }
 
           // Head glow
           this.p.noStroke();
-          this.p.fill(this.color.r, this.color.g, this.color.b, 255 * fadeMultiplier);
+          this.p.fill(
+            this.color.r,
+            this.color.g,
+            this.color.b,
+            255 * fadeMultiplier,
+          );
           this.p.circle(this.x, this.y, 6);
         }
       }
@@ -232,7 +273,7 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
         h: number = 0;
         active: boolean = false;
         timer: number = 0;
-        color: {r: number, g: number, b: number} = {r: 255, g: 255, b: 255};
+        color: { r: number; g: number; b: number } = { r: 255, g: 255, b: 255 };
 
         constructor(p: p5) {
           this.p = p;
@@ -248,9 +289,10 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
               this.x = 0;
               this.w = this.p.width;
               this.h = this.p.random(2, 40);
-              this.color = this.p.random() > 0.7 
-                ? { r: 255, g: 102, b: 0 } 
-                : { r: 255, g: 255, b: 255 };
+              this.color =
+                this.p.random() > 0.7
+                  ? { r: 255, g: 102, b: 0 }
+                  : { r: 255, g: 255, b: 255 };
             }
           } else {
             this.timer--;
@@ -261,20 +303,30 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
         display() {
           if (this.active && isDynamic) {
             this.p.noStroke();
-            this.p.fill(this.color.r, this.color.g, this.color.b, this.p.random(20, 80));
-            
+            this.p.fill(
+              this.color.r,
+              this.color.g,
+              this.color.b,
+              this.p.random(20, 80),
+            );
+
             // Draw a main slice
             this.p.rect(this.x, this.y, this.w, this.h);
-            
+
             // Draw some tiny "digital noise" blocks nearby
             if (this.p.random() > 0.5) {
-              for(let i=0; i<5; i++) {
-                this.p.fill(this.color.r, this.color.g, this.color.b, this.p.random(50, 150));
+              for (let i = 0; i < 5; i++) {
+                this.p.fill(
+                  this.color.r,
+                  this.color.g,
+                  this.color.b,
+                  this.p.random(50, 150),
+                );
                 this.p.rect(
-                  this.p.random(this.p.width), 
-                  this.y + this.p.random(-50, 50), 
-                  this.p.random(5, 50), 
-                  this.p.random(1, 4)
+                  this.p.random(this.p.width),
+                  this.y + this.p.random(-50, 50),
+                  this.p.random(5, 50),
+                  this.p.random(1, 4),
                 );
               }
             }
@@ -293,31 +345,38 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
           this.points = [];
           // Increase density for "simulated" smoothness
           for (let i = 0; i < 12; i++) {
-            this.points.push(this.p.createVector(
-              this.p.random(this.p.width), 
-              this.p.random(this.p.height)
-            ));
+            this.points.push(
+              this.p.createVector(
+                this.p.random(this.p.width),
+                this.p.random(this.p.height),
+              ),
+            );
           }
         }
 
         update() {
           this.points.forEach((pt, i) => {
             // Finer noise for smoother drifting
-            pt.x += (this.p.noise(this.seed + i, this.p.frameCount * 0.003) - 0.5) * 1.5;
-            pt.y += (this.p.noise(this.seed + i + 100, this.p.frameCount * 0.003) - 0.5) * 1.5;
+            pt.x +=
+              (this.p.noise(this.seed + i, this.p.frameCount * 0.003) - 0.5) *
+              1.5;
+            pt.y +=
+              (this.p.noise(this.seed + i + 100, this.p.frameCount * 0.003) -
+                0.5) *
+              1.5;
           });
         }
 
         display() {
           if (!this.points || this.points.length < 2) return;
-          
+
           try {
             this.p.noFill();
-            
+
             let strokeCol;
-            if (stringColor === 'orange') {
+            if (stringColor === "orange") {
               strokeCol = this.p.color(255, 102, 0, 180);
-            } else if (stringColor === 'white') {
+            } else if (stringColor === "white") {
               strokeCol = this.p.color(255, 255, 255, 210); // Sharp high-contrast white
             } else {
               strokeCol = this.p.color(26, 29, 46, 150);
@@ -325,7 +384,7 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
 
             this.p.stroke(strokeCol);
             this.p.strokeWeight(1.8);
-            
+
             // Ultra-Smooth Vertex Path
             this.p.beginShape();
             for (let i = 0; i < this.points.length; i++) {
@@ -336,7 +395,7 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
             // Pulsing terminal nodes
             const start = this.points[0];
             const end = this.points[this.points.length - 1];
-            
+
             const pulse = this.p.sin(this.p.frameCount * 0.08 + this.seed) * 4;
             const nodeSize = 6 + pulse;
 
@@ -427,12 +486,12 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
       `}</style>
 
       {/* Mobile/Tablet Static Background */}
-      <div 
+      <div
         className="mobile-bg absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ 
-          backgroundImage: `url('/media/aicodex_vector_wallpaper.png')`, 
-          opacity: 0.9, 
-          filter: 'blur(0.5px)'
+        style={{
+          backgroundImage: `url('/media/aicodex_vector_wallpaper.png')`,
+          opacity: 0.9,
+          filter: "blur(0.5px)",
         }}
       />
 
@@ -445,7 +504,11 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
           muted
           playsInline
           className="desktop-video absolute inset-0 w-full h-full object-cover"
-          style={{ opacity: 0.2, filter: 'blur(0.5px)', objectPosition: 'center bottom' }}
+          style={{
+            opacity: 0.2,
+            filter: "blur(0.5px)",
+            objectPosition: "center bottom",
+          }}
         >
           <source src="/media/landscape_background.mp4" type="video/mp4" />
         </video>
@@ -453,137 +516,149 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
 
       {/* Still Vector Background */}
       {visualSettings.showStillBackground && (
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat animate-in fade-in duration-700"
-          style={{ 
-            backgroundImage: `url('/media/thabang_vector_wallpaper_2.png')`, 
-            opacity: 0.25, 
-            filter: 'blur(0.5px)',
-            objectPosition: 'center'
+          style={{
+            backgroundImage: `url('/media/thabang_vector_wallpaper_2.png')`,
+            opacity: 0.25,
+            filter: "blur(0.5px)",
+            objectPosition: "center",
           }}
         />
       )}
       {/* Mandatory Watermark Mask - Radial Gradient from Bottom-Right */}
-      <div 
+      <div
         className="absolute inset-0 pointer-events-none"
-        style={{ 
-          background: 'radial-gradient(circle at bottom right, #E2E8F0 0%, #E2E8F0 12%, transparent 35%)',
-          opacity: 0.95
+        style={{
+          background:
+            "radial-gradient(circle at bottom right, #E2E8F0 0%, #E2E8F0 12%, transparent 35%)",
+          opacity: 0.95,
         }}
       />
       {/* Shifting Gradient Overlay (The "Energy Wave") */}
-      <div 
-        className="absolute inset-0 bg-gradient-to-tr from-[#FF6600]/5 via-transparent to-white/10 mix-blend-overlay"
-        style={{ 
-          animation: 'none' 
+      <div
+        className="absolute inset-0 bg-gradient-to-tr from-[#fd3b12]/5 via-transparent to-white/10 mix-blend-overlay"
+        style={{
+          animation: "none",
         }}
       />
 
       {/* Subtle Glitch Layer - occasionally "slices" the view */}
       {showGlitches && (
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center opacity-10 mix-blend-screen"
-          style={{ 
+          style={{
             backgroundImage: `url('/media/aicodex_vector_wallpaper.png')`,
-            animation: isDynamic ? 'glitch-slice 15s linear infinite' : 'none'
+            animation: isDynamic ? "glitch-slice 15s linear infinite" : "none",
           }}
         />
       )}
 
       {/* Additional Chromatic Aberration Glitch - High Intensity, Low Frequency */}
       {showGlitches && (
-        <div 
+        <div
           className="absolute inset-0 bg-white opacity-0 mix-blend-overlay pointer-events-none"
-          style={{ 
-            animation: isDynamic ? 'chromatic-flicker 12s step-end infinite' : 'none'
+          style={{
+            animation: isDynamic
+              ? "chromatic-flicker 12s step-end infinite"
+              : "none",
           }}
         />
       )}
-      
+
       {/* P5 Animated Grid and Traces */}
-      <div 
-        ref={containerRef} 
-        className="absolute inset-0 opacity-80" 
-        style={{ filter: 'blur(1px)' }}
+      <div
+        ref={containerRef}
+        className="absolute inset-0 opacity-80"
+        style={{ filter: "blur(1px)" }}
       />
 
       {/* CRT System Overlay - Scanlines, Vignette, and Phosphor Mask */}
       <div className="absolute inset-0 pointer-events-none z-[100] overflow-hidden">
         {/* Diagonal Marching Scanlines - Thicker 12px lines */}
         {showScanlines && (
-          <div 
+          <div
             className="absolute inset-[-50%] w-[200%] h-[200%] opacity-[0.1]"
-            style={{ 
-              backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.12) 50%)',
-              backgroundSize: '100% 12px',
-              transform: 'rotate(-40deg)',
-              animation: isDynamic ? 'marching-scanlines 1s linear infinite' : 'none'
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.12) 50%)",
+              backgroundSize: "100% 12px",
+              transform: "rotate(-40deg)",
+              animation: isDynamic
+                ? "marching-scanlines 1s linear infinite"
+                : "none",
             }}
           />
         )}
 
         {/* The Great Silver Wave - Sweeping diagonal highlight */}
         {showWaves && (
-          <div 
+          <div
             className="absolute inset-[-100%] w-[300%] h-[300%] mix-blend-overlay pointer-events-none opacity-40"
-            style={{ 
-              background: 'linear-gradient(to bottom, transparent, rgba(192, 204, 218, 0.5), transparent)',
-              animation: isDynamic ? 'wave-silver 12s linear infinite' : 'none',
-              filter: 'blur(40px)'
+            style={{
+              background:
+                "linear-gradient(to bottom, transparent, rgba(192, 204, 218, 0.5), transparent)",
+              animation: isDynamic ? "wave-silver 12s linear infinite" : "none",
+              filter: "blur(40px)",
             }}
           />
         )}
 
         {/* The Great Orange Wave - Counter-sweeping highlight */}
         {showWaves && (
-          <div 
+          <div
             className="absolute inset-[-100%] w-[300%] h-[300%] mix-blend-overlay pointer-events-none opacity-30"
-            style={{ 
-              background: 'linear-gradient(to bottom, transparent, rgba(255, 102, 0, 0.4), transparent)',
-              animation: isDynamic ? 'wave-orange 18s linear infinite' : 'none',
-              filter: 'blur(60px)'
+            style={{
+              background:
+                "linear-gradient(to bottom, transparent, rgba(255, 102, 0, 0.4), transparent)",
+              animation: isDynamic ? "wave-orange 18s linear infinite" : "none",
+              filter: "blur(60px)",
             }}
           />
         )}
 
         {/* Rolling Scanline (The "Refresh" bar) */}
         {showScanlines && (
-          <div 
+          <div
             className="absolute w-full h-20 bg-white/10 opacity-30 pointer-events-none"
-            style={{ 
-              animation: isDynamic ? 'scanline-roll 10s linear infinite' : 'none',
-              filter: 'blur(15px)'
+            style={{
+              animation: isDynamic
+                ? "scanline-roll 10s linear infinite"
+                : "none",
+              filter: "blur(15px)",
             }}
           />
         )}
 
         {/* RGB Phosphor Grid (Ultra subtle) */}
         {showScanlines && (
-          <div 
+          <div
             className="absolute inset-0 w-full h-full opacity-[0.02]"
-            style={{ 
-              backgroundImage: 'linear-gradient(90deg, rgba(255, 0, 0, 0.5), rgba(0, 255, 0, 0.5), rgba(0, 0, 255, 0.5))',
-              backgroundSize: '3px 100%'
+            style={{
+              backgroundImage:
+                "linear-gradient(90deg, rgba(255, 0, 0, 0.5), rgba(0, 255, 0, 0.5), rgba(0, 0, 255, 0.5))",
+              backgroundSize: "3px 100%",
             }}
           />
         )}
 
         {/* Screen Flicker / Static Pulse - Switched to White for "Light Mode" CRT */}
         {showScanlines && (
-          <div 
+          <div
             className="absolute inset-0 w-full h-full bg-white pointer-events-none"
-            style={{ 
-              animation: isDynamic ? 'crt-flicker 0.15s infinite' : 'none'
+            style={{
+              animation: isDynamic ? "crt-flicker 0.15s infinite" : "none",
             }}
           />
         )}
 
         {/* CRT Vignette (Tube shape) - Softened */}
-        <div 
+        <div
           className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ 
-            background: 'radial-gradient(circle, transparent 50%, rgba(0,0,0,0.15) 100%)',
-            zIndex: 40
+          style={{
+            background:
+              "radial-gradient(circle, transparent 50%, rgba(0,0,0,0.15) 100%)",
+            zIndex: 40,
           }}
         />
 
@@ -591,28 +666,31 @@ const P5Background: React.FC<P5BackgroundProps> = ({ isDynamic: propIsDynamic })
         {visualSettings.showMonochrome && (
           <>
             {/* The Phosphor Wash */}
-            <div 
+            <div
               className="absolute inset-0 w-full h-full pointer-events-none mix-blend-screen opacity-40 animate-in fade-in duration-1000"
-              style={{ 
-                backgroundColor: '#00FF41',
+              style={{
+                backgroundColor: "#00FF41",
                 zIndex: 45,
-                animation: visualSettings.isDynamic ? 'crt-flicker 0.2s infinite' : 'none'
+                animation: visualSettings.isDynamic
+                  ? "crt-flicker 0.2s infinite"
+                  : "none",
               }}
             />
             {/* The Darkening Layer (The "Darker" part of the request) */}
-            <div 
+            <div
               className="absolute inset-0 w-full h-full pointer-events-none mix-blend-multiply opacity-50"
-              style={{ 
-                backgroundColor: '#0A1A0A',
-                zIndex: 44
+              style={{
+                backgroundColor: "#0A1A0A",
+                zIndex: 44,
               }}
             />
             {/* Extra Green Vignette */}
-            <div 
+            <div
               className="absolute inset-0 w-full h-full pointer-events-none"
-              style={{ 
-                background: 'radial-gradient(circle, transparent 40%, rgba(0, 40, 0, 0.4) 100%)',
-                zIndex: 46
+              style={{
+                background:
+                  "radial-gradient(circle, transparent 40%, rgba(0, 40, 0, 0.4) 100%)",
+                zIndex: 46,
               }}
             />
           </>

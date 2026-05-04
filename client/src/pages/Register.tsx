@@ -53,7 +53,7 @@ const Register: React.FC = () => {
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center w-24 h-24 mb-6 drop-shadow-2xl">
               <img
-                src="/media/aicodex_logo_2_transp_spirit_bird.png"
+                src="/media/aicodex-spirit-bird.png"
                 alt="AICodex Logo"
                 className="w-full h-full object-contain rounded-3xl border-2 border-[var(--accent)]"
               />

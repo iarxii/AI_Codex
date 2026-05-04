@@ -115,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               className="w-18 h-18 object-contain transition-all duration-500 group-hover:scale-105"
             /> */}
             <img
-              src="/media/aicodex_logo_2_transp_spirit_bird.png"
+              src="/media/aicodex-spirit-bird.png"
               alt="Adaptivconcept FL Logo"
               className="w-20 h-20 cursor-pointer object-contain rounded-3xl border-2 border-[var(--accent)]"
               title="AdaptivConcept FL"
@@ -130,31 +130,31 @@ const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-[var(--text-muted)] flex items-center gap-1.5">
                 {provider === "local" && (
                   <>
-                    <CpuChipIcon className="w-3.5 h-3.5 text-[#FF6600]" />
+                    <CpuChipIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
                     Neural Core
                   </>
                 )}
                 {provider === "ollama_cloud" && (
                   <>
-                    <CloudIcon className="w-3.5 h-3.5 text-[#FF6600]" />
+                    <CloudIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
                     Neural Cloud
                   </>
                 )}
                 {provider === "groq" && (
                   <>
-                    <BoltIcon className="w-3.5 h-3.5 text-[#FF6600]" />
+                    <BoltIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
                     Neural Velocity
                   </>
                 )}
                 {provider === "openrouter" && (
                   <>
-                    <GlobeAltIcon className="w-3.5 h-3.5 text-[#FF6600]" />
+                    <GlobeAltIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
                     Neural Interface
                   </>
                 )}
                 {provider === "gemini" && (
                   <>
-                    <SparklesIcon className="w-3.5 h-3.5 text-[#FF6600]" />
+                    <SparklesIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
                     Neural Expert
                   </>
                 )}
