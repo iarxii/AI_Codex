@@ -241,6 +241,9 @@ const Chat: React.FC = () => {
       } else if (data.type === 'done') {
         setLoading(false);
         isProcessing.current = false;
+        
+        let extractedArtifacts: Artifact[] = [];
+        
         setMessages(prev => {
           const updated = [...prev];
           if (updated.length > 0 && updated[updated.length - 1].sender === 'bot') {
@@ -257,48 +260,58 @@ const Chat: React.FC = () => {
             };
 
             // Parse artifacts from final response (once, not on every token)
-            const finalArtifacts = parseArtifacts(lastMsg.content, lastMsg.id);
+            extractedArtifacts = parseArtifacts(lastMsg.content, lastMsg.id);
 
             // Extract artifacts from tool calls
             currentToolCallsRef.current.forEach(tc => {
               if (tc.name === 'workspace_writer' && tc.args) {
-                const type = (tc.args.type || 'code').toLowerCase();
+                let argsObj = tc.args;
+                if (typeof argsObj === 'string') {
+                  try { argsObj = JSON.parse(argsObj); } catch (e) { argsObj = {}; }
+                }
+                const type = (argsObj.type || 'code').toLowerCase();
                 const typeNormMap: Record<string, Artifact['type']> = { 'code': 'code', 'docs': 'docs', 'doc': 'docs', 'research': 'research' };
                 const artifactType = typeNormMap[type] || 'docs';
-                const title = tc.args.filename || 'scratchpad';
+                const title = argsObj.filename || 'scratchpad';
                 
-                finalArtifacts.push({
-                  id: `${artifactType}-${title.replace(/\\s+/g, '-').toLowerCase()}`,
+                extractedArtifacts.push({
+                  id: `${artifactType}-${title.replace(/\s+/g, '-').toLowerCase()}`,
                   type: artifactType,
                   title: title,
-                  content: tc.args.content || '',
+                  content: argsObj.content || '',
                   language: artifactType === 'code' ? 'text' : undefined,
                   timestamp: Date.now(),
                   messageId: lastMsg.id
                 });
               }
             });
-
-            if (finalArtifacts.length > 0) {
-              setArtifacts(prev => {
-                const merged = [...prev];
-                finalArtifacts.forEach(art => {
-                  const idx = merged.findIndex(a => a.id === art.id);
-                  if (idx >= 0) merged[idx] = art;
-                  else merged.push(art);
-                });
-                return merged;
-              });
-
-              // Auto-sync code artifacts to scratchpad
-              const codeArt = finalArtifacts.find(a => a.type === 'code');
-              if (codeArt) saveToScratchpad(codeArt);
-
-              if (!isCanvasOpenRef.current) setIsCanvasOpen(true);
-            }
           }
           return updated;
         });
+
+        setTimeout(() => {
+          if (extractedArtifacts.length > 0) {
+            setArtifacts(prev => {
+              const merged = [...prev];
+              extractedArtifacts.forEach(art => {
+                const idx = merged.findIndex(a => a.id === art.id);
+                if (idx >= 0) merged[idx] = art;
+                else merged.push(art);
+              });
+              return merged;
+            });
+
+            // Auto-sync code artifacts to scratchpad
+            const codeArt = extractedArtifacts.find(a => a.type === 'code');
+            if (codeArt) saveToScratchpad(codeArt);
+
+            setSelectedArtifactId(prev => prev || extractedArtifacts[0].id);
+
+            if (!isCanvasOpenRef.current) {
+              setIsCanvasOpen(true);
+            }
+          }
+        }, 0);
       } else if (data.type === 'error') {
         setMessages(prev => [...prev, { id: 'err-' + Date.now(), sender: 'bot', content: '❌ Error: ' + data.message }]);
         setLoading(false);

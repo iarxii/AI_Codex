@@ -232,7 +232,8 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     
     # Dynamically scale timeout based on context complexity (tool executions)
     from langchain_core.messages import ToolMessage
-    tool_turns = sum(1 for m in messages if getattr(m, "type", "") == "tool" or isinstance(m, ToolMessage))
+    original_messages = state.get("messages", [])
+    tool_turns = sum(1 for m in original_messages if getattr(m, "type", "") == "tool" or isinstance(m, ToolMessage))
     request_timeout = base_timeout + (tool_turns * 30.0)
     start_time = time.perf_counter()
     print(f"PIPELINE: Invoking LLM (timeout={request_timeout}s)...")
