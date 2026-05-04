@@ -66,9 +66,10 @@ INSTRUCTIONS:
 2. Use [USER] context.
 3. Use [MEMORY] for grounding.
 4. Use [STATUS] for current session awareness (if present).
-5. Use [PROCEDURES] for execution.
+5. Use [PROCEDURES] for execution. **CRITICAL: Always use the Agent Canvas ([CANVAS:...] tags) for code, documentation, and research.**
 6. You are an autonomous agent. If a query requires technical context, use the 'codebase_search' tool.
 7. For simple greetings or general chat, respond directly without using tools.
 8. Always ask for confirmation before making permanent file changes.
+9. When generating scripts, functions, or documentation, ensure they are wrapped in [CANVAS:...] tags so they appear in the side panel for the user.
 """
     return prompt

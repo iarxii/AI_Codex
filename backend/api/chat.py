@@ -58,6 +58,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         model = payload_data.get("model")
         api_key = payload_data.get("api_key")
         base_url = payload_data.get("base_url")
+        agent_mode = payload_data.get("agent_mode", True)
         
         if not conversation_id:
             await websocket.send_json({"type": "error", "message": "conversation_id is required"})
@@ -117,7 +118,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "model": model, 
                         "api_key": api_key,
                         "base_url": base_url,
-                        "conversation_id": str(conversation_id)
+                        "conversation_id": str(conversation_id),
+                        "agent_mode": agent_mode
                     },
                     "recursion_limit": 25
                 }

@@ -46,7 +46,7 @@ const Chat: React.FC = () => {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
-  const [activeConversationId] = useState<string>(Date.now().toString()); // Simple ID for now
+  const [agentMode, setAgentMode] = useState(true);
   
   // Global AI State
   const { provider: activeProvider, model: activeModel, getApiKey } = useAI();
@@ -80,7 +80,7 @@ const Chat: React.FC = () => {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          conversation_id: activeConversationId,
+          conversation_id: currentConvId,
           filename: artifact.title || 'scratchpad.py',
           content: artifact.content
         })
@@ -456,14 +456,16 @@ const Chat: React.FC = () => {
         throw new Error('Neural link disconnected. Please refresh or check connection.');
       }
 
-      ws.current.send(JSON.stringify({
+      const payload = {
         message: input,
         conversation_id: currentConvId,
         provider: activeProvider,
         model: activeModel,
         api_key: apiKey,
+        agent_mode: agentMode,
         base_url: localStorage.getItem('ollama_cloud_url') || ''
-      }));
+      };
+      ws.current.send(JSON.stringify(payload));
       
       setInput('');
     } catch (err: any) {
@@ -557,6 +559,8 @@ const Chat: React.FC = () => {
           currentConvId={currentConvId}
           showTelemetry={showTelemetry}
           setShowTelemetry={setShowTelemetry}
+          agentMode={agentMode}
+          setAgentMode={setAgentMode}
         />
       </div>
 

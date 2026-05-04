@@ -9,6 +9,8 @@ interface ChatInputProps {
   currentConvId: number | null;
   showTelemetry: boolean;
   setShowTelemetry: (val: boolean) => void;
+  agentMode: boolean;
+  setAgentMode: (val: boolean) => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
@@ -18,7 +20,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
   loading,
   currentConvId,
   showTelemetry,
-  setShowTelemetry
+  setShowTelemetry,
+  agentMode,
+  setAgentMode
 }) => {
   return (
     <footer className="px-6 pb-5 pt-3 bg-transparent border-t border-black/[0.04] z-20">
@@ -63,14 +67,18 @@ const ChatInput: React.FC<ChatInputProps> = ({
             {/* Agent Mode */}
             <button
               type="button"
-              onClick={() => alert('Agent mode — coming soon!')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[#4A4D5E] hover:text-[#FF6600] hover:bg-[#FF6600]/8 transition-all"
+              onClick={() => setAgentMode(!agentMode)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                agentMode 
+                  ? 'bg-[#FF6600] text-white shadow-sm shadow-[#FF6600]/20' 
+                  : 'text-[#4A4D5E] hover:text-[#FF6600] hover:bg-[#FF6600]/8'
+              }`}
               title="Toggle agent mode"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
-              Agent
+              {agentMode ? 'Agent: ON' : 'Agent'}
             </button>
 
             <div className="flex-1" />
