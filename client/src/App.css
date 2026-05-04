@@ -11,10 +11,10 @@
   --bg-input: #FFFFFF;           /* Input field backgrounds — clean white */
   --bg-elevated: #FFFFFF;        /* Modals, dropdowns — clean white */
   --bg-chat-bot: #E2E6EC;        /* Bot message bubbles */
-  --bg-chat-user: #FF6600;       /* User message bubbles — AdaptivOrange */
+  --bg-chat-user: #fd3b12;       /* User message bubbles — AdaptivOrange */
 
   /* Accent — AdaptivOrange */
-  --accent: #FF6600;
+  --accent: #fd3b12;
   --accent-hover: #E65C00;
   --accent-glow: rgba(255, 102, 0, 0.12);
   --accent-border: rgba(255, 102, 0, 0.35);
