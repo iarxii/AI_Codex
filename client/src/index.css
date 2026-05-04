@@ -124,13 +124,14 @@ body {
 
 /* Chat Markdown Readability */
 .prose-chat {
-  font-size: 12px !important;
-  line-height: 1.65 !important;
+  font-size: 13px !important;
+  line-height: 1.7 !important;
+  color: #334155;
 }
 
 .prose-chat p {
-  margin-top: 0.75em;
-  margin-bottom: 0.75em;
+  margin-top: 1em;
+  margin-bottom: 1em;
 }
 
 .prose-chat p:first-child {
@@ -142,22 +143,25 @@ body {
 }
 
 .prose-chat code {
-  background-color: rgba(0, 0, 0, 0.05);
-  padding: 0.2em 0.4em;
-  border-radius: 4px;
-  font-size: 0.9em;
+  background-color: rgba(255, 102, 0, 0.08);
+  padding: 0.2em 0.45em;
+  border-radius: 6px;
+  font-size: 0.85em;
   font-weight: 600;
-  color: #FF6600;
+  color: #E65C00;
+  border: 1px solid rgba(255, 102, 0, 0.1);
+  font-family: var(--font-mono);
 }
 
 .prose-chat pre {
-  background-color: #1A1D2E !important;
-  color: #E2E8F0 !important;
-  padding: 1rem !important;
-  border-radius: 12px !important;
-  margin: 1rem 0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  font-size: 11px !important;
+  background-color: #0F172A !important;
+  color: #F1F5F9 !important;
+  padding: 1.25rem !important;
+  border-radius: 14px !important;
+  margin: 1.5rem 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  font-size: 11.5px !important;
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);
 }
 
 .prose-chat pre code {
@@ -165,26 +169,58 @@ body {
   padding: 0 !important;
   color: inherit !important;
   font-weight: 400 !important;
+  border: none !important;
 }
 
 .prose-chat ul, .prose-chat ol {
-  margin-top: 0.5em;
-  margin-bottom: 0.5em;
-  padding-left: 1.25em;
+  margin-top: 1em;
+  margin-bottom: 1em;
+  padding-left: 1.5em;
 }
 
 .prose-chat li {
-  margin-top: 0.25em;
-  margin-bottom: 0.25em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  position: relative;
+}
+
+.prose-chat ul li::before {
+  content: "";
+  position: absolute;
+  left: -1.25em;
+  top: 0.65em;
+  width: 4px;
+  height: 4px;
+  background-color: #FF6600;
+  border-radius: 50%;
+  opacity: 0.6;
 }
 
 .prose-chat h1, .prose-chat h2, .prose-chat h3, .prose-chat h4 {
-  color: #1A1D2E;
-  font-weight: 700;
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
+  color: #0F172A;
+  font-weight: 800;
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+  letter-spacing: -0.025em;
 }
 
-.prose-chat h1 { font-size: 1.4em; }
-.prose-chat h2 { font-size: 1.25em; }
-.prose-chat h3 { font-size: 1.1em; }
+.prose-chat h1 { font-size: 1.6em; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 0.3em; }
+.prose-chat h2 { font-size: 1.4em; }
+.prose-chat h3 { font-size: 1.2em; }
+
+.prose-chat strong {
+  color: #1E293B;
+  font-weight: 700;
+}
+
+.prose-chat blockquote {
+  border-left: 3px solid #FF6600;
+  padding-left: 1.25em;
+  font-style: italic;
+  color: #64748B;
+  background: rgba(255, 102, 0, 0.03);
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  border-radius: 0 8px 8px 0;
+  margin: 1.5em 0;
+}
