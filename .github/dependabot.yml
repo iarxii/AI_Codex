@@ -1,0 +1,41 @@
+version: 2
+updates:
+  # 1. Root NPM updates
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      root-dependencies:
+        patterns:
+          - "*"
+
+  # 2. Frontend (Client) NPM updates
+  - package-ecosystem: "npm"
+    directory: "/client"
+    schedule:
+      interval: "weekly"
+    groups:
+      client-dependencies:
+        patterns:
+          - "*"
+
+  # 3. Backend (Python) updates
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    groups:
+      backend-dependencies:
+        patterns:
+          - "*"
+
+  # 4. Archived Legacy Server updates
+  - package-ecosystem: "npm"
+    directory: "/archive/server_old"
+    schedule:
+      interval: "weekly"
+    groups:
+      archive-dependencies:
+        patterns:
+          - "*"
