@@ -22,6 +22,10 @@ export interface Artifact {
   language?: string;
   timestamp: number;
   messageId?: string; // Link to the message that generated this artifact
+  // Multi-modular support
+  module?: string;         // Groups related files (e.g., "graphify-integration")
+  filePath?: string;       // Full relative path (e.g., "backend/skills/graphify_skill.py")
+  dependencies?: string[]; // IDs of other artifacts this one references
 }
 
 export interface ModelTelemetry {

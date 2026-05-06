@@ -18,7 +18,7 @@ import ModelTelemetryHUD from '../components/chat/ModelTelemetryHUD';
 
 // Types
 import type { Message, ThoughtLogEntry, Artifact, ModelTelemetry } from '../types/chat';
-import { parseArtifacts } from '../utils/artifactParser';
+import { parseArtifacts, inferDependencies, assignModuleFromBatch } from '../utils/artifactParser';
 
 const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -309,7 +309,8 @@ const Chat: React.FC = () => {
             // Parse artifacts from final response (once, not on every token)
             extractedArtifacts = parseArtifacts(lastMsg.content, lastMsg.id);
 
-            // Extract artifacts from tool calls
+            // Extract artifacts from tool calls (multi-modular aware)
+            const toolArtifacts: Artifact[] = [];
             currentToolCallsRef.current.forEach(tc => {
               if (tc.name === 'workspace_writer' && tc.args) {
                 let argsObj = tc.args;
@@ -321,17 +322,29 @@ const Chat: React.FC = () => {
                 const artifactType = typeNormMap[type] || 'docs';
                 const title = argsObj.filename || 'scratchpad';
                 
-                extractedArtifacts.push({
+                // Detect file extension for language
+                const extMatch = title.match(/\.([a-zA-Z0-9]+)$/);
+                const detectedLang = extMatch ? extMatch[1].toLowerCase() : (artifactType === 'code' ? 'text' : undefined);
+
+                toolArtifacts.push({
                   id: `${artifactType}-${title.replace(/\s+/g, '-').toLowerCase()}`,
                   type: artifactType,
                   title: title,
                   content: argsObj.content || '',
-                  language: artifactType === 'code' ? 'text' : undefined,
+                  language: detectedLang,
                   timestamp: Date.now(),
-                  messageId: lastMsg.id
+                  messageId: lastMsg.id,
+                  filePath: argsObj.filename || undefined,
                 });
               }
             });
+
+            // Post-process: infer dependencies and assign module grouping
+            if (toolArtifacts.length > 0) {
+              inferDependencies(toolArtifacts);
+              assignModuleFromBatch(toolArtifacts);
+              extractedArtifacts.push(...toolArtifacts);
+            }
           }
           return updated;
         });

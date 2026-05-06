@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import type { Artifact } from '../types/chat';
 import ArtifactView from './canvas/ArtifactView';
 import GraphView from './canvas/GraphView';
+import ModuleTree from './canvas/ModuleTree';
+import DependencyMinimap from './canvas/DependencyMinimap';
 
 interface AgentCanvasProps {
   isOpen: boolean;
@@ -23,7 +25,6 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
       const art = artifacts.find(a => a.id === externalSelectedId);
       if (art) {
         setSelectedId(externalSelectedId);
-        // Switch tab automatically
         if (art.type === 'code') setActiveTab('Code');
         else if (art.type === 'docs') setActiveTab('Docs');
         else if (art.type === 'research') setActiveTab('Research');
@@ -41,13 +42,14 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
 
   // Auto-select first artifact in a tab if none selected
   useEffect(() => {
-    if (activeTab === 'Graph') return; // No artifact selection needed for graph tab
+    if (activeTab === 'Graph') return;
     if (filteredArtifacts.length > 0 && (!selectedId || !filteredArtifacts.find(a => a.id === selectedId))) {
       setSelectedId(filteredArtifacts[0].id);
     }
   }, [activeTab, artifacts, selectedId]);
 
   const selectedArtifact = artifacts.find(a => a.id === selectedId);
+  const isMultiFile = filteredArtifacts.length > 1;
 
   if (!isOpen) return null;
 
@@ -111,38 +113,56 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
       <div className="flex-1 overflow-hidden flex flex-col">
         {activeTab === 'Graph' ? (
           <div className="flex-1 flex flex-col p-5 overflow-hidden">
-             <GraphView workspaceId={conversationId || 'unknown'} />
+            <GraphView workspaceId={conversationId || 'unknown'} />
           </div>
         ) : filteredArtifacts.length > 0 ? (
-          <div className="flex-1 flex flex-col p-5 space-y-5 overflow-y-auto scrollbar-hide">
-            {/* Artifact List (Compact if multiple) */}
-            {filteredArtifacts.length > 1 && (
-              <div className="flex gap-2 pb-2 overflow-x-auto scrollbar-hide shrink-0">
-                {filteredArtifacts.map(art => (
-                  <button
-                    key={art.id}
-                    onClick={() => setSelectedId(art.id)}
-                    className={`px-3 py-2 rounded-xl border transition-all text-left min-w-[120px] max-w-[120px] ${
-                      selectedId === art.id 
-                        ? 'bg-white border-[var(--accent)]/30 shadow-sm' 
-                        : 'bg-black/[0.02] border-transparent opacity-60 hover:opacity-100'
-                    }`}
-                  >
-                    <div className="text-[9px] font-bold text-[var(--text-primary)] truncate">{art.title}</div>
-                    <div className="text-[7px] text-[var(--text-muted)] font-mono uppercase truncate">{art.language || art.type}</div>
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Multi-file: Module Tree Sidebar + Detail Pane */}
+            {isMultiFile ? (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Module Tree (collapsible file browser) */}
+                <div className="max-h-[220px] overflow-y-auto scrollbar-hide border-b border-black/[0.04] bg-black/[0.01]">
+                  <ModuleTree
+                    artifacts={filteredArtifacts}
+                    selectedId={selectedId}
+                    onSelect={setSelectedId}
+                  />
+                </div>
 
-            {/* Selected Artifact Detail */}
-            {selectedArtifact ? (
-              <div className="flex-1">
-                <ArtifactView artifact={selectedArtifact} />
+                {/* Selected Artifact Detail */}
+                <div className="flex-1 overflow-hidden flex flex-col p-4">
+                  {selectedArtifact ? (
+                    <div className="flex-1 overflow-hidden">
+                      <ArtifactView artifact={selectedArtifact} />
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-[10px] uppercase tracking-widest font-bold opacity-30">
+                      Select a file to view
+                    </div>
+                  )}
+                </div>
+
+                {/* Dependency Minimap (only if deps exist) */}
+                <div className="px-4 pb-3 shrink-0">
+                  <DependencyMinimap
+                    artifacts={filteredArtifacts}
+                    selectedId={selectedId}
+                    onSelect={setSelectedId}
+                  />
+                </div>
               </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-[10px] uppercase tracking-widest font-bold opacity-30">
-                Select an artifact to view
+              /* Single file: Classic view */
+              <div className="flex-1 flex flex-col p-5 space-y-5 overflow-y-auto scrollbar-hide">
+                {selectedArtifact ? (
+                  <div className="flex-1">
+                    <ArtifactView artifact={selectedArtifact} />
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-[10px] uppercase tracking-widest font-bold opacity-30">
+                    Select an artifact to view
+                  </div>
+                )}
               </div>
             )}
           </div>
