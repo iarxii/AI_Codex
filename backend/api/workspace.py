@@ -39,3 +39,16 @@ async def update_scratchpad(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+@router.post("/rebuild-global-graph")
+async def rebuild_global_graph(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Triggers a rebuild of the global knowledge map.
+    """
+    from backend.utils.admin_ops import generate_global_knowledge_map
+    success = generate_global_knowledge_map()
+    if success:
+        return {"status": "success", "message": "Global graph rebuilt successfully."}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to rebuild global graph.")
