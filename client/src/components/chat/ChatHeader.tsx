@@ -105,6 +105,18 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           llama.cpp
         </a>
 
+        {/* Global Knowledge Map Toggle */}
+        <button
+          onClick={() => navigate('/admin/overview')}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-[#fd3b12]/5 border-[#fd3b12]/20 text-[#fd3b12] hover:bg-[#fd3b12]/10 transition-all text-xs font-semibold"
+          title="Open Super-Admin Global Knowledge Map"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A2 2 0 013 15.485V6.415a2 2 0 011.118-1.789L9 2l5.447 2.724A2 2 0 0115 6.415v9.07a2 2 0 01-1.118 1.789L9 20zm0-18v18m0-18l-5.447 2.724m10.894 0L9 2m5.447 13.485L9 20m-5.447-2.724L9 20" />
+          </svg>
+          Global Map
+        </button>
+
         {/* Canvas Toggle */}
         <button
           onClick={() => setIsCanvasOpen(!isCanvasOpen)}

@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import type { Artifact } from '../types/chat';
 import ArtifactView from './canvas/ArtifactView';
+import GraphView from './canvas/GraphView';
 
 interface AgentCanvasProps {
   isOpen: boolean;
   onClose: () => void;
   artifacts: Artifact[];
   externalSelectedId?: string | null;
+  conversationId?: string | number | null;
 }
 
-type TabType = 'Code' | 'Docs' | 'Research';
+type TabType = 'Code' | 'Docs' | 'Research' | 'Graph';
 
-const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, externalSelectedId }) => {
+const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, externalSelectedId, conversationId }) => {
   const [activeTab, setActiveTab] = useState<TabType>('Code');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -39,6 +41,7 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
 
   // Auto-select first artifact in a tab if none selected
   useEffect(() => {
+    if (activeTab === 'Graph') return; // No artifact selection needed for graph tab
     if (filteredArtifacts.length > 0 && (!selectedId || !filteredArtifacts.find(a => a.id === selectedId))) {
       setSelectedId(filteredArtifacts[0].id);
     }
@@ -78,7 +81,7 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
 
       {/* Tabs */}
       <div className="px-5 py-3 flex items-center gap-4 border-b border-black/[0.02] bg-black/[0.01]">
-        {(['Code', 'Docs', 'Research'] as TabType[]).map((tab) => {
+        {(['Code', 'Docs', 'Research', 'Graph'] as TabType[]).map((tab) => {
           const count = artifacts.filter(a => a.type === tab.toLowerCase()).length;
           return (
             <button
@@ -91,7 +94,7 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
               }`}
             >
               {tab}
-              {count > 0 && (
+              {tab !== 'Graph' && count > 0 && (
                 <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-black/[0.05] text-[8px] border border-black/[0.05]">
                   {count}
                 </span>
@@ -106,7 +109,11 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
 
       {/* Content Area */}
       <div className="flex-1 overflow-hidden flex flex-col">
-        {filteredArtifacts.length > 0 ? (
+        {activeTab === 'Graph' ? (
+          <div className="flex-1 flex flex-col p-5 overflow-hidden">
+             <GraphView workspaceId={conversationId || 'unknown'} />
+          </div>
+        ) : filteredArtifacts.length > 0 ? (
           <div className="flex-1 flex flex-col p-5 space-y-5 overflow-y-auto scrollbar-hide">
             {/* Artifact List (Compact if multiple) */}
             {filteredArtifacts.length > 1 && (

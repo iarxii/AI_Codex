@@ -4,6 +4,7 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
+import AdminOverview from './pages/AdminOverview';
 import { AIProvider } from './contexts/AIContext';
 import P5Background from './components/P5Background';
 
@@ -19,6 +20,7 @@ const App: React.FC = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/admin/overview" element={<AdminOverview />} />
           {/* Fallback to login */}
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>

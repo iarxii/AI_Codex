@@ -2,6 +2,11 @@
 
 **AdaptivIntelligenceCodex (AICodex)** is a comprehensive knowledge base and code generation pipeline for Senior Agentic AI Engineers, designed for rapid prototyping and architecture mapping. It features an AI-powered Health and Oversight Data Analysis engine supporting both OpenAI (gpt-4o) and Google Gemini (2.5 Flash) models.
 
+## Core Capabilities
+
+- **Neural Analytics**: Real-time hardware telemetry (NPU/GPU/CPU) tracking.
+- **Graphify Knowledge Graph**: Interactive structural codebase mapping and cross-project intelligence. [See Docs](docs/GRAPHIFY_INTEGRATION.md)
+
 ## Setup
 
 Run the provided setup script to install dependencies and create starter `.env` files in both `client` and `server`:

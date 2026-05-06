@@ -623,6 +623,7 @@ const Chat: React.FC = () => {
         onClose={() => setIsCanvasOpen(false)} 
         artifacts={artifacts}
         externalSelectedId={selectedArtifactId}
+        conversationId={currentConvId}
       />
       <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
       
