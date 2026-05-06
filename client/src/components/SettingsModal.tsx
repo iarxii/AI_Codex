@@ -1,6 +1,7 @@
 import React, { Fragment, useState, useEffect } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { Cog6ToothIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { useNavigate } from "react-router-dom";
 import { PROVIDERS, type ProviderId } from "./providerMeta";
 import { useAI, type VisualSettings } from "../contexts/AIContext";
 import ProviderIcon from "./ProviderIcon";
@@ -17,6 +18,7 @@ type SettingsModalProps = {
 };
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
+  const navigate = useNavigate();
   const { provider, setProvider, visualSettings, updateVisualSetting } =
     useAI();
   const [activeProvider, setActiveProvider] = useState<ProviderId>(provider);
@@ -385,28 +387,33 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                     ))}
                   </div>
 
-                  {/* String Color Selector */}
-                  <div className="mt-6 flex items-center justify-between">
-                    <span className="text-sm text-[#1A1D2E] font-medium">
-                      Neural String Color
-                    </span>
-                    <div className="flex bg-[#D8DCE4] p-1 rounded-lg">
-                      {(["orange", "white", "dark"] as const).map((color) => (
-                        <button
-                          key={color}
-                          onClick={() =>
-                            updateVisualSetting("stringColor", color)
-                          }
-                          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
-                            visualSettings.stringColor === color
-                              ? "bg-[#fd3b12] text-white shadow-sm"
-                              : "text-[#4A4D5E] hover:text-[#1A1D2E]"
-                          }`}
-                        >
-                          {color}
-                        </button>
-                      ))}
-                    </div>
+                  {/* Super Admin Section */}
+                  <div className="mt-6 pt-6 border-t border-black/[0.06]">
+                    <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-4">
+                      Super Admin Controls
+                    </label>
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        navigate('/admin/overview');
+                      }}
+                      className="w-full flex items-center justify-between p-3 rounded-xl bg-black/5 hover:bg-black/10 border border-black/[0.05] transition-all group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-[#fd3b12]/10 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-[#fd3b12]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A2 2 0 013 15.485V6.415a2 2 0 011.118-1.789L9 2l5.447 2.724A2 2 0 0115 6.415v9.07a2 2 0 01-1.118 1.789L9 20zm0-18v18m0-18l-5.447 2.724m10.894 0L9 2m5.447 13.485L9 20m-5.447-2.724L9 20" />
+                          </svg>
+                        </div>
+                        <div className="text-left">
+                          <div className="text-[11px] font-bold text-[#1A1D2E] uppercase tracking-wider">Super Admin Overview</div>
+                          <div className="text-[9px] text-[#7A7D8E]">Access cross-workspace knowledge clusters</div>
+                        </div>
+                      </div>
+                      <svg className="w-4 h-4 text-[#7A7D8E] group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
 
