@@ -82,7 +82,7 @@ if "%DEPLOY_FE%"=="true" (
     echo [5/5] Generating Route Map JSON...
     for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-lab --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set FRONTEND_URL=%%i
     
-    SET ROUTE_MAP_PATH=..\..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-react\src\data\route_map.json
+    SET ROUTE_MAP_PATH=..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-react\src\data\route_map.json
     (
         echo {
         echo   "project": "%PROJECT_ID%",
@@ -92,7 +92,16 @@ if "%DEPLOY_FE%"=="true" (
         echo   "last_deployed": "%DATE% %TIME%"
         echo }
     ) > !ROUTE_MAP_PATH!
-    echo Route map generated: !ROUTE_MAP_PATH!
+    (
+        echo {
+        echo   "project": "%PROJECT_ID%",
+        echo   "region": "%REGION%",
+        echo   "backend_url": "!BACKEND_URL!",
+        echo   "frontend_url": "!FRONTEND_URL!",
+        echo   "last_deployed": "%DATE% %TIME%"
+        echo }
+    ) > route_map.json
+    echo Route map generated in website and local project.
 ) else (
     echo [SKIP] Skipping frontend deployment steps.
 )
