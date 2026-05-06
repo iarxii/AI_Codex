@@ -1,9 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GraphView from '../components/canvas/GraphView';
+import { config } from '../config';
+
+interface WorkspaceSummary {
+  id: string;
+  fileCount: number;
+}
 
 const AdminOverview: React.FC = () => {
   const navigate = useNavigate();
+  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
+  const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
+
+  const fetchWorkspaces = useCallback(async () => {
+    setLoadingWorkspaces(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/conversations/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // data is expected to be an array of conversations
+        const summaries: WorkspaceSummary[] = (Array.isArray(data) ? data : []).map((c: any) => ({
+          id: String(c.id),
+          fileCount: 0, // will be enriched once graph data exists
+        }));
+        setWorkspaces(summaries);
+      }
+    } catch {
+      // fail silently — workspaces list is informational
+    } finally {
+      setLoadingWorkspaces(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWorkspaces();
+  }, [fetchWorkspaces]);
 
   return (
     <div className="w-full h-screen bg-[#D8DCE4] flex flex-col overflow-hidden">
@@ -25,9 +60,12 @@ const AdminOverview: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="px-3 py-1.5 rounded-full bg-white/50 border border-black/[0.05] text-[9px] font-bold text-[#4A4D5E] uppercase tracking-wider">
-            All Workspaces Syncing
-          </div>
+          <button
+            onClick={fetchWorkspaces}
+            className="px-3 py-1.5 rounded-full bg-white/50 border border-black/[0.05] text-[9px] font-bold text-[#4A4D5E] uppercase tracking-wider hover:bg-white/80 transition-all"
+          >
+            Refresh
+          </button>
         </div>
       </header>
 
@@ -41,10 +79,10 @@ const AdminOverview: React.FC = () => {
           {/* Stats Bar */}
           <div className="h-20 shrink-0 grid grid-cols-4 gap-6">
             {[
-              { label: 'Total Workspaces', value: '12', trend: '+2 this week' },
-              { label: 'Active Clusters', value: '8', trend: 'High density' },
-              { label: 'Cross-Project Links', value: '142', trend: 'Growing' },
-              { label: 'Global Memory Size', value: '42MB', trend: 'Optimized' }
+              { label: 'Workspaces', value: loadingWorkspaces ? '…' : String(workspaces.length), trend: loadingWorkspaces ? 'Loading' : 'Live' },
+              { label: 'Active Clusters', value: '—', trend: 'Awaiting graph' },
+              { label: 'Cross-Project Links', value: '—', trend: 'Awaiting graph' },
+              { label: 'Global Memory', value: '—', trend: 'Awaiting graph' }
             ].map((stat, i) => (
               <div key={i} className="bg-white/40 backdrop-blur-md border border-black/[0.03] rounded-2xl p-4 flex flex-col justify-center">
                 <div className="text-[8px] font-black uppercase tracking-widest text-[#7A7D8E] mb-1">{stat.label}</div>
