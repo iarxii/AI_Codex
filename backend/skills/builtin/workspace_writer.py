@@ -1,7 +1,9 @@
 import os
+import asyncio
 from pathlib import Path
 from typing import Any, Dict, Optional
 from ..base import BaseSkill, SkillResult
+from ..registry import registry
 from backend.utils.storage import save_scratchpad_file
 
 class WorkspaceWriterSkill(BaseSkill):
@@ -51,10 +53,12 @@ class WorkspaceWriterSkill(BaseSkill):
                 content=content
             )
 
-            # We return a message that includes the CANVAS tag so the frontend can still parse it if needed,
-            # though the backend save is now primary.
-            canvas_tag = f"[CANVAS:{type.upper()}:{safe_filename}]{content}[/CANVAS]"
-            
+            # Trigger non-blocking graphify update
+            graph_skill = registry.get_skill("graphify")
+            if graph_skill:
+                # We run this in the background to not block the main response
+                asyncio.create_task(graph_skill.execute(action="update", conversation_id=conversation_id))
+
             return SkillResult(
                 success=True, 
                 output=f"Successfully updated {safe_filename} in the workspace scratchpad.",

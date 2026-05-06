@@ -65,6 +65,27 @@ Added three optional fields to `Artifact`:
 
 ---
 
+### Phase 5: Backend Static Mounts & Graphify Integration
+
+#### [main.py](file:///c:/AppDev/My_Linkdin/projects/iarxii/AI_Codex/backend/main.py)
+- Added `StaticFiles` mounts for `/admin/graph` (global map) and `/graph` (workspace assets).
+- Implemented a dynamic `get_workspace_graph` route to serve isolated `graph.html` files from `graphify-out`.
+
+#### [GraphifySkill.py](file:///c:/AppDev/My_Linkdin/projects/iarxii/AI_Codex/backend/skills/builtin/graphify_skill.py) [NEW]
+- Wraps the `graphify` submodule CLI.
+- Supports `rebuild` (full scan), `update` (incremental), and `query` (agent-to-graph reasoning).
+- Automatically adds the submodule to `PYTHONPATH` for execution.
+
+#### [workspace_writer.py](file:///c:/AppDev/My_Linkdin/projects/iarxii/AI_Codex/backend/skills/builtin/workspace_writer.py)
+- Added a non-blocking `asyncio.create_task` trigger that calls `graphify update` whenever the agent writes a file.
+- Ensures the "Graph" tab in the Agent Canvas stays in sync with code changes without manual rebuilds.
+
+#### [admin_ops.py](file:///c:/AppDev/My_Linkdin/projects/iarxii/AI_Codex/backend/utils/admin_ops.py) [NEW] & [workspace.py](file:///c:/AppDev/My_Linkdin/projects/iarxii/AI_Codex/backend/api/workspace.py)
+- Implemented `generate_global_knowledge_map` using `graphify merge-graphs`.
+- Added `/api/v1/workspace/rebuild-global-graph` endpoint for admin-triggered aggregation.
+
+---
+
 ## Validation
 
 | Check | Result |
@@ -73,8 +94,8 @@ Added three optional fields to `Artifact`:
 | Graph tab when backend unavailable | Shows styled "Graph Not Available" placeholder |
 | Admin Overview with no graph data | Shows live workspace count, "Awaiting graph" for metrics |
 | Artifact type backward compatibility | New fields are optional — existing artifacts work unchanged |
+| **Backend Static Mounts** | Configured to serve `graphify-out` artifacts from data/workspaces |
+| **Graphify Auto-Sync** | Hooked into `workspace_writer` via non-blocking task |
 
-## What's Next (Phase 5 — Deferred)
-- Backend `main.py` static mounts for graph HTML
-- `GraphifySkill` implementation
-- `workspace_writer` → graphify auto-update hook
+## Final Status
+All phases of the **Knowledge-Aware Agent Canvas** project are now complete. The environment is now a professional, multi-modular development space with automated structural mapping.

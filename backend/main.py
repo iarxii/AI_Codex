@@ -2,6 +2,8 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from backend.config import settings
 from backend.db.session import init_db
 from backend.utils.logger import mask_uvicorn_logs
@@ -51,6 +53,27 @@ app.add_middleware(
 @app.get("/")
 async def root():
     return {"message": f"Welcome to {settings.PROJECT_NAME} API", "status": "running"}
+
+# Static Mounts for Knowledge Graphs
+admin_graph_dir = Path("data/admin/global-graph")
+admin_graph_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/admin/graph", StaticFiles(directory=str(admin_graph_dir), html=True), name="admin-graph")
+
+# Workspace graphs: we mount the parent workspaces dir
+# Requests will be /graph/{id}/graphify-out/graph.html
+# To match frontend /graph/{id}/graph.html, we'll need a custom serving route or change frontend.
+# I'll add a helper route to serve the graph.html from graphify-out.
+@app.get("/graph/{session_id}/graph.html")
+async def get_workspace_graph(session_id: str):
+    from fastapi.responses import FileResponse
+    from fastapi import HTTPException
+    path = Path(f"data/workspaces/{session_id}/graphify-out/graph.html")
+    if path.exists():
+        return FileResponse(path)
+    raise HTTPException(status_code=404, detail="Graph not found")
+
+# Mount the rest of the graphify-out assets (JS/CSS)
+app.mount("/graph", StaticFiles(directory="data/workspaces", html=True), name="workspace-graphs")
 
 @app.get("/healthz")
 async def health_check():
