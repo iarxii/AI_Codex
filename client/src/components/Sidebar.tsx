@@ -34,8 +34,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { provider } = useAI();
+  const { provider, userProfile } = useAI();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  
+  // Display name logic
+  const displayName = userProfile?.first_name 
+    ? `${userProfile.first_name} ${userProfile.surname || ''}`.trim()
+    : (localStorage.getItem("username") || "Neural Architect");
+
+  const displayTitle = userProfile?.profession || "System.Active";
+
+  useEffect(() => {
+    if (currentConversationId) {
+      localStorage.setItem("lastConvId", currentConversationId.toString());
+    }
+  }, [currentConversationId]);
   const [loading, setLoading] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -279,15 +292,15 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="p-4 border-t border-black/[0.06] bg-[var(--bg-primary)]/50">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-hover)] flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
-              ADM
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-hover)] flex items-center justify-center text-[10px] font-bold text-white shadow-sm border border-white/20">
+              {displayName.substring(0, 2).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-[var(--text-primary)] truncate">
-                Administrator
+                {userProfile?.title ? `${userProfile.title}. ` : ''}{displayName}
               </p>
-              <p className="text-[10px] text-green-600 font-mono">
-                System.Active
+              <p className="text-[10px] text-[var(--accent)] font-mono truncate">
+                {displayTitle}
               </p>
             </div>
             <button
