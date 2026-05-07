@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -22,6 +22,14 @@ class Token(BaseModel):
 class UserCreate(BaseModel):
     username: str
     password: str
+    title: str | None = None
+    first_name: str | None = None
+    surname: str | None = None
+    dob: str | None = None # ISO format string
+    gender: str | None = None
+    pronouns: str | None = "Prefer not to say"
+    country: str | None = None
+    profession: str | None = None
 
 class TokenData(BaseModel):
     username: str | None = None
@@ -110,10 +118,26 @@ async def register_user(
             detail="Username already registered"
         )
     
+    # Parse DOB if provided
+    dob_dt = None
+    if user_in.dob:
+        try:
+            dob_dt = datetime.fromisoformat(user_in.dob.replace('Z', '+00:00'))
+        except ValueError:
+            pass
+
     # Create new user
     new_user = User(
         username=user_in.username,
         hashed_password=pwd_context.hash(user_in.password),
+        title=user_in.title,
+        first_name=user_in.first_name,
+        surname=user_in.surname,
+        dob=dob_dt,
+        gender=user_in.gender,
+        pronouns=user_in.pronouns,
+        country=user_in.country,
+        profession=user_in.profession,
         is_active=True
     )
     db.add(new_user)
@@ -129,4 +153,19 @@ async def register_user(
 
 @router.get("/me")
 async def read_users_me(current_user: Annotated[User, Depends(get_current_user)]):
-    return {"username": current_user.username, "id": current_user.id}
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "profile": {
+            "title": current_user.title,
+            "first_name": current_user.first_name,
+            "surname": current_user.surname,
+            "dob": current_user.dob.isoformat() if current_user.dob else None,
+            "gender": current_user.gender,
+            "pronouns": current_user.pronouns,
+            "country": current_user.country,
+            "profession": current_user.profession,
+        },
+        "settings": current_user.settings_json,
+        "created_at": current_user.created_at.isoformat()
+    }

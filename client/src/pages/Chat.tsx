@@ -99,6 +99,12 @@ const Chat: React.FC = () => {
       navigate('/login');
       return;
     }
+
+    // Restore last active conversation
+    const lastId = localStorage.getItem('lastConvId');
+    if (lastId && !currentConvId) {
+      loadConversation(parseInt(lastId));
+    }
   }, [navigate]);
 
   const handleExport = () => {

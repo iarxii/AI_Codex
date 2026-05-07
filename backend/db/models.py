@@ -17,6 +17,19 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
+    # Profile Info
+    title: Mapped[Optional[str]] = mapped_column(String(20)) # Mr, Ms, Mx, Dr, etc.
+    first_name: Mapped[Optional[str]] = mapped_column(String(100))
+    surname: Mapped[Optional[str]] = mapped_column(String(100))
+    dob: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    gender: Mapped[Optional[str]] = mapped_column(String(50))
+    pronouns: Mapped[Optional[str]] = mapped_column(String(50), default="Prefer not to say")
+    country: Mapped[Optional[str]] = mapped_column(String(100))
+    profession: Mapped[Optional[str]] = mapped_column(String(100))
+    
+    # Cloud-Synced Settings
+    settings_json: Mapped[Optional[str]] = mapped_column(Text) # JSON string for UI/Model preferences
+    
     conversations: Mapped[List["Conversation"]] = relationship(back_populates="user")
 
 class Conversation(Base):
