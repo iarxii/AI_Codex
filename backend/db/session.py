@@ -28,7 +28,8 @@ async def init_db():
                 if not existing_admin:
                     admin_user = User(
                         username="admin",
-                        hashed_password=pwd_context.hash("admin123")
+                        hashed_password=pwd_context.hash("admin123"),
+                        role="super_admin"
                     )
                     session.add(admin_user)
                     print("Seeded admin user (admin / admin123)")

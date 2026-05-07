@@ -26,6 +26,7 @@ class User(Base):
     pronouns: Mapped[Optional[str]] = mapped_column(String(50), default="Prefer not to say")
     country: Mapped[Optional[str]] = mapped_column(String(100))
     profession: Mapped[Optional[str]] = mapped_column(String(100))
+    role: Mapped[str] = mapped_column(String(20), default="user") # user, admin, super_admin
     
     # Cloud-Synced Settings
     settings_json: Mapped[Optional[str]] = mapped_column(Text) # JSON string for UI/Model preferences

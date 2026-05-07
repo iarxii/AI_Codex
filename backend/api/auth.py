@@ -165,6 +165,7 @@ async def read_users_me(current_user: Annotated[User, Depends(get_current_user)]
             "pronouns": current_user.pronouns,
             "country": current_user.country,
             "profession": current_user.profession,
+            "role": current_user.role
         },
         "settings": current_user.settings_json,
         "created_at": current_user.created_at.isoformat()
