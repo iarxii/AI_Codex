@@ -12,6 +12,7 @@ export interface UserProfile {
   pronouns?: string;
   country?: string;
   profession?: string;
+  role?: string;
 }
 
 export interface VisualSettings {

@@ -290,6 +290,25 @@ const Sidebar: React.FC<SidebarProps> = ({
           ))}
         </div>
 
+        {['admin', 'super_admin'].includes(userProfile?.role || '') && (
+          <div className="px-4 py-2 border-t border-black/[0.04]">
+            <button
+              onClick={() => {
+                const win = window.open('/admin/users', '_blank');
+                if (win) win.focus();
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-bold text-[#4A4D5E] hover:bg-[#fd3b12]/5 hover:text-[#fd3b12] transition-all group border border-transparent hover:border-[#fd3b12]/10"
+            >
+              <div className="p-1.5 rounded-lg bg-white/50 group-hover:bg-white shadow-sm transition-all border border-black/[0.03]">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              ADMINISTRATIVE CONTROL
+            </button>
+          </div>
+        )}
+
         <div className="p-4 border-t border-black/[0.06] bg-[var(--bg-primary)]/50">
           <div className="flex items-center gap-3 px-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-hover)] flex items-center justify-center text-[10px] font-bold text-white shadow-sm border border-white/20">

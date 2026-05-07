@@ -11,6 +11,7 @@ async def check():
         for u in users:
             print(f"Username: {u.username}")
             print(f"Name: {u.first_name} {u.surname}")
+            print(f"Role: {u.role}")
             print(f"Profession: {u.profession}")
             print(f"Settings: {u.settings_json[:50] if u.settings_json else 'None'}")
             print("-" * 20)
