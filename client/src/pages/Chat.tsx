@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import AgentCanvas from '../components/AgentCanvas';
 import SettingsModal from '../components/SettingsModal';
-import { PROVIDER_MAP } from '../components/providerMeta';
+import { PROVIDER_MAP, getLocalBackendMode } from '../components/providerMeta';
 import { useAI } from '../contexts/AIContext';
 import { config } from '../config';
 import WorkspaceOnboardingModal from '../components/WorkspaceOnboardingModal';
@@ -530,6 +530,7 @@ const Chat: React.FC = () => {
         model: activeModel,
         api_key: apiKey,
         agent_mode: agentMode,
+        local_backend_mode: getLocalBackendMode(),
         config: modelConfig,
         base_url: localStorage.getItem('ollama_cloud_url') || ''
       };

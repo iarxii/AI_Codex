@@ -3,7 +3,8 @@ import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { useAI } from "../contexts/AIContext";
 import { config } from "../config";
-import { PROVIDERS, PROVIDER_MAP } from "./providerMeta";
+import { PROVIDERS, PROVIDER_MAP, getLocalBackendMode, setLocalBackendMode } from "./providerMeta";
+import type { LocalBackendMode } from "./providerMeta";
 import ProviderIcon from "./ProviderIcon";
 
 interface ProviderSelectorProps {
@@ -21,10 +22,11 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   >([]);
   const [loading, setLoading] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
+  const [backendMode, setBackendMode] = useState<LocalBackendMode>(getLocalBackendMode());
 
   useEffect(() => {
     fetchModels();
-  }, [provider]);
+  }, [provider, backendMode]);
 
   const fetchModels = async () => {
     setLoading(true);
@@ -44,6 +46,11 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       if (provider === "ollama_cloud") {
         const cloudUrl = localStorage.getItem("ollama_cloud_url");
         if (cloudUrl) headers["X-Base-Url"] = cloudUrl;
+      }
+
+      // Pass local backend mode so the API queries the correct server
+      if (provider === "local") {
+        headers["X-Local-Backend-Mode"] = backendMode;
       }
 
       const response = await fetch(url, { headers });
@@ -84,8 +91,47 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   const selectedModel =
     availableModels.find((m) => m.id === model) || availableModels[0];
 
+  const handleBackendModeChange = (mode: LocalBackendMode) => {
+    setBackendMode(mode);
+    setLocalBackendMode(mode);
+  };
+
   return (
-    <div className="mb-2 flex gap-3">
+    <div className="mb-2 flex flex-col gap-2">
+      {/* Backend mode toggle — only visible when local provider is selected */}
+      {provider === "local" && (
+        <div className="flex items-center gap-2 px-1">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-[#4A4D5E]">
+            Backend
+          </span>
+          <div className="flex rounded-lg bg-[#D8DCE4] border border-black/[0.06] p-0.5">
+            <button
+              type="button"
+              onClick={() => handleBackendModeChange("ollama")}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all ${
+                backendMode === "ollama"
+                  ? "bg-[#A3E635]/20 text-[#65A30D] shadow-sm border border-[#A3E635]/30"
+                  : "text-[#7A7D8E] hover:text-[#4A4D5E]"
+              }`}
+            >
+              Ollama
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBackendModeChange("llamacpp")}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all ${
+                backendMode === "llamacpp"
+                  ? "bg-[#fb923c]/20 text-[#ea580c] shadow-sm border border-[#fb923c]/30"
+                  : "text-[#7A7D8E] hover:text-[#4A4D5E]"
+              }`}
+            >
+              llama.cpp
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-3">
       <div className="flex-none flex flex-col justify-end">
         <span className="block text-[10px] font-bold uppercase tracking-widest text-[#4A4D5E] mb-1.5 ml-1">
           Neuro
@@ -313,6 +359,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
             </Transition>
           </div>
         </Listbox>
+      </div>
       </div>
     </div>
   );

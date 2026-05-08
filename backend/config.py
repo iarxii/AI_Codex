@@ -17,8 +17,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week
     
-    # Ollama
+    # Local LLM Backend
     OLLAMA_BASE_URL: str = "http://localhost:11434"
+    LLAMACPP_BASE_URL: str = "http://localhost:8080"
+    LOCAL_BACKEND_MODE: str = "ollama"  # "ollama" | "llamacpp"
     DEFAULT_MODEL: str = "llama3.2:3b"
     
     # Database

@@ -61,6 +61,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         base_url = payload_data.get("base_url")
         model_config = payload_data.get("config", {})
         agent_mode = payload_data.get("agent_mode", True)
+        local_backend_mode = payload_data.get("local_backend_mode", "ollama")
         
         if not conversation_id:
             await websocket.send_json({"type": "error", "message": "conversation_id is required"})
@@ -132,12 +133,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "base_url": base_url,
                         "model_config": model_config,
                         "conversation_id": str(conversation_id),
-                        "agent_mode": agent_mode
+                        "agent_mode": agent_mode,
+                        "local_backend_mode": local_backend_mode
                     },
                     "recursion_limit": 25
                 }
                 
-                if provider == "local":
+                if provider == "local" and local_backend_mode == "llamacpp":
+                    # NativeLocalClient streaming — only in llamacpp mode
                     first_token_received = False
                     async def _token_callback(accumulated_content: str):
                         nonlocal full_ai_response, first_token_received

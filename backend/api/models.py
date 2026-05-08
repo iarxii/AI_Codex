@@ -10,7 +10,8 @@ async def list_models(
     provider: str, 
     api_key: str = Query(None), 
     x_api_key: str = Header(None),
-    x_base_url: str = Header(None)
+    x_base_url: str = Header(None),
+    x_local_backend_mode: str = Header(None),
 ):
     """
     Dynamically list available models for a given provider using non-blocking async calls.
@@ -18,43 +19,58 @@ async def list_models(
     actual_key = x_api_key or api_key
     async with httpx.AsyncClient(timeout=10.0) as client:
         if provider == "local":
-            try:
-                response = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
-                if response.status_code == 200:
-                    data = response.json()
+            local_mode = x_local_backend_mode or settings.LOCAL_BACKEND_MODE
+            
+            if local_mode == "llamacpp":
+                # ── LLAMACPP MODE ──
+                # llama-server typically serves one model, queryable via /v1/models
+                try:
+                    base_url = settings.LLAMACPP_BASE_URL.rstrip("/")
                     models = []
-                    for m in data.get("models", []):
-                        name = m["name"].lower()
-                        if any(x in name for x in ["embed", "minilm", "nomic", "bert", "ranker"]):
-                            continue
-                        model_id = m["name"]
-                        display_name = m["name"]
-                        # llama-server (turboquant) returns SHA256 blob digests
-                        # Normalize to "default" since it only serves one model
-                        if model_id.startswith("sha256-") or model_id.startswith("sha256:"):
-                            model_id = "default"
-                            display_name = f"Local Model (llama-server)"
-                        models.append({"id": model_id, "name": display_name})
-                    # If llama-server returned no models via /api/tags, add a default entry
+                    try:
+                        r = await client.get(f"{base_url}/v1/models")
+                        if r.status_code == 200:
+                            v1_data = r.json()
+                            for m in v1_data.get("data", []):
+                                model_id = m.get("id", "default")
+                                # Normalize SHA256 digests
+                                if model_id.startswith("sha256-") or model_id.startswith("sha256:"):
+                                    model_id = "default"
+                                models.append({"id": model_id, "name": m.get("id", "Local Model (llama-server)")})
+                    except Exception:
+                        pass
                     if not models:
-                        # Try /v1/models endpoint for pure OpenAI-compat servers
-                        try:
-                            base_v1 = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/v1"
-                            r2 = await client.get(f"{base_v1}/models")
-                            if r2.status_code == 200:
-                                v1_data = r2.json()
-                                for m in v1_data.get("data", []):
-                                    models.append({"id": m.get("id", "default"), "name": m.get("id", "Local Model")})
-                        except Exception:
-                            pass
+                        models.append({"id": "default", "name": "Local Model (llama-server)"})
+                    return models
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"llama-server error: {str(e)}")
+            
+            else:
+                # ── OLLAMA MODE (default) ──
+                try:
+                    response = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
+                    if response.status_code == 200:
+                        data = response.json()
+                        models = []
+                        for m in data.get("models", []):
+                            name = m["name"].lower()
+                            if any(x in name for x in ["embed", "minilm", "nomic", "bert", "ranker"]):
+                                continue
+                            model_id = m["name"]
+                            display_name = m["name"]
+                            # llama-server (turboquant) returns SHA256 blob digests
+                            # Normalize to "default" since it only serves one model
+                            if model_id.startswith("sha256-") or model_id.startswith("sha256:"):
+                                model_id = "default"
+                                display_name = f"Local Model (llama-server)"
+                            models.append({"id": model_id, "name": display_name})
+                        # If Ollama returned no chat models, add a default
                         if not models:
                             models.append({"id": "default", "name": "Local Model (auto-detect)"})
-                    return models
-                # Server is running but /api/tags returned non-200
-                # Still provide a default entry so the user can attempt chat
-                return [{"id": "default", "name": "Local Model (auto-detect)"}]
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Ollama error: {str(e)}")
+                        return models
+                    return [{"id": "default", "name": "Local Model (auto-detect)"}]
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"Ollama error: {str(e)}")
 
         elif provider == "ollama_cloud":
             if not x_base_url:
