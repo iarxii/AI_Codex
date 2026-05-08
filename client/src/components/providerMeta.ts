@@ -5,6 +5,7 @@
 
 
 export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud';
+export type LocalBackendMode = 'ollama' | 'llamacpp';
 
 export interface ProviderInfo {
   id: ProviderId;
@@ -20,8 +21,8 @@ export interface ProviderInfo {
 export const PROVIDERS: ProviderInfo[] = [
   {
     id: 'local',
-    label: 'Llama.cpp',
-    description: 'Local GPU inference',
+    label: 'Local LLM',
+    description: 'Ollama or llama-server',
     color: '#A3E635',
     icon: '/media/brand-icons/ollama-color.svg',
     iconType: 'svg-file',
@@ -84,3 +85,14 @@ export function getActiveProviderInfo(): ProviderInfo {
   const id = getActiveProvider();
   return PROVIDER_MAP[id] || PROVIDERS[0];
 }
+
+/** Get the local backend mode from localStorage, defaulting to 'ollama' */
+export function getLocalBackendMode(): LocalBackendMode {
+  return (localStorage.getItem('local_backend_mode') as LocalBackendMode) || 'ollama';
+}
+
+/** Set the local backend mode in localStorage */
+export function setLocalBackendMode(mode: LocalBackendMode): void {
+  localStorage.setItem('local_backend_mode', mode);
+}
+

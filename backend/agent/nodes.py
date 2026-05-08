@@ -12,7 +12,7 @@ from backend.config import settings
 from backend.skills.registry import registry
 from backend.integrations.ollamaopt_bridge import get_context_builder, get_retriever
 from .profile import build_system_prompt
-from .local_client import NativeLocalClient
+from .local_client import NativeLocalClient, detect_template
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,10 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
     """
     Retrieves and configures the LLM provider based on the provided configuration.
     Includes robustness fixes for tool binding and connection failures.
+    
+    Local provider supports two backend modes:
+      - 'ollama': Uses Ollama App's OpenAI-compatible API (auto-templating)
+      - 'llamacpp': Uses raw llama-server with NativeLocalClient (manual templates)
     """
     provider = config.get("configurable", {}).get("provider", "local")
     model = config.get("configurable", {}).get("model")
@@ -77,46 +81,106 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
                 target_model = target_model.replace("models/", "")
             llm = ChatGoogleGenerativeAI(model=target_model, api_key=api_key, temperature=temp, max_output_tokens=max_toks, streaming=True)
         else:
-            # Local provider (llama-server.exe or Ollama)
-            from langchain_openai import ChatOpenAI
+            # ─── Local Provider: Ollama App or raw llama-server ───
+            local_backend_mode = config.get("configurable", {}).get(
+                "local_backend_mode", settings.LOCAL_BACKEND_MODE
+            )
             target_model = model or settings.DEFAULT_MODEL
-            base_url = settings.OLLAMA_BASE_URL
             
-            # Note: llama-server.exe (turboquant) is often OpenAI compatible at the root or /v1
-            if not base_url.endswith("/v1"):
-                base_url = f"{base_url.rstrip('/')}/v1"
-            
-            # Normalize model name: SHA256 blob digests from llama-server's /api/tags
-            # are not valid model names for /v1/chat/completions — use "default"
+            # Normalize model name: SHA256 blob digests are not valid model names
             local_model = target_model if target_model and target_model != "local" else "default"
             if local_model.startswith("sha256-") or local_model.startswith("sha256:"):
                 print(f"DEBUG: Detected blob digest model name '{local_model[:20]}...', normalizing to 'default'")
                 local_model = "default"
-                
-            print(f"DEBUG: Local Neural Core at {base_url} (Model: {local_model})")
             
-            # Pre-flight connection check — fail fast with a clear error
-            import httpx
-            try:
-                probe_url = base_url.replace("/v1", "")
-                async with httpx.AsyncClient(timeout=3.0) as client:
-                    resp = await client.get(f"{probe_url}/api/tags")
-                    if resp.status_code != 200:
-                        # Try /v1/models as fallback (pure OpenAI-compat servers)
-                        resp2 = await client.get(f"{base_url}/models")
-                        if resp2.status_code != 200:
-                            raise ConnectionError(f"Local LLM server at {probe_url} returned status {resp.status_code}")
-            except (httpx.ConnectError, httpx.RequestError):
-                raise ConnectionError(f"Cannot reach local LLM server at {base_url}. Is Ollama or llama-server running?")
-            except httpx.TimeoutException:
-                raise ConnectionError(f"Local LLM server at {base_url} timed out. The server may be overloaded.")
+            if local_backend_mode == "ollama":
+                # ── OLLAMA MODE ──
+                # Ollama handles chat templates automatically via its Modelfile.
+                # We use LangChain's ChatOpenAI against Ollama's OpenAI-compat API.
+                from langchain_openai import ChatOpenAI
+                base_url = settings.OLLAMA_BASE_URL
+                if not base_url.endswith("/v1"):
+                    base_url = f"{base_url.rstrip('/')}/v1"
                 
-            # Use NativeLocalClient for local for better stability and caching
-            return NativeLocalClient(
-                base_url=base_url, 
-                model=local_model, 
-                temperature=temp
-            )
+                print(f"DEBUG: Local [Ollama mode] at {base_url} (Model: {local_model})")
+                
+                # Pre-flight connection check
+                import httpx
+                try:
+                    probe_url = settings.OLLAMA_BASE_URL.rstrip("/")
+                    async with httpx.AsyncClient(timeout=3.0) as client:
+                        resp = await client.get(f"{probe_url}/api/tags")
+                        if resp.status_code != 200:
+                            raise ConnectionError(
+                                f"Ollama server at {probe_url} returned status {resp.status_code}"
+                            )
+                except (httpx.ConnectError, httpx.RequestError):
+                    raise ConnectionError(
+                        f"Cannot reach Ollama at {settings.OLLAMA_BASE_URL}. "
+                        "Is the Ollama App running?"
+                    )
+                except httpx.TimeoutException:
+                    raise ConnectionError(
+                        f"Ollama at {settings.OLLAMA_BASE_URL} timed out. "
+                        "The server may be overloaded."
+                    )
+                
+                llm = ChatOpenAI(
+                    model=local_model,
+                    base_url=base_url,
+                    api_key="ollama",  # Ollama doesn't need a real key
+                    temperature=temp,
+                    max_tokens=max_toks,
+                    streaming=True,
+                )
+                # Ollama mode returns a standard ChatOpenAI instance —
+                # tool binding and streaming are handled by LangChain natively
+                
+            else:
+                # ── LLAMACPP MODE ──
+                # Direct connection to llama-server.exe with manual chat templates.
+                # Uses NativeLocalClient which auto-detects the template from model name.
+                base_url = settings.LLAMACPP_BASE_URL
+                if not base_url.endswith("/v1"):
+                    base_url = f"{base_url.rstrip('/')}/v1"
+                
+                detected_template = detect_template(local_model)
+                print(
+                    f"DEBUG: Local [llamacpp mode] at {base_url} "
+                    f"(Model: {local_model}, Template: {detected_template})"
+                )
+                
+                # Pre-flight connection check
+                import httpx
+                try:
+                    probe_url = base_url.replace("/v1", "")
+                    async with httpx.AsyncClient(timeout=3.0) as client:
+                        # llama-server doesn't have /api/tags, try /v1/models
+                        resp = await client.get(f"{base_url}/models")
+                        if resp.status_code != 200:
+                            # Try the root health endpoint
+                            resp2 = await client.get(f"{probe_url}/health")
+                            if resp2.status_code != 200:
+                                raise ConnectionError(
+                                    f"llama-server at {probe_url} returned status {resp.status_code}"
+                                )
+                except (httpx.ConnectError, httpx.RequestError):
+                    raise ConnectionError(
+                        f"Cannot reach llama-server at {settings.LLAMACPP_BASE_URL}. "
+                        "Is llama-server.exe running?"
+                    )
+                except httpx.TimeoutException:
+                    raise ConnectionError(
+                        f"llama-server at {settings.LLAMACPP_BASE_URL} timed out. "
+                        "The server may be overloaded."
+                    )
+                
+                return NativeLocalClient(
+                    base_url=base_url,
+                    model=local_model,
+                    temperature=temp,
+                    template=detected_template,
+                )
             
         if bind_tools:
             # Skip tool binding for local NativeLocalClient:
@@ -250,9 +314,11 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 continue
             valid_tools.append(t)
             
-        if valid_tools:
+        if valid_tools and not isinstance(llm, NativeLocalClient):
             print(f"PIPELINE: Binding {len(valid_tools)} tools to LLM...")
             llm = llm.bind_tools(valid_tools)
+        elif valid_tools and isinstance(llm, NativeLocalClient):
+            print(f"PIPELINE: Skipping tool binding for NativeLocalClient (llamacpp mode)")
     except Exception as init_err:
         print(f"PIPELINE ERROR: LLM init failed — {init_err}")
         from langchain_core.messages import AIMessage
