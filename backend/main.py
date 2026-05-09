@@ -13,25 +13,32 @@ mask_uvicorn_logs()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("[LIFESPAN] Starting initialization...")
     # Sync SQLite from GCS if in Cloud Run
     is_cloud_run = os.getenv("K_SERVICE") is not None
     if is_cloud_run and settings.DB_TYPE == "sqlite":
+        print("[LIFESPAN] Cloud Run detected, syncing DB from GCS...")
         from backend.utils.storage import download_db_from_gcs
         download_db_from_gcs()
 
     # Initialize DB on startup
-    print(f"[DB_DEBUG] Using database: {settings.async_database_url}")
+    print(f"[LIFESPAN] Initializing database: {settings.async_database_url}")
     await init_db()
+    print("[LIFESPAN] Database initialized.")
     
     # Initialize OllamaOpt bridge
+    print("[LIFESPAN] Setting up OllamaOpt bridge...")
     from backend.integrations.ollamaopt_bridge import setup_ollamaopt_bridge
     setup_ollamaopt_bridge()
+    print("[LIFESPAN] Initialization complete. Server ready.")
     yield
     
     # Sync SQLite back to GCS on shutdown
     if is_cloud_run and settings.DB_TYPE == "sqlite":
+        print("[LIFESPAN] Shutdown detected, syncing DB back to GCS...")
         from backend.utils.storage import upload_db_to_gcs
         upload_db_to_gcs()
+    print("[LIFESPAN] Shutdown complete.")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -72,7 +79,8 @@ async def get_workspace_graph(session_id: str):
         return FileResponse(path)
     raise HTTPException(status_code=404, detail="Graph not found")
 
-# Mount the rest of the graphify-out assets (JS/CSS)
+# Ensure static directories exist before mounting
+Path("data/workspaces").mkdir(parents=True, exist_ok=True)
 app.mount("/graph", StaticFiles(directory="data/workspaces", html=True), name="workspace-graphs")
 
 @app.get("/healthz")

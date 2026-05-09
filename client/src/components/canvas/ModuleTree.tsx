@@ -40,7 +40,7 @@ function buildTree(artifacts: Artifact[]): TreeNode {
   return root;
 }
 
-const FileIcon: React.FC<{ type: Artifact['type']; language?: string }> = ({ type, language }) => {
+const FileIcon: React.FC<{ type: Artifact['type'] }> = ({ type }) => {
   const color = type === 'code'
     ? 'text-blue-500'
     : type === 'docs'
@@ -65,7 +65,6 @@ const DirNode: React.FC<{
   onSelect: (id: string) => void;
 }> = ({ node, depth, selectedId, onSelect }) => {
   const [expanded, setExpanded] = useState(true);
-  const hasChildren = node.children.size > 0 || node.artifacts.length > 0;
 
   return (
     <div>
@@ -122,7 +121,7 @@ const DirNode: React.FC<{
               }`}
               style={{ paddingLeft: `${(depth + 1) * 12 + 4}px` }}
             >
-              <FileIcon type={art.type} language={art.language} />
+              <FileIcon type={art.type} />
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-[9px] font-bold text-[var(--text-primary)] truncate">{art.title}</span>
                 <span className="text-[7px] text-[var(--text-muted)] font-mono uppercase tracking-tighter truncate">
@@ -196,7 +195,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({ artifacts, selectedId, onSelect
                   : 'hover:bg-black/[0.03] border-l-2 border-transparent'
               }`}
             >
-              <FileIcon type={art.type} language={art.language} />
+              <FileIcon type={art.type} />
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-[9px] font-bold text-[var(--text-primary)] truncate">{art.title}</span>
                 <span className="text-[7px] text-[var(--text-muted)] font-mono uppercase">{art.language || art.type}</span>

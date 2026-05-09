@@ -40,7 +40,9 @@ if "%DEPLOY_BE%"=="true" (
         --region %REGION% ^
         --project %PROJECT_ID% ^
         --allow-unauthenticated ^
-        --set-env-vars "SECRET_KEY=AICODEX_SUPER_SECRET_KEY_CHANGEME,DB_TYPE=sqlite,CORS_ORIGINS=*"
+        --memory 1Gi ^
+        --timeout 600 ^
+        --set-env-vars "SECRET_KEY=AICODEX_SUPER_SECRET_KEY_CHANGEME,DB_TYPE=sqlite,CORS_ORIGINS=*,GCS_BUCKET_NAME=aicodex-data-1096425756328"
     if %ERRORLEVEL% NEQ 0 (
         echo Backend deployment failed. Exiting.
         exit /b %ERRORLEVEL%
