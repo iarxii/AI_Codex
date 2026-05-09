@@ -14,11 +14,11 @@ import { useAI } from '../contexts/AIContext';
 
 interface AdminUser {
   id: number;
-  username: str;
-  first_name: str | null;
-  surname: str | null;
+  username: string;
+  first_name: string | null;
+  surname: string | null;
   role: string;
-  is_active: bool;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -32,7 +32,7 @@ const AdminDashboard: React.FC = () => {
 
   // RBAC Check
   useEffect(() => {
-    if (userProfile && !['admin', 'super_admin'].includes(userProfile.role)) {
+    if (userProfile && !['admin', 'super_admin'].includes(userProfile.role as string)) {
       navigate('/chat');
     }
   }, [userProfile, navigate]);
@@ -132,6 +132,16 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+        
+        {error && (
+          <div className="mb-6 p-4 bg-red-100 border border-red-200 text-red-700 rounded-2xl flex items-center gap-3 animate-shake">
+            <XCircleIcon className="w-5 h-5" />
+            <span className="text-sm font-bold">{error}</span>
+            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
+              <XCircleIcon className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

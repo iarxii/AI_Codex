@@ -8,6 +8,33 @@ pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 engine = create_async_engine(settings.async_database_url)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
+async def migrate_db(conn):
+    """Simple migration to add missing columns to users table for SQLite."""
+    if settings.DB_TYPE != "sqlite":
+        return
+
+    from sqlalchemy import text
+    result = await conn.execute(text("PRAGMA table_info(users)"))
+    existing_columns = {row[1] for row in result.fetchall()}
+    
+    required_columns = {
+        "title": "VARCHAR(20)",
+        "first_name": "VARCHAR(100)",
+        "surname": "VARCHAR(100)",
+        "dob": "DATETIME",
+        "gender": "VARCHAR(50)",
+        "pronouns": "VARCHAR(50) DEFAULT 'Prefer not to say'",
+        "country": "VARCHAR(100)",
+        "profession": "VARCHAR(100)",
+        "role": "VARCHAR(20) DEFAULT 'user'",
+        "settings_json": "TEXT"
+    }
+    
+    for col, col_definition in required_columns.items():
+        if col not in existing_columns:
+            print(f"[MIGRATION] Adding column {col} to users table...")
+            await conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_definition}"))
+
 async def init_db():
     try:
         async with engine.begin() as conn:
@@ -18,6 +45,9 @@ async def init_db():
             
             # await conn.run_sync(Base.metadata.drop_all) # Careful in prod
             await conn.run_sync(Base.metadata.create_all)
+            
+            # Run manual migrations for SQLite
+            await migrate_db(conn)
             
         async with AsyncSessionLocal() as session:
             # Seed admin user if not exists
