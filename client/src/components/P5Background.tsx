@@ -410,8 +410,10 @@ const P5Background: React.FC<P5BackgroundProps> = ({
       }
     };
 
-    const p5Instance = new p5(sketch);
-    return () => p5Instance.remove();
+    const p5Instance = new p5(sketch, containerRef.current!);
+    return () => {
+      p5Instance.remove();
+    };
   }, [visualSettings, isDynamic]);
 
   return (
