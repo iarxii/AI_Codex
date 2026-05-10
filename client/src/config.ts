@@ -10,17 +10,17 @@ export const config = {
 };
 
 /**
- * Resolves the backend URL based on the active space.
+ * Resolves the backend URL based on the active space status.
  * Default is Cloud Run, but Premium CodexSpaces use Colab.
  */
-export const getApiUrl = (spaceSlug?: string) => {
-  if (spaceSlug?.includes('premium') && config.COLAB_URL) {
+export const getApiUrl = (isPremium?: boolean) => {
+  if (isPremium && config.COLAB_URL) {
     return config.COLAB_URL;
   }
   return config.API_BASE_URL;
 };
 
-export const getWsUrl = (spaceSlug?: string) => {
-  const url = getApiUrl(spaceSlug);
+export const getWsUrl = (isPremium?: boolean) => {
+  const url = getApiUrl(isPremium);
   return url.replace(/^http/, 'ws');
 };

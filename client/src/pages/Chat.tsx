@@ -64,6 +64,7 @@ const Chat: React.FC = () => {
     setModel,
     viewSpacesCatalog, 
     activeSpace, 
+    isPremiumSpace,
     availableSpaces, 
     setActiveSpace 
   } = useAI();
@@ -91,13 +92,13 @@ const Chat: React.FC = () => {
     if (!token || !artifact.content) return;
 
     try {
-      const baseUrl = getApiUrl(activeSpace?.slug);
+      const baseUrl = getApiUrl(isPremiumSpace);
       await fetch(`${baseUrl}${config.API_V1_STR}/workspace/scratchpad`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          ...(baseUrl === config.COLAB_URL && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
+          ...(isPremiumSpace && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
         },
         body: JSON.stringify({
           conversation_id: currentConvId,
@@ -173,7 +174,7 @@ const Chat: React.FC = () => {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const wsUrl = getWsUrl(activeSpace?.slug);
+    const wsUrl = getWsUrl(isPremiumSpace);
     const handshakeQuery = (wsUrl.includes('ngrok') && config.COLAB_SECRET) ? `&handshake=${config.COLAB_SECRET}` : '';
     
     const socket = new WebSocket(`${wsUrl}${config.API_V1_STR}/chat/ws/agent?token=${token}${handshakeQuery}`);
@@ -407,7 +408,7 @@ const Chat: React.FC = () => {
     };
 
     // 2. Metrics Socket
-    const metricsWsUrl = getWsUrl(activeSpace?.slug);
+    const metricsWsUrl = getWsUrl(isPremiumSpace);
     const mHandshakeQuery = (metricsWsUrl.includes('ngrok') && config.COLAB_SECRET) ? `&handshake=${config.COLAB_SECRET}` : '';
     const mSocket = new WebSocket(`${metricsWsUrl}${config.API_V1_STR}/metrics/ws/metrics?token=${token}${mHandshakeQuery}`);
     metricsWs.current = mSocket;
@@ -446,7 +447,7 @@ const Chat: React.FC = () => {
       if (socket.readyState !== WebSocket.CLOSED) socket.close();
       if (mSocket.readyState !== WebSocket.CLOSED) mSocket.close();
     };
-  }, [reconnectCount]);
+  }, [reconnectCount, isPremiumSpace]);
 
   // 3. Auto-scroll
   useEffect(() => {
@@ -461,11 +462,11 @@ const Chat: React.FC = () => {
     setCurrentToolCalls([]);
 
     try {
-      const baseUrl = getApiUrl(activeSpace?.slug);
+      const baseUrl = getApiUrl(isPremiumSpace);
       const response = await fetch(`${baseUrl}${config.API_V1_STR}/conversations/${id}`, {
         headers: { 
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          ...(baseUrl === config.COLAB_URL && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
+          ...(isPremiumSpace && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
         }
       });
       if (response.ok) {

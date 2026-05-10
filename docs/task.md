@@ -10,6 +10,14 @@
 - [x] Initialize Python environment in `backend/`
     - [x] Create `backend/requirements.txt`
     - [x] Create `backend/.env`
+
+# Phase 2: Deployment & Premium Polishing
+
+- [x] Fix space seeding logic (move out of `SEED_ADMIN`)
+- [x] Refactor `ChatHeader` functions into `NeuralFunctionSwitch`
+- [x] Implement Premium Handshake verification middleware
+- [x] Pass `COLAB_URL` and `COLAB_SECRET` through CI/CD
+- [/] Execute full stack deployment to Cloud Run
 - [x] Create FastAPI skeleton
     - [x] `backend/main.py`
     - [x] `backend/config.py`
