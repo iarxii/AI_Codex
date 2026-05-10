@@ -12,8 +12,9 @@ from backend.utils.telemetry import get_model_capabilities, estimate_tokens
 
 from datetime import datetime
 from backend.db.session import get_db, AsyncSessionLocal
-from backend.db.models import Conversation, Message
+from backend.db.models import Conversation, Message, CodexSpace, CodexSpaceAccess
 from backend.agent.graph import create_agent_graph
+from backend.agent.space_config import get_space_config
 from sqlalchemy import select, update
 
 router = APIRouter()
@@ -55,9 +56,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
     async def run_agent_task(payload_data):
         conversation_id = payload_data.get("conversation_id")
         user_message = payload_data.get("message")
-        provider = payload_data.get("provider", "local")
+        provider = payload_data.get("provider")
         model = payload_data.get("model")
-        api_key = payload_data.get("api_key")
+        api_key = payload_data.get("api_key") # Legacy fallback
+        api_keys = payload_data.get("api_keys", {}) # New multi-key support
         base_url = payload_data.get("base_url")
         model_config = payload_data.get("config", {})
         agent_mode = payload_data.get("agent_mode", True)
@@ -72,6 +74,62 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
         try:
             async with AsyncSessionLocal() as db:
+                # 0. Get Conversation space_type and Verify Access
+                conv_result = await db.execute(select(Conversation).filter_by(id=conversation_id))
+                conversation = conv_result.scalar_one_or_none()
+                if not conversation:
+                    await websocket.send_json({"type": "error", "message": "Conversation not found"})
+                    return
+                
+                space_type = conversation.space_type
+                
+                if space_type != "general":
+                    space_res = await db.execute(select(CodexSpace).filter_by(slug=space_type, is_active=True))
+                    space = space_res.scalar_one_or_none()
+                    if not space:
+                        await websocket.send_json({"type": "error", "message": "Space not found"})
+                        return
+                    
+                    is_admin = user.role in ["admin", "super_admin"]
+                    if not is_admin and not space.is_public:
+                        access_res = await db.execute(select(CodexSpaceAccess).filter_by(space_id=space.id, user_id=user.id))
+                        if not access_res.scalar_one_or_none():
+                            await websocket.send_json({"type": "error", "message": "Access denied to this space"})
+                            return
+                
+                s_config = get_space_config(space_type)
+                
+                # Apply provider/model recommendations if not explicitly provided by user
+                if not provider and s_config.get("recommended_provider"):
+                    provider = s_config["recommended_provider"]
+                    print(f"PIPELINE: Using recommended provider [{provider}] for space [{space_type}]")
+                
+                if not model and s_config.get("recommended_model"):
+                    model = s_config["recommended_model"]
+                    print(f"PIPELINE: Using recommended model [{model}] for space [{space_type}]")
+
+                # Default fallback
+                provider = provider or "local"
+
+                # Extract correct API key for the resolved provider
+                if provider != "local":
+                    # Priority: api_keys map > legacy api_key field
+                    # Robust key resolution
+                    print(f"PIPELINE: Resolving key for provider [{provider}]. Available map keys: {list(api_keys.keys())}")
+                    
+                    provider_key = api_keys.get(provider)
+                    if not provider_key and api_key:
+                        print(f"PIPELINE: Key not found in map for [{provider}], falling back to legacy field.")
+                        provider_key = api_key
+                        
+                    if provider_key and str(provider_key).strip():
+                        api_key = str(provider_key).strip()
+                        masked_key = f"{api_key[:6]}...{api_key[-4:]}" if len(api_key) > 10 else "****"
+                        print(f"PIPELINE: Successfully resolved API key for [{provider}]: {masked_key}")
+                    else:
+                        api_key = None
+                        print(f"PIPELINE CRITICAL: No valid API key found for resolved provider [{provider}]")
+
                 # 1. Load History
                 history_result = await db.execute(
                     select(Message)
@@ -101,6 +159,32 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     .where(Conversation.id == conversation_id)
                     .values(updated_at=datetime.utcnow())
                 )
+                
+                config = {
+                    "configurable": {
+                        "provider": provider, 
+                        "model": model, 
+                        "api_key": api_key,
+                        "base_url": base_url,
+                        "model_config": model_config,
+                        "conversation_id": str(conversation_id),
+                        "agent_mode": agent_mode,
+                        "local_backend_mode": local_backend_mode
+                    },
+                    "recursion_limit": 25
+                }
+                
+                # Early Auth Check for Cloud Providers
+                if provider in ["groq", "openrouter", "gemini", "ollama_cloud"]:
+                    api_key = config.get("configurable", {}).get("api_key")
+                    
+                    is_missing = not api_key or (provider == "ollama_cloud" and api_key == "sk-ollama")
+                    if is_missing:
+                        p_label = provider.capitalize() if provider != "ollama_cloud" else "Ollama Cloud"
+                        full_ai_response = f"❌ **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core."
+                        await websocket.send_json({"type": "token", "content": full_ai_response, "node": "auth_check", "provider": provider, "model": model, "duration": 0})
+                        return
+
                 await db.commit()
 
                 # 3. Initial state for Graph
@@ -119,7 +203,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "capabilities": get_model_capabilities(provider, model),
                         "provider": provider,
                         "model": model
-                    }
+                    },
+                    "space_config": s_config
                 }
                 
                 # 4. Execute graph with event streaming
