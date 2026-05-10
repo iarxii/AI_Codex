@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 from langchain_ollama import ChatOllama
-from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage, BaseMessage
+from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage, BaseMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from .state import AgentState
 from .tools import get_agent_tools
@@ -274,16 +274,22 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     conversation_id = config.get("configurable", {}).get("conversation_id", "default")
     system_prompt = build_system_prompt(conversation_id)
     
+    space_config = state.get("space_config", {})
+    if space_config.get("system_prompt_prefix"):
+        system_prompt = f"{space_config['system_prompt_prefix']}\n\n{system_prompt}"
+
     # Initialize context builder with provider-aware budget
     provider = config.get("configurable", {}).get("provider", "local")
     
-    # Early Auth Check for Cloud
-    if provider == "ollama_cloud":
+    # Early Auth Check for Cloud Providers
+    if provider in ["groq", "openrouter", "gemini", "ollama_cloud"]:
         api_key = config.get("configurable", {}).get("api_key")
-        if not api_key or api_key == "sk-ollama":
-            from langchain_core.messages import AIMessage
+        
+        is_missing = not api_key or (provider == "ollama_cloud" and api_key == "sk-ollama")
+        if is_missing:
+            p_label = provider.capitalize() if provider != "ollama_cloud" else "Ollama Cloud"
             return {
-                "messages": [AIMessage(content="❌ **Ollama Cloud API Key Missing**\nPlease open the **Settings** (gear icon) and add your remote API key to enable Cloud Neural core.")],
+                "messages": [AIMessage(content=f"❌ **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core.")],
                 "current_tool_calls": [],
                 "context_data": {"error": "auth_missing"}
             }
@@ -299,7 +305,8 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     
     # Initialize tools and binding logic
     conversation_id = config.get("configurable", {}).get("conversation_id")
-    tools = get_agent_tools(conversation_id)
+    allowed_skills = space_config.get("skills", ["all"])
+    tools = get_agent_tools(conversation_id, allowed_skills)
     
     # Use the dynamic LLM with tools bound
     try:
@@ -321,7 +328,6 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             print(f"PIPELINE: Skipping tool binding for NativeLocalClient (llamacpp mode)")
     except Exception as init_err:
         print(f"PIPELINE ERROR: LLM init failed — {init_err}")
-        from langchain_core.messages import AIMessage
         return {
             "messages": [AIMessage(content=f"❌ LLM initialization failed: {init_err}")],
             "current_tool_calls": [],
@@ -354,8 +360,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 print(token, end="", flush=True)  # Terminal monitoring
                 await token_callback(full_content)  # Push to WebSocket
             
-            from langchain_core.messages import AIMessage as _AIMsg
-            response = _AIMsg(content=full_content)
+            response = AIMessage(content=full_content)
         else:
             # STANDARD PATH: LangChain providers with native streaming support
             response = await _asyncio.wait_for(llm.ainvoke(messages), timeout=request_timeout)
@@ -372,10 +377,9 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             if "429" in error_msg:
                 error_msg = "Rate limited by provider. Please wait and retry, or switch models."
             elif "401" in error_msg or "API key" in error_msg or "unauthorized" in error_msg.lower():
-                error_msg = f"Authentication failed for {provider}. Please check your API key in Settings."
+                error_msg = f"Authentication failed for {provider}. Please check your API key in Settings. (Original error: {error_msg})"
             elif "Could not find model" in error_msg or "404" in error_msg:
                 error_msg = "Model not found. Please select a different model."
-        from langchain_core.messages import AIMessage
         return {
             "messages": [AIMessage(content=f"❌ {error_msg}")],
             "current_tool_calls": [],
