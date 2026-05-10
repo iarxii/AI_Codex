@@ -27,6 +27,7 @@ class ConversationRead(BaseModel):
     title: str
     created_at: datetime
     updated_at: datetime
+    space_type: str
 
     class Config:
         from_attributes = True
@@ -44,7 +45,7 @@ async def list_conversations(
 ):
     result = await db.execute(
         select(Conversation)
-        .filter_by(user_id=current_user.id)
+        .filter_by(user_id=current_user.id, space_type="general")
         .order_by(desc(Conversation.updated_at))
     )
     return result.scalars().all()
