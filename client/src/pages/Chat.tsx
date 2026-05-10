@@ -608,8 +608,7 @@ const Chat: React.FC = () => {
   const themeClass = activeSpace && !viewSpacesCatalog ? `space-theme-${activeSpace.slug}` : '';
 
   return (
-    <div className={`flex h-screen bg-[#D8DCE4] font-sans overflow-hidden transition-colors duration-500 ${themeClass}`}>
-      <div className="absolute inset-0 bg-[#C8CDD5]/30 pointer-events-none -z-10"></div>
+    <div className={`flex h-screen bg-transparent font-sans overflow-hidden transition-colors duration-500 ${themeClass}`}>
       
       <Sidebar 
         currentConversationId={currentConvId} 

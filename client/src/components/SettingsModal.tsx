@@ -86,20 +86,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   };
 
   const handleSave = () => {
-    setProvider(activeProvider);
-    
-    localStorage.setItem("groq_api_key", groqKey.trim());
-    localStorage.setItem("openrouter_api_key", openRouterKey.trim());
-    localStorage.setItem("gemini_api_key", geminiKey.trim());
-    localStorage.setItem("ollama_cloud_key", ollamaCloudKey.trim());
-    localStorage.setItem("ollama_cloud_url", ollamaCloudUrl.trim());
+    try {
+      setProvider(activeProvider);
+      
+      localStorage.setItem("groq_api_key", (groqKey || "").trim());
+      localStorage.setItem("openrouter_api_key", (openRouterKey || "").trim());
+      localStorage.setItem("gemini_api_key", (geminiKey || "").trim());
+      localStorage.setItem("ollama_cloud_key", (ollamaCloudKey || "").trim());
+      localStorage.setItem("ollama_cloud_url", (ollamaCloudUrl || "").trim());
 
-    // Dispatch custom event for parts of the app not yet using Context
-    window.dispatchEvent(new Event("ai-settings-changed"));
-    setIsOpen(false);
-    
-    // Force reload to ensure all components pick up new keys from localStorage
-    window.location.reload();
+      // Dispatch custom event for parts of the app not yet using Context
+      window.dispatchEvent(new Event("ai-settings-changed"));
+      
+      setIsOpen(false);
+      
+      // Force reload to ensure all components pick up new keys from localStorage
+      // Small delay to allow modal close animation to start if needed, 
+      // but window.location.reload() is the priority.
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      alert("Error saving settings. Please try again.");
+    }
   };
 
   return (
