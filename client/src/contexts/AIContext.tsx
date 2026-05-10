@@ -81,6 +81,7 @@ interface AIContextType {
   visualSettings: VisualSettings;
   modelConfig: ModelConfig;
   activeSpace: CodexSpace | null;
+  isPremiumSpace: boolean;
   availableSpaces: CodexSpace[];
   setActiveSpace: (space: CodexSpace | null) => void;
   setAvailableSpaces: (spaces: CodexSpace[]) => void;
@@ -150,6 +151,8 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     }
     return {};
   });
+
+  const isPremiumSpace = !!(activeSpace?.config_json && JSON.parse(activeSpace.config_json).premium);
 
   const activeModel = models[provider];
 
@@ -294,6 +297,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       visualSettings,
       modelConfig: activeModelConfig,
       activeSpace,
+      isPremiumSpace,
       availableSpaces,
       setActiveSpace: updateActiveSpace,
       setAvailableSpaces,

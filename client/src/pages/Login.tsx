@@ -146,7 +146,7 @@ const Login: React.FC = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-5 py-4 bg-white border border-black/[0.05] rounded-2xl focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all placeholder:text-[var(--text-muted)] text-sm shadow-sm"
-                placeholder="e.g. admin"
+                placeholder="Neural•Identity"
                 required
               />
             </div>
@@ -160,7 +160,7 @@ const Login: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-5 py-4 bg-white border border-black/[0.05] rounded-2xl focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none transition-all placeholder:text-[var(--text-muted)] text-sm shadow-sm"
-                placeholder="••••••••"
+                placeholder="Neural•Key"
                 required
               />
             </div>

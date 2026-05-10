@@ -1,7 +1,8 @@
 import httpx
-from fastapi import APIRouter, HTTPException, Query, Header
+from fastapi import APIRouter, HTTPException, Query, Header, Depends
 from typing import List, Dict, Any
 from backend.config import settings
+from backend.db.session import get_db
 
 router = APIRouter()
 
@@ -12,10 +13,21 @@ async def list_models(
     x_api_key: str = Header(None),
     x_base_url: str = Header(None),
     x_local_backend_mode: str = Header(None),
+    x_space_slug: str = Header(None),
+    x_is_premium: str = Header(None),
+    db: Any = Depends(get_db)
 ):
     """
-    Dynamically list available models for a given provider using non-blocking async calls.
+    Dynamically list available models for a given provider.
+    Mutes local models for Standard workspaces and locks models for non-premium spaces.
     """
+    # 1. Enforcement: Mute local models in Standard Workspaces (no slug)
+    if provider == "local" and not x_space_slug:
+        return []
+
+    # 2. Enforcement: Check if we should lock to a single model for non-premium Colab spaces
+    is_premium = x_is_premium == "true"
+    
     actual_key = x_api_key or api_key
     async with httpx.AsyncClient(timeout=10.0) as client:
         if provider == "local":
@@ -42,8 +54,8 @@ async def list_models(
                     if not models:
                         models.append({"id": "default", "name": "Local Model (llama-server)"})
                     return models
-                except Exception as e:
-                    raise HTTPException(status_code=500, detail=f"llama-server error: {str(e)}")
+                except Exception:
+                    return [{"id": "default", "name": "Local Model (unreachable)"}]
             
             else:
                 # ── OLLAMA MODE (default) ──
@@ -64,13 +76,21 @@ async def list_models(
                                 model_id = "default"
                                 display_name = f"Local Model (llama-server)"
                             models.append({"id": model_id, "name": display_name})
+                        
+                        # Enforcement: If non-premium space, only allow 1 predefined model
+                        if not is_premium and x_space_slug:
+                            # Try to find deepseek-r1:7b or just return the first one
+                            premium_default = next((m for m in models if "deepseek-r1:7b" in m["id"]), models[0] if models else None)
+                            if premium_default:
+                                return [premium_default]
+
                         # If Ollama returned no chat models, add a default
                         if not models:
                             models.append({"id": "default", "name": "Local Model (auto-detect)"})
                         return models
                     return [{"id": "default", "name": "Local Model (auto-detect)"}]
-                except Exception as e:
-                    raise HTTPException(status_code=500, detail=f"Ollama error: {str(e)}")
+                except Exception:
+                    return [{"id": "default", "name": "Local Model (unreachable)"}]
 
         elif provider == "ollama_cloud":
             if not x_base_url:

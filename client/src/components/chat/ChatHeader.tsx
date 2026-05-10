@@ -3,6 +3,7 @@ import AgentPulse from "../AgentPulse";
 import { useNavigate } from "react-router-dom";
 import ProviderIcon from "../ProviderIcon";
 import { useAI } from "../../contexts/AIContext";
+import NeuralFunctionSwitch from "./NeuralFunctionSwitch";
 
 interface ChatHeaderProps {
   isSidebarOpen: boolean;
@@ -102,58 +103,12 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
       {/* items justified to the right */}
       <div className="flex items-center justify-end gap-3">
-        {/* llama.cpp Portal Shortcut */}
-        <a
-          href="http://127.0.0.1:11434"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border bg-black/[0.04] border-black/[0.08] text-[#4A4D5E] hover:text-[#1A1D2E] hover:border-black/[0.15] text-xs font-semibold transition-all"
-          title="Open llama.cpp server portal"
-        >
-          <ProviderIcon provider={activeProviderInfo} size={14} />
-          llama.cpp
-        </a>
-
-        {/* Global Knowledge Map Toggle */}
-        <button
-          onClick={() => navigate('/admin/overview')}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-[#fd3b12]/5 border-[#fd3b12]/20 text-[#fd3b12] hover:bg-[#fd3b12]/10 transition-all text-xs font-semibold"
-          title="Open Super-Admin Global Knowledge Map"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A2 2 0 013 15.485V6.415a2 2 0 011.118-1.789L9 2l5.447 2.724A2 2 0 0115 6.415v9.07a2 2 0 01-1.118 1.789L9 20zm0-18v18m0-18l-5.447 2.724m10.894 0L9 2m5.447 13.485L9 20m-5.447-2.724L9 20" />
-          </svg>
-          Global Map
-        </button>
-
-        {/* Canvas Toggle */}
-        <button
-          onClick={() => setIsCanvasOpen(!isCanvasOpen)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-            isCanvasOpen
-              ? "bg-[#fd3b12]/10 border-[#fd3b12]/30 text-[#fd3b12]"
-              : "bg-black/[0.04] border-black/[0.08] text-[#4A4D5E] hover:text-[#1A1D2E] hover:border-black/[0.15]"
-          }`}
-        >
-          <svg
-            className="w-3.5 h-3.5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M3 9h18M9 21V9" />
-          </svg>
-          Canvas
-          {artifactCount > 0 && (
-            <span className="flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-[#fd3b12] text-white text-[8px] font-black animate-in zoom-in">
-              {artifactCount}
-            </span>
-          )}
-        </button>
+        {/* System Function Shifter Dropdown */}
+        <NeuralFunctionSwitch 
+          isCanvasOpen={isCanvasOpen}
+          setIsCanvasOpen={setIsCanvasOpen}
+          artifactCount={artifactCount}
+        />
 
         {/* Agent Pulse Status */}
         <div className="hidden md:flex items-center px-4 border-l border-black/[0.06] ml-2">
