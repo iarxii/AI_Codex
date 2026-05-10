@@ -13,7 +13,11 @@ COPY . .
 # Build the app
 # Note: VITE_API_URL should be set as a build argument or environment variable
 ARG VITE_API_URL
+ARG VITE_COLAB_URL
+ARG VITE_COLAB_SECRET
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_COLAB_URL=$VITE_COLAB_URL
+ENV VITE_COLAB_SECRET=$VITE_COLAB_SECRET
 RUN npm run build
 
 # Stage 2: Serve
