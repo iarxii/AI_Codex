@@ -19,7 +19,7 @@ type SettingsModalProps = {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const navigate = useNavigate();
-  const { provider, setProvider, visualSettings, updateVisualSetting } =
+  const { provider, setProvider, setModel, visualSettings, updateVisualSetting } =
     useAI();
   const [activeProvider, setActiveProvider] = useState<ProviderId>(provider);
   const [groqKey, setGroqKey] = useState("");
@@ -87,17 +87,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
 
   const handleSave = () => {
     setProvider(activeProvider);
-    localStorage.setItem("groq_api_key", groqKey);
-    localStorage.setItem("openrouter_api_key", openRouterKey);
-    localStorage.setItem("gemini_api_key", geminiKey);
-    localStorage.setItem("ollama_cloud_key", ollamaCloudKey);
-    localStorage.setItem("ollama_cloud_url", ollamaCloudUrl);
+    
+    localStorage.setItem("groq_api_key", groqKey.trim());
+    localStorage.setItem("openrouter_api_key", openRouterKey.trim());
+    localStorage.setItem("gemini_api_key", geminiKey.trim());
+    localStorage.setItem("ollama_cloud_key", ollamaCloudKey.trim());
+    localStorage.setItem("ollama_cloud_url", ollamaCloudUrl.trim());
 
     // Dispatch custom event for parts of the app not yet using Context
     window.dispatchEvent(new Event("ai-settings-changed"));
     setIsOpen(false);
-
-    // Force a hard reload to reset P5 and video buffers
+    
+    // Force reload to ensure all components pick up new keys from localStorage
     window.location.reload();
   };
 

@@ -8,6 +8,8 @@ import {
   SparklesIcon,
   PencilSquareIcon,
   CloudIcon,
+  CubeTransparentIcon,
+  RectangleStackIcon
 } from "@heroicons/react/24/outline";
 import { useAI } from "../contexts/AIContext";
 import { config } from "../config";
@@ -17,6 +19,9 @@ type Conversation = {
   title: string;
   created_at: string;
   updated_at: string;
+  space_type?: string;
+  space_name?: string;
+  message_count?: number;
 };
 
 interface SidebarProps {
@@ -34,8 +39,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { provider, userProfile } = useAI();
+  const { provider, userProfile, activeSpace, setActiveSpace, setAvailableSpaces, setViewSpacesCatalog } = useAI();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [spaceConversations, setSpaceConversations] = useState<Conversation[]>([]);
+  const [activeTab, setActiveTab] = useState<'workspaces' | 'spaces'>('workspaces');
   
   // Display name logic
   const displayName = userProfile?.first_name 
@@ -79,7 +86,66 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     fetchConversations();
+    fetchSpaces();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'spaces') {
+        if (activeSpace) {
+            fetchSpaceConversations(activeSpace.slug);
+        } else {
+            fetchAllSpaceConversations();
+        }
+    }
+  }, [activeSpace, activeTab]);
+
+  const fetchSpaces = async () => {
+      try {
+          const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/spaces/`, {
+              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) {
+              const data = await res.json();
+              setAvailableSpaces(data);
+          }
+      } catch (e) {
+          console.error("Failed to fetch spaces", e);
+      }
+  }
+
+  const fetchSpaceConversations = async (slug: string) => {
+      setLoading(true);
+      try {
+          const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/spaces/${slug}/conversations`, {
+              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) {
+              const data = await res.json();
+              setSpaceConversations(data);
+          }
+      } catch (e) {
+          console.error("Failed to fetch space conversations", e);
+      } finally {
+          setLoading(false);
+      }
+  }
+
+  const fetchAllSpaceConversations = async () => {
+      setLoading(true);
+      try {
+          const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/spaces/conversations/all`, {
+              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) {
+              const data = await res.json();
+              setSpaceConversations(data);
+          }
+      } catch (e) {
+          console.error("Failed to fetch all space conversations", e);
+      } finally {
+          setLoading(false);
+      }
+  }
 
   const fetchConversations = async () => {
     setLoading(true);
@@ -177,29 +243,59 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        <div className="p-4 border-b border-black/[0.06]">
+        {/* Tabs */}
+        <div className="flex p-2 gap-1 bg-black/[0.02] border-b border-black/[0.06]">
+            <button
+                onClick={() => {
+                    setActiveTab('workspaces');
+                    setActiveSpace(null);
+                    setViewSpacesCatalog(false);
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === 'workspaces' ? 'bg-white shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
+            >
+                <RectangleStackIcon className="w-4 h-4" />
+                Standard
+            </button>
+            <button
+                onClick={() => setActiveTab('spaces')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === 'spaces' ? 'bg-[var(--accent)]/10 text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
+            >
+                <CubeTransparentIcon className="w-4 h-4" />
+                Spaces
+            </button>
+        </div>
+
+        <div className="p-4 border-b border-black/[0.06] space-y-2.5">
+          {activeTab === 'spaces' && (
+            <button
+              onClick={() => {
+                setActiveSpace(null);
+                setViewSpacesCatalog(true);
+                if (window.innerWidth < 1024) onClose();
+              }}
+              className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl text-xs font-bold transition-all bg-white/50 hover:bg-white border border-black/[0.05] hover:border-[var(--accent)]/30 text-[var(--text-secondary)] hover:text-[var(--accent)] group shadow-sm"
+            >
+              <CubeTransparentIcon className="w-4 h-4 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110" />
+              BROWSE SPACES CATALOG
+            </button>
+          )}
+
           <button
             onClick={async () => {
               await onNewChat();
-              await fetchConversations();
+              if (activeSpace) {
+                await fetchSpaceConversations(activeSpace.slug);
+              } else {
+                await fetchConversations();
+              }
               if (window.innerWidth < 1024) onClose();
             }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-xl text-sm font-semibold text-white transition-all active:scale-95 shadow-md shadow-[var(--accent)]/20 group"
+            className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-md group bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white shadow-[var(--accent)]/20"
           >
-            <svg
-              className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M12 4v16m8-8H4"
-              />
+            <svg className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
             </svg>
-            New Workspace
+            NEW WORKSPACE
           </button>
         </div>
 
@@ -210,15 +306,38 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {!loading && conversations.length === 0 && (
+          {!loading && activeTab === 'workspaces' && conversations.length === 0 && (
             <div className="text-center py-10 px-4">
               <p className="text-xs text-[var(--text-muted)] font-medium">
                 No active sessions.
               </p>
             </div>
           )}
+          
+          {!loading && activeTab === 'spaces' && activeSpace && spaceConversations.length === 0 && (
+            <div className="text-center py-10 px-4">
+              <p className="text-xs text-[var(--text-muted)] font-medium">
+                No active sessions in this space.
+              </p>
+            </div>
+          )}
 
-          {conversations.map((conv) => (
+          {!loading && activeTab === 'spaces' && spaceConversations.length === 0 && (
+             <div className="text-center py-10 px-4">
+               <CubeTransparentIcon className="w-8 h-8 text-[var(--text-muted)]/50 mx-auto mb-2" />
+               <p className="text-xs text-[var(--text-muted)] font-medium leading-relaxed">
+                 No active space sessions.<br/>Browse the catalog to start one.
+               </p>
+               <button 
+                onClick={() => setViewSpacesCatalog(true)}
+                className="mt-4 text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] hover:underline"
+               >
+                 Browse Catalog
+               </button>
+             </div>
+          )}
+
+          {(activeTab === 'workspaces' ? conversations : spaceConversations).map((conv) => (
             <button
               key={conv.id}
               onClick={() => {
@@ -237,6 +356,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                 ></div>
                 <div className="flex-1 min-w-0 flex items-center justify-between group/item">
                   <div className="flex-1 min-w-0">
+                    {activeTab === 'spaces' && conv.space_name && (
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--accent)] mb-0.5 opacity-80">
+                        {conv.space_name}
+                      </p>
+                    )}
                     {editingId === conv.id ? (
                       <input
                         type="text"
@@ -266,9 +390,16 @@ const Sidebar: React.FC<SidebarProps> = ({
                         {conv.title}
                       </p>
                     )}
-                    <p className="text-[10px] text-[var(--text-muted)] font-mono uppercase tracking-tighter mt-0.5">
-                      {new Date(conv.updated_at).toLocaleDateString()}
-                    </p>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className="text-[10px] text-[var(--text-muted)] font-mono uppercase tracking-tighter">
+                        {new Date(conv.updated_at).toLocaleDateString()}
+                      </p>
+                      {conv.message_count !== undefined && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-black/[0.04] text-[var(--text-muted)]">
+                          {conv.message_count} msgs
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {currentConversationId === conv.id &&
                     editingId !== conv.id && (

@@ -59,18 +59,39 @@ const DEFAULT_VISUAL_SETTINGS: VisualSettings = {
   showStillBackground: true,
 };
 
+export interface CodexSpace {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  icon: string | null;
+  color?: string;
+  is_public: boolean;
+  is_active: boolean;
+  capacity: number;
+  recommended_provider?: string;
+  recommended_model?: string;
+}
+
 interface AIContextType {
   provider: ProviderId;
   model: string;
   userProfile: UserProfile | null;
   visualSettings: VisualSettings;
   modelConfig: ModelConfig;
+  activeSpace: CodexSpace | null;
+  availableSpaces: CodexSpace[];
+  setActiveSpace: (space: CodexSpace | null) => void;
+  setAvailableSpaces: (spaces: CodexSpace[]) => void;
+  viewSpacesCatalog: boolean;
+  setViewSpacesCatalog: (val: boolean) => void;
   setProvider: (p: ProviderId) => void;
-  setModel: (m: string) => void;
+  setModel: (m: string, p?: ProviderId) => void;
   updateVisualSetting: <K extends keyof VisualSettings>(key: K, value: VisualSettings[K]) => void;
   updateModelConfig: <K extends keyof ModelConfig>(key: K, value: ModelConfig[K]) => void;
   updateUserProfile: (profile: UserProfile) => Promise<void>;
   getApiKey: (p: ProviderId) => string | null;
+  getAllApiKeys: () => Record<string, string | null>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -97,6 +118,29 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     }
     return DEFAULT_VISUAL_SETTINGS;
   });
+
+  // Removed unused modelConfig state
+  
+  const [activeSpace, setActiveSpace] = useState<CodexSpace | null>(() => {
+    const saved = localStorage.getItem('ai_active_space');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return null;
+  });
+
+  const [availableSpaces, setAvailableSpaces] = useState<CodexSpace[]>([]);
+  const [viewSpacesCatalog, setViewSpacesCatalog] = useState<boolean>(false);
+
+  const updateActiveSpace = (space: CodexSpace | null) => {
+    setActiveSpace(space);
+    if (space) {
+        localStorage.setItem('ai_active_space', JSON.stringify(space));
+        setViewSpacesCatalog(false);
+    } else {
+        localStorage.removeItem('ai_active_space');
+    }
+  };
 
   const [modelConfigs, setModelConfigs] = useState<Record<string, ModelConfig>>(() => {
     const saved = localStorage.getItem('ai_model_configs');
@@ -164,9 +208,10 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     localStorage.setItem('ai_provider', p);
   };
 
-  const setModel = (m: string) => {
-    setModels(prev => ({ ...prev, [provider]: m }));
-    localStorage.setItem(`ai_model_${provider}`, m);
+  const setModel = (m: string, p?: ProviderId) => {
+    const targetProvider = p || provider;
+    setModels(prev => ({ ...prev, [targetProvider]: m }));
+    localStorage.setItem(`ai_model_${targetProvider}`, m);
     localStorage.setItem('ai_model', m);
   };
 
@@ -231,6 +276,15 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     }
   };
 
+  const getAllApiKeys = () => {
+    return {
+      groq: localStorage.getItem('groq_api_key'),
+      openrouter: localStorage.getItem('openrouter_api_key'),
+      gemini: localStorage.getItem('gemini_api_key'),
+      ollama_cloud: localStorage.getItem('ollama_cloud_key'),
+    };
+  };
+
   return (
     <AIContext.Provider value={{ 
       provider, 
@@ -238,12 +292,19 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       userProfile,
       visualSettings,
       modelConfig: activeModelConfig,
+      activeSpace,
+      availableSpaces,
+      setActiveSpace: updateActiveSpace,
+      setAvailableSpaces,
+      viewSpacesCatalog,
+      setViewSpacesCatalog,
       setProvider, 
       setModel, 
       updateVisualSetting,
       updateModelConfig,
       updateUserProfile,
       getApiKey,
+      getAllApiKeys,
       refreshProfile
     }}>
       {children}

@@ -1,7 +1,8 @@
 import React from "react";
+import { TrendingUpIcon, ActivityIcon } from "lucide-react";
 import MessageItem from "./MessageItem";
 import type { Message, ThoughtLogEntry } from "../../types/chat";
-import type { ProviderId } from "../../contexts/AIContext";
+import type { ProviderId, CodexSpace } from "../../contexts/AIContext";
 
 interface MessageListProps {
   messages: Message[];
@@ -14,6 +15,7 @@ interface MessageListProps {
   currentConvId: number | null;
   activeProvider: ProviderId;
   activeModel: string;
+  activeSpace: CodexSpace | null;
   onCancel: () => void;
   onViewInCanvas: (artifactId: string) => void;
 }
@@ -29,6 +31,7 @@ const MessageList: React.FC<MessageListProps> = ({
   currentConvId,
   activeProvider,
   activeModel,
+  activeSpace,
   onCancel,
   onViewInCanvas,
 }) => {
@@ -40,6 +43,73 @@ const MessageList: React.FC<MessageListProps> = ({
     <main className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide relative z-10">
       {!currentConvId &&
         (() => {
+          if (activeSpace?.slug === 'trading-space') {
+            return (
+              <div className="h-full flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-700">
+                <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Market Signal Node */}
+                  <div className="col-span-1 md:col-span-2 p-8 rounded-[32px] bg-[#1A1D27] border border-white/5 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <TrendingUpIcon className="w-32 h-32 text-emerald-500" />
+                    </div>
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2.5 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                          <ActivityIcon className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <h3 className="text-sm font-black text-white uppercase tracking-widest">Market Signals Analysis Node</h3>
+                      </div>
+                      <h2 className="text-4xl font-black text-white mb-4 tracking-tighter leading-none">
+                        BULLISH <span className="text-emerald-500">SENTIMENT</span> DETECTED
+                      </h2>
+                      <p className="text-gray-400 text-sm font-medium mb-8 max-w-md leading-relaxed">
+                        The Alpha Terminal has aggregated real-time sentiment from 14 global data streams. High-probability trade setups identified in the BTC/USD pair.
+                      </p>
+                      <div className="flex gap-4">
+                        <div className="px-4 py-2 bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest rounded-lg">Strength: 89%</div>
+                        <div className="px-4 py-2 bg-white/5 text-gray-400 text-[10px] font-black uppercase tracking-widest rounded-lg border border-white/5">Confidence: High</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Agent Status Card */}
+                  <div className="p-8 rounded-[32px] bg-white border border-black/[0.05] shadow-xl flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Agent Status</span>
+                      </div>
+                      <h4 className="text-xl font-bold text-[#1A1D2E] mb-2">Quant Assistant</h4>
+                      <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                        Connected to the neural core. Standing by for strategy validation or market research queries.
+                      </p>
+                    </div>
+                    <div className="mt-8 space-y-3">
+                      <div className="p-3 rounded-xl bg-black/[0.02] border border-black/[0.03] flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-gray-400">LATENCY</span>
+                        <span className="text-[10px] font-black text-[#1A1D2E]">12ms</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-black/[0.02] border border-black/[0.03] flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-gray-400">UPTIME</span>
+                        <span className="text-[10px] font-black text-[#1A1D2E]">99.9%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-12 flex flex-col items-center gap-4">
+                  <div className="flex items-center gap-2 px-4 py-2 bg-[#1A1D27] rounded-full border border-white/10 shadow-lg">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Initialized in Financial Mode</span>
+                  </div>
+                  <p className="text-[#7A7D8E] text-[11px] font-bold uppercase tracking-tighter opacity-60">
+                    Select a workspace or type a message to start technical analysis
+                  </p>
+                </div>
+              </div>
+            );
+          }
+
           const config = {
             local: {
               label: "Neural Core",
@@ -231,13 +301,31 @@ const MessageList: React.FC<MessageListProps> = ({
                           Security Sandbox Protocol
                         </span>
                       </div>
-                      <p className="text-[11px] text-amber-800/80 leading-relaxed font-medium italic">
+                      <p className="text-[11px] text-amber-800/80 leading-relaxed font-medium italic mb-3">
                         "To maintain system integrity, please generate a
                         dedicated API key exclusively for this sandbox. We
                         recommend restricted permissions that deny
                         administrative access or payment modifications, ensuring
                         this key is used only for isolated neural experiments."
                       </p>
+                      <div className="flex items-center gap-4 pt-2 border-t border-amber-200/30">
+                        <a 
+                          href="/terms-of-use" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-[9px] font-black uppercase tracking-widest text-amber-700 hover:text-amber-900 transition-colors"
+                        >
+                          Terms of Use
+                        </a>
+                        <a 
+                          href="/disclaimers" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-[9px] font-black uppercase tracking-widest text-amber-700 hover:text-amber-900 transition-colors"
+                        >
+                          Disclaimers
+                        </a>
+                      </div>
                     </div>
 
                     <a
