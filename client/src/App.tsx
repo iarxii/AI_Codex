@@ -12,10 +12,10 @@ import P5Background from './components/P5Background';
 import './App.css';
 
 const AppContent: React.FC = () => {
-  const { visualSettings } = useAI();
+  const { visualSettings, activeSpace } = useAI();
   return (
     <>
-      <P5Background key={JSON.stringify(visualSettings)} />
+      <P5Background key={`${JSON.stringify(visualSettings)}-${activeSpace?.slug || 'global'}`} />
       <Router>
         <Routes>
           <Route path="/" element={<Landing />} />
