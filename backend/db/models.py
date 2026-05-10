@@ -39,6 +39,7 @@ class Conversation(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(200), default="New Conversation")
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    space_type: Mapped[str] = mapped_column(String(50), default="general", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -84,3 +85,28 @@ class DocumentChunk(Base):
     __table_args__ = (
         Index("idx_document_chunks_embedding", embedding, postgresql_using="ivfflat", postgresql_with={"lists": 100}, postgresql_ops={"embedding": "vector_cosine_ops"}),
     )
+
+class CodexSpace(Base):
+    __tablename__ = "codex_spaces"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str] = mapped_column(Text)
+    icon: Mapped[Optional[str]] = mapped_column(String(50))
+    color: Mapped[Optional[str]] = mapped_column(String(20))
+    is_active: Mapped[bool] = mapped_column(default=True)
+    is_public: Mapped[bool] = mapped_column(default=False)
+    required_role: Mapped[str] = mapped_column(String(20), default="user")
+    capacity: Mapped[int] = mapped_column(default=5)
+    config_json: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class CodexSpaceAccess(Base):
+    __tablename__ = "codex_space_access"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    space_id: Mapped[int] = mapped_column(ForeignKey("codex_spaces.id"), index=True)
+    granted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    granted_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))

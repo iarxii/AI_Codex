@@ -35,6 +35,12 @@ async def migrate_db(conn):
             print(f"[MIGRATION] Adding column {col} to users table...")
             await conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {col_definition}"))
 
+    result = await conn.execute(text("PRAGMA table_info(conversations)"))
+    existing_columns_conv = {row[1] for row in result.fetchall()}
+    if "space_type" not in existing_columns_conv:
+        print("[MIGRATION] Adding column space_type to conversations table...")
+        await conn.execute(text("ALTER TABLE conversations ADD COLUMN space_type VARCHAR(50) DEFAULT 'general'"))
+
 async def init_db():
     try:
         async with engine.begin() as conn:
@@ -66,6 +72,21 @@ async def init_db():
                 else:
                     existing_admin.hashed_password = pwd_context.hash("admin123")
                     print("Updated existing admin user password hash")
+                
+                # Seed Spaces
+                from backend.db.models import CodexSpace
+                spaces_to_seed = [
+                    {"slug": "general", "name": "General", "description": "Default workspace", "is_public": True},
+                    {"slug": "trading-space", "name": "Financial Trading Space", "description": "AI trading debate room", "is_public": False, "icon": "ChartBarIcon"},
+                    {"slug": "code-lab", "name": "Code Lab", "description": "Specialized coding environment", "is_public": False, "icon": "CodeBracketIcon"}
+                ]
+                for space_data in spaces_to_seed:
+                    result = await session.execute(select(CodexSpace).filter_by(slug=space_data["slug"]))
+                    if not result.scalar_one_or_none():
+                        new_space = CodexSpace(**space_data)
+                        session.add(new_space)
+                        print(f"Seeded space: {space_data['slug']}")
+                
                 await session.commit()
     except Exception as e:
         print(f"Warning: Database initialization failed. Server starting without DB connectivity. Error: {e}")
