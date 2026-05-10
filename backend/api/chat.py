@@ -138,18 +138,20 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 )
                 history_msgs = history_result.scalars().all()
                 
+                from langchain_core.messages import HumanMessage as _HumanMessage, AIMessage as _AIMessage
                 langchain_history = []
                 for m in history_msgs:
                     if m.role == "user":
-                        langchain_history.append(HumanMessage(content=m.content))
+                        langchain_history.append(_HumanMessage(content=m.content))
                     elif m.role == "assistant":
-                        langchain_history.append(AIMessage(content=m.content))
+                        langchain_history.append(_AIMessage(content=m.content))
                 
                 # 2. Persist User Message
+                user_message_str = str(user_message) if user_message is not None else ""
                 new_user_msg = Message(
                     conversation_id=conversation_id,
                     role="user",
-                    content=user_message
+                    content=user_message_str
                 )
                 db.add(new_user_msg)
                 
@@ -189,7 +191,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
                 # 3. Initial state for Graph
                 initial_state = {
-                    "messages": langchain_history + [HumanMessage(content=user_message)],
+                    "messages": langchain_history + [_HumanMessage(content=user_message_str)],
                     "current_tool_calls": [],
                     "context_data": {},
                     "routing_decision": {},

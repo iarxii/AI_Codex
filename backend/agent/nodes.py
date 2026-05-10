@@ -45,7 +45,7 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
         bind_tools = False
 
     # Debug logging for model initialization
-    print(f"DEBUG: Initializing LLM Provider: {provider} | Model: {model} | Agent Mode: {agent_mode}")
+    logger.debug(f"DEBUG: Initializing LLM Provider: {provider} | Model: {model} | Agent Mode: {agent_mode}")
 
     model_config = config.get("configurable", {}).get("model_config", {})
     temp = model_config.get("temperature", 0.0)
@@ -90,7 +90,7 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
             # Normalize model name: SHA256 blob digests are not valid model names
             local_model = target_model if target_model and target_model != "local" else "default"
             if local_model.startswith("sha256-") or local_model.startswith("sha256:"):
-                print(f"DEBUG: Detected blob digest model name '{local_model[:20]}...', normalizing to 'default'")
+                logger.debug(f"DEBUG: Detected blob digest model name '{local_model[:20]}...', normalizing to 'default'")
                 local_model = "default"
             
             if local_backend_mode == "ollama":
@@ -102,7 +102,7 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
                 if not base_url.endswith("/v1"):
                     base_url = f"{base_url.rstrip('/')}/v1"
                 
-                print(f"DEBUG: Local [Ollama mode] at {base_url} (Model: {local_model})")
+                logger.debug(f"DEBUG: Local [Ollama mode] at {base_url} (Model: {local_model})")
                 
                 # Pre-flight connection check
                 import httpx
@@ -145,7 +145,7 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
                     base_url = f"{base_url.rstrip('/')}/v1"
                 
                 detected_template = detect_template(local_model)
-                print(
+                logger.debug(
                     f"DEBUG: Local [llamacpp mode] at {base_url} "
                     f"(Model: {local_model}, Template: {detected_template})"
                 )
@@ -186,7 +186,7 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
             # Skip tool binding for local NativeLocalClient:
             # llama-server (turboquant) doesn't support OpenAI-compatible function calling.
             if provider == "local" and isinstance(llm, NativeLocalClient):
-                print(f"DEBUG: Skipping tool binding for provider '{provider}' (not supported by native client)")
+                logger.debug(f"DEBUG: Skipping tool binding for provider '{provider}' (not supported by native client)")
                 return llm
             try:
                 conv_id = config.get("configurable", {}).get("conversation_id")
@@ -194,7 +194,7 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
                 # Try to bind tools, but catch if the model/provider doesn't support it
                 return llm.bind_tools(tools)
             except Exception as e:
-                print(f"WARNING: Provider {provider} does not support tool binding: {e}. Proceeding with plain LLM.")
+                logger.warning(f"WARNING: Provider {provider} does not support tool binding: {e}. Proceeding with plain LLM.")
                 return llm
         return llm
 
@@ -250,6 +250,8 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     Decides whether to respond directly or use tools.
     """
     messages = state["messages"]
+    provider = config.get("configurable", {}).get("provider", "local")
+    model = config.get("configurable", {}).get("model", "default")
     
     # Workspace Sentinel: update status file periodically
     from backend.agent.workspace_sentinel import (
@@ -261,7 +263,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         if status:
             conversation_id = config.get("configurable", {}).get("conversation_id", "default")
             write_workspace_status(conversation_id, status)
-            print(f"SENTINEL: Status updated at turn {turn_count} ({len(status)} chars)")
+            logger.info(f"SENTINEL: Status updated at turn {turn_count} ({len(status)} chars)")
     
     # Context Budgeting: If history is long, summarize older parts
     summary = ""
@@ -294,14 +296,14 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 "context_data": {"error": "auth_missing"}
             }
 
-    print(f"PIPELINE: Building context for provider={provider}...")
+    logger.info(f"PIPELINE: Building context for provider={provider}...")
     context_builder = get_context_builder(provider=provider)
     
     # Wire the budget! 
     # This transforms the raw message list into a budget-aware prompt
     messages = context_builder.build_context(messages, system_prompt=system_prompt)
     
-    print(f"PIPELINE: Context built (len={len(messages)}). Initializing LLM...")
+    logger.info(f"PIPELINE: Context built (len={len(messages)}). Initializing LLM...")
     
     # Initialize tools and binding logic
     conversation_id = config.get("configurable", {}).get("conversation_id")
@@ -317,17 +319,21 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         valid_tools = []
         for t in tools:
             if not getattr(t, "name", None):
-                print(f"PIPELINE WARNING: Found tool without name, skipping: {t}")
+                logger.warning(f"PIPELINE WARNING: Found tool without name, skipping: {t}")
                 continue
             valid_tools.append(t)
             
-        if valid_tools and not isinstance(llm, NativeLocalClient):
-            print(f"PIPELINE: Binding {len(valid_tools)} tools to LLM...")
+        # Proactive check: only bind tools if model claims support in telemetry
+        capabilities = state.get("telemetry", {}).get("capabilities", [])
+        has_tool_support = "Tools" in capabilities
+        
+        if valid_tools and has_tool_support and not isinstance(llm, NativeLocalClient):
+            logger.info(f"PIPELINE: Binding {len(valid_tools)} tools to LLM (Model: {model})")
             llm = llm.bind_tools(valid_tools)
-        elif valid_tools and isinstance(llm, NativeLocalClient):
-            print(f"PIPELINE: Skipping tool binding for NativeLocalClient (llamacpp mode)")
+        elif valid_tools:
+            logger.info(f"PIPELINE: Skipping tool binding for '{model}' (Capability 'Tools' not found in {capabilities})")
     except Exception as init_err:
-        print(f"PIPELINE ERROR: LLM init failed — {init_err}")
+        logger.error(f"PIPELINE ERROR: LLM init failed — {init_err}")
         return {
             "messages": [AIMessage(content=f"❌ LLM initialization failed: {init_err}")],
             "current_tool_calls": [],
@@ -343,7 +349,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     tool_turns = sum(1 for m in original_messages if getattr(m, "type", "") == "tool" or isinstance(m, ToolMessage))
     request_timeout = base_timeout + (tool_turns * 30.0)
     start_time = time.perf_counter()
-    print(f"PIPELINE: Invoking LLM (timeout={request_timeout}s)...")
+    logger.info(f"PIPELINE: Invoking LLM (timeout={request_timeout}s)...")
     
     # For local providers: use native streaming via callback for instant UI feedback
     token_callback = config.get("configurable", {}).get("token_callback")
@@ -357,7 +363,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             async for chunk in llm.astream(messages):
                 token = chunk.get("content", "")
                 full_content += token
-                print(token, end="", flush=True)  # Terminal monitoring
+                logger.debug(token)  # Terminal monitoring
                 await token_callback(full_content)  # Push to WebSocket
             
             response = AIMessage(content=full_content)
@@ -366,34 +372,53 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             response = await _asyncio.wait_for(llm.ainvoke(messages), timeout=request_timeout)
             
     except (TimeoutError, Exception) as invoke_err:
-        is_timeout = isinstance(invoke_err, (_asyncio.TimeoutError, TimeoutError)) or "TimeoutError" in type(invoke_err).__name__
-        if is_timeout:
-            print(f"PIPELINE ERROR: LLM call timed out after {request_timeout}s")
-            error_msg = f"Request timed out after {request_timeout}s. The model server may be overloaded or prefilling context. Please try again."
-        else:
-            print(f"PIPELINE ERROR: LLM invocation failed — {invoke_err}")
-            error_msg = str(invoke_err)
-            # Parse common API errors
-            if "429" in error_msg:
-                error_msg = "Rate limited by provider. Please wait and retry, or switch models."
-            elif "401" in error_msg or "API key" in error_msg or "unauthorized" in error_msg.lower():
-                error_msg = f"Authentication failed for {provider}. Please check your API key in Settings. (Original error: {error_msg})"
-            elif "Could not find model" in error_msg or "404" in error_msg:
-                error_msg = "Model not found. Please select a different model."
-        return {
-            "messages": [AIMessage(content=f"❌ {error_msg}")],
-            "current_tool_calls": [],
-            "context_data": {"error": str(invoke_err)}
-        }
+        error_msg = str(invoke_err)
+        
+        # ─── ROBUST FALLBACK ───
+        # If the model provider rejects the request because of tool calling,
+        # we retry WITHOUT tool binding to allow the model to still reply.
+        is_tool_error = "does not support tools" in error_msg or "invalid_request_error" in error_msg
+        if is_tool_error and "valid_tools" in locals() and valid_tools:
+            logger.warning(f"PIPELINE WARNING: Tool-calling error caught: {error_msg}. Retrying without tools...")
+            try:
+                # Re-initialize LLM without any tool binding
+                llm_fallback = await get_dynamic_llm(config, bind_tools=False)
+                response = await _asyncio.wait_for(llm_fallback.ainvoke(messages), timeout=request_timeout)
+                # Success! Override error_msg and continue
+                invoke_err = None 
+            except Exception as retry_err:
+                logger.error(f"PIPELINE ERROR: Fallback retry also failed: {retry_err}")
+                error_msg = f"Model failed with tool calling, and fallback also failed: {retry_err}"
+        
+        if invoke_err:
+            is_timeout = isinstance(invoke_err, (_asyncio.TimeoutError, TimeoutError)) or "TimeoutError" in type(invoke_err).__name__
+            if is_timeout:
+                logger.error(f"PIPELINE ERROR: LLM call timed out after {request_timeout}s")
+                error_msg = f"Request timed out after {request_timeout}s. The model server may be overloaded or prefilling context. Please try again."
+            else:
+                logger.error(f"PIPELINE ERROR: LLM invocation failed — {invoke_err}")
+                error_msg = str(invoke_err)
+                # Parse common API errors
+                if "429" in error_msg:
+                    error_msg = "Rate limited by provider. Please wait and retry, or switch models."
+                elif "401" in error_msg or "API key" in error_msg or "unauthorized" in error_msg.lower():
+                    error_msg = f"Authentication failed for {provider}. Please check your API key in Settings. (Original error: {error_msg})"
+                elif "Could not find model" in error_msg or "404" in error_msg:
+                    error_msg = "Model not found. Please select a different model."
+            return {
+                "messages": [AIMessage(content=f"❌ {error_msg}")],
+                "current_tool_calls": [],
+                "context_data": {"error": str(invoke_err)}
+            }
     duration = time.perf_counter() - start_time
     
     provider = config.get("configurable", {}).get("provider", "local")
     model = config.get("configurable", {}).get("model", "default")
     log_performance("LLM_REASONING", duration, {"provider": provider, "model": model})
-    print(f"\nPIPELINE: LLM responded in {duration:.2f}s, content length={len(str(response.content))}")
+    logger.info(f"PIPELINE: LLM responded in {duration:.2f}s, content length={len(str(response.content))}")
     
     tool_calls = getattr(response, "tool_calls", [])
-    print(f"PIPELINE: Tool calls: {len(tool_calls)}")
+    logger.info(f"PIPELINE: Tool calls: {len(tool_calls)}")
     
     # Telemetry Update
     telemetry = state.get("telemetry", {})

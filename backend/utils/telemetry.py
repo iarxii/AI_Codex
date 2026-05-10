@@ -11,9 +11,24 @@ def get_model_capabilities(provider: str, model: str) -> List[str]:
     if provider in ["groq", "gemini", "openrouter"]:
         capabilities.append("Tools")
     elif provider == "local" or provider == "ollama_cloud":
-        # Gemma 4 supports native tool calling in local environments
-        if "gemma4" in (model or "").lower():
-            capabilities.append("Tools")
+        # Broaden tool support for modern Ollama models
+        # These families are known to support native tool calling in Ollama
+        tool_capable_families = [
+            "llama3.1", "llama3.2", "llama3.3", 
+            "mistral", "mistral-nemo", 
+            "qwen2.5", "command-r", "gemma4"
+        ]
+        model_lower = (model or "").lower()
+        
+        # Heuristic: check if model belongs to a tool-capable family
+        # BUT explicitly exclude DeepSeek-R1 for now as it lacks standard tool-calling support in Ollama
+        if any(f in model_lower for f in tool_capable_families):
+            if "deepseek-r1" not in model_lower:
+                capabilities.append("Tools")
+        
+        # Fallback for generic "llama3" names that might be 3.1/3.2
+        elif "llama3" in model_lower and "deepseek" not in model_lower:
+             capabilities.append("Tools")
     
     
     # Thinking / Reasoning Support
