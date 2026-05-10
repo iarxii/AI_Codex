@@ -26,6 +26,7 @@ export interface Artifact {
   module?: string;         // Groups related files (e.g., "graphify-integration")
   filePath?: string;       // Full relative path (e.g., "backend/skills/graphify_skill.py")
   dependencies?: string[]; // IDs of other artifacts this one references
+  tutorExplanation?: string; // Spirit Bird's educational content
 }
 
 export interface ModelTelemetry {

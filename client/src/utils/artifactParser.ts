@@ -21,7 +21,16 @@ export const parseArtifacts = (content: string, messageId?: string): Artifact[] 
     const title = match[2];
     const language = match[3];
     const pathHint = match[4]; // optional directory path
-    const artifactContent = match[5].trim();
+    let artifactContent = match[5].trim();
+    let tutorExplanation: string | undefined = undefined;
+
+    // Extract Spirit Bird tutor explanation if present
+    const tutorRegex = /\[TUTOR\]([\s\S]*?)\[\/TUTOR\]/i;
+    const tutorMatch = tutorRegex.exec(artifactContent);
+    if (tutorMatch) {
+      tutorExplanation = tutorMatch[1].trim();
+      artifactContent = artifactContent.replace(tutorRegex, '').trim();
+    }
     
     const typeNormMap: Record<string, Artifact['type']> = {
       'code': 'code',
@@ -42,6 +51,7 @@ export const parseArtifacts = (content: string, messageId?: string): Artifact[] 
       timestamp: Date.now(),
       messageId,
       filePath: pathHint ? `${pathHint}/${title}` : undefined,
+      tutorExplanation
     });
   }
 
