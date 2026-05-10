@@ -69,6 +69,7 @@ export interface CodexSpace {
   is_public: boolean;
   is_active: boolean;
   capacity: number;
+  config_json?: string;
   recommended_provider?: string;
   recommended_model?: string;
 }

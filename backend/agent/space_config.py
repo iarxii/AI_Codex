@@ -1,6 +1,6 @@
 from typing import Dict, Any, Optional
 
-TRADING_SPACE_SYSTEM_PROMPT = """You are a specialized AI Assistant acting within the Financial Trading Space. 
+TRADING_SPACE_SYSTEM_PROMPT = """You are a specialized AI Assistant acting within the FinTrader Analytics Lab. 
 Your role is to orchestrate market analysis, evaluate bull and bear cases, and provide a synthesized view.
 Always base your reasoning on current market data and technical indicators when available.
 Maintain a professional, analytical, and objective tone."""
@@ -11,6 +11,19 @@ You leverage Google's Gemma 4 family optimizations, specifically Multi-Token Pre
 MTP uses speculative decoding with a smaller assistant model to predict potential upcoming text, which you (the larger model) verify in a single step.
 This allows for significantly increased generation speed (up to 3x) without compromising quality.
 Always provide clean, well-documented, and optimal code. Follow best practices and include tests when applicable."""
+
+HEALTH_TECH_SYSTEM_PROMPT = """You are a HealthTech specialist AI. You assist with analyzing medical data patterns, 
+healthcare workflow optimization, and regulatory compliance (HIPAA/GDPR) inquiries. 
+Always prioritize patient privacy and evidence-based reasoning."""
+
+ART_GEN_SYSTEM_PROMPT = """You are a Creative Design AI specialized in ArtGen Design Lab. 
+You assist with prompt engineering for visual models, UI/UX conceptualization, and aesthetic theory.
+Your goal is to bridge the gap between creative vision and technical execution."""
+
+SPIRIT_BOOK_SYSTEM_PROMPT = """You are SpiritBook, a versatile Language and Audio specialist. 
+You excel at writing, copywriting, and sophisticated linguistic analysis. 
+In the near future, you will also handle Audio Translation, Transcription, and Audio Generation.
+Maintain a creative, helpful, and eloquent persona."""
 
 SPACE_CONFIGS: Dict[str, Dict[str, Any]] = {
     "general": {
@@ -38,6 +51,30 @@ SPACE_CONFIGS: Dict[str, Dict[str, Any]] = {
         "skills": ["all"],
         "recommended_provider": "ollama_cloud",
         "recommended_model": "gemma4:31b",
+        "constraints": {}
+    },
+    "health-tech": {
+        "system_prompt_prefix": HEALTH_TECH_SYSTEM_PROMPT,
+        "graph_type": "default",
+        "skills": ["memory_skill", "url_reader"],
+        "recommended_provider": "groq",
+        "recommended_model": "llama-3.3-70b-specdec",
+        "constraints": {}
+    },
+    "art-gen": {
+        "system_prompt_prefix": ART_GEN_SYSTEM_PROMPT,
+        "graph_type": "default",
+        "skills": ["all"],
+        "recommended_provider": "openrouter",
+        "recommended_model": "anthropic/claude-3.5-sonnet",
+        "constraints": {}
+    },
+    "spirit-book": {
+        "system_prompt_prefix": SPIRIT_BOOK_SYSTEM_PROMPT,
+        "graph_type": "default",
+        "skills": ["all"],
+        "recommended_provider": "google",
+        "recommended_model": "gemini-2.0-flash-exp",
         "constraints": {}
     }
 }
