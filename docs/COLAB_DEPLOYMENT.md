@@ -1,0 +1,101 @@
+# Google Colab Deployment Guide
+
+This guide explains how to deploy the AI_Codex backend to Google Colab to leverage powerful GPUs (T4, A100, or L4) for local model inference, while still using your local or cloud-hosted UI.
+
+## Prerequisites
+- A Google Account.
+- An [ngrok](https://ngrok.com/) account for secure tunneling.
+
+## Step 1: Open Colab & Setup GPU
+1.  Go to [colab.research.google.com](https://colab.research.google.com/).
+2.  Create a new notebook.
+3.  Go to **Runtime > Change runtime type** and select **T4 GPU**.
+    *   **Note**: Do NOT select **TPU** (v5e-1), as Ollama and CUDA-based inference require an NVIDIA GPU to function.
+4.  Click **Save**.
+
+## Step 2: Clone & Install Dependencies
+Run the following cell to set up the environment:
+
+```python
+# 1. Clone the repository and initialize submodules
+!git clone https://github.com/iarxii/AI_Codex.git
+%cd AI_Codex
+!git submodule update --init --recursive
+
+# 2. Install requirements (pin requests to avoid Colab conflict)
+%cd backend
+!pip install requests==2.32.4
+!pip install -r requirements.txt
+!pip install pyngrok 
+```
+
+## Step 3: Setup Ollama
+Install and start Ollama as a background process:
+
+```python
+# Install Ollama
+!curl -fsSL https://ollama.com/install.sh | sh
+
+# Start Ollama in the background
+import subprocess
+import os
+subprocess.Popen(["ollama", "serve"], env=dict(os.environ, OLLAMA_HOST="0.0.0.0"))
+
+# Pull your preferred models
+!ollama pull deepseek-r1:7b
+!ollama pull gemma:7b
+!ollama pull llama3.1:8b
+!ollama pull deepseek-coder:6.7b
+!ollama pull qwen2.5:7b
+```
+
+## Step 4: Start Tunnel & Backend
+Expose the FastAPI backend and start it as a background process to keep the notebook interactive.
+
+```python
+from pyngrok import ngrok
+import subprocess
+import os
+
+# 1. Setup Tunnel
+NGROK_TOKEN = "YOUR_NGROK_AUTHTOKEN"
+ngrok.set_auth_token(NGROK_TOKEN)
+public_url = ngrok.connect(9173)
+print(f"🚀 Colab Backend URL: {public_url}")
+
+# 2. Configure Environment
+os.environ['PYTHONPATH'] = "/content/AI_Codex"
+os.environ['DATABASE_URL'] = "sqlite+aiosqlite:///./test.db"
+os.environ['SECRET_KEY'] = "colab_development_key_123"
+
+# 3. Start Backend as Background Process
+%cd /content/AI_Codex
+backend_process = subprocess.Popen(
+    ["python", "backend/main.py", "--port", "9173"],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.STDOUT,
+    universal_newlines=True
+)
+
+print("✅ Backend starting in background...")
+```
+
+## Step 5: Connect Client (Cloud Run or Local)
+1.  Open your AI_Codex UI (Local or Cloud Run).
+2.  Go to **Settings** (Gear Icon).
+3.  In **Local Backend Config**:
+    *   **Base URL**: Paste the `public_url` from Colab (e.g., `https://xxxx.ngrok-free.app`).
+    *   **Provider**: Select `Local`.
+4.  The UI should now detect the models pulled in Step 3.
+
+---
+
+## Troubleshooting
+
+### 'ngrok' is not recognized
+If you are trying to run `ngrok` on your local Windows machine instead of Colab:
+- Ensure `%USERPROFILE%\AppData\Local\Microsoft\WindowsApps` is in your system's **PATH**.
+- Or use the full path: `& "$env:LOCALAPPDATA\Microsoft\WindowsApps\ngrok.exe" config add-authtoken <token>`.
+
+### ModuleNotFoundError: No module named 'backend'
+Ensure you are running from `/content/AI_Codex` and have set `PYTHONPATH` as shown in Step 4.

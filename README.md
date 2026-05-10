@@ -9,34 +9,40 @@
 
 ## Setup
 
-Run the provided setup script to install dependencies and create starter `.env` files in both `client` and `server`:
+The AI_Codex project consists of a **FastAPI Backend** and a **React Frontend**.
 
+### 1. Backend Setup (Python 3.10+)
 ```sh
-./setup.sh
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-Or manually:
-
-1. Install dependencies in both `client` and `server` folders:
-   ```sh
-   cd client && npm install
-   cd ../server && npm install
-   ```
-2. Create a `.env` file in the `server` folder with your API keys and config (see `.env.example` if available).
+### 2. Frontend Setup (React)
+```sh
+cd client
+npm install
+```
 
 ## Running the App
 
-1. Start the server:
-   ```sh
-   cd server
-   npm run server
-   ```
-2. Start the client (if applicable):
-   ```sh
-   cd client
-   # e.g. use live-server or your preferred static server
-   npx live-server
-   ```
+### Local Development
+To start both services with a single command (requires the provided `.bat` or `.sh` scripts):
+```sh
+./start_website_dev.bat --aicodex --local
+```
+
+Alternatively, start them separately:
+1. **Backend**: `cd backend && python main.py`
+2. **Frontend**: `cd client && npm run dev`
+
+## Deployment & Hardware
+
+- **Hardware Guidelines**: Running large models locally requires significant RAM/VRAM. See [Hardware Requirements](docs/HARDWARE_REQUIREMENTS.md).
+- **Google Colab**: Deploy the GPU-enabled backend to Colab for premium performance. See [Colab Deployment Guide](docs/COLAB_DEPLOYMENT.md).
+- **Production (Cloud Run)**: Automated deployment to Google Cloud Run is supported. See [Production Deployment](deploy_production.bat).
+
 
 ### Features
 

@@ -33,8 +33,11 @@ Key Components and Features:
 
 - The inclusion of the Browserbase SDK suggests the agents may have the ability to perform web scraping and browser automation tasks, enabling them to interact with websites to gather information or perform actions.
 
-6. User Interface:
+In summary, AI_Codex is a comprehensive framework for building powerful, multi-tool AI agents. Its main strengths are its model-agnostic approach, robust hardware management for local inference, and a highly resilient orchestration layer.
 
-- The project has a frontend built with React. UI components like cmdk (a command menu) and react-simple-code-editor suggest an interactive and developer-friendly interface, possibly for creating, testing, and managing agents and their prompts.
+---
 
-In summary, AI_Codex is a comprehensive framework for building powerful, multi-tool AI agents. Its main strengths are its model-agnostic approach, its use of standardized protocols like MCP for tool integration, and its robust orchestration capabilities, likely powered by LangChain.
+### Key Documentation
+- [Hardware Requirements](file:///c:/AppDev/My_Linkdin/projects/iarxii/AI_Codex/docs/HARDWARE_REQUIREMENTS.md): Guidelines for running local models like DeepSeek and Gemma.
+- [Colab Deployment Guide](file:///c:/AppDev/My_Linkdin/projects/iarxii/AI_Codex/docs/COLAB_DEPLOYMENT.md): Guide for GPU-accelerated backend deployment.
+- [Reliability Updates](file:///c:/AppDev/My_Linkdin/projects/iarxii/AI_Codex/docs/RELIABILITY_UPDATES.md): Summary of the tool-calling fallback and telemetry improvements.
