@@ -3,6 +3,8 @@ steps:
     args: [
       'build',
       '--build-arg', 'VITE_API_URL=$_VITE_API_URL',
+      '--build-arg', 'VITE_COLAB_URL=$_VITE_COLAB_URL',
+      '--build-arg', 'VITE_COLAB_SECRET=$_VITE_COLAB_SECRET',
       '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/aicodex-repo/frontend',
       '.'
     ]

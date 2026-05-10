@@ -11,17 +11,33 @@ SET FRONTEND_IMAGE=us-central1-docker.pkg.dev/%PROJECT_ID%/aicodex-repo/frontend
 :: Default to deploying both
 SET DEPLOY_BE=true
 SET DEPLOY_FE=true
+SET COLAB_URL=
+SET COLAB_SECRET=
 
 :: Parse arguments
+:parse_args
+if "%~1"=="" goto end_parse
 if "%~1"=="--be" (
     echo Deployment Mode: Backend Only
     SET DEPLOY_FE=false
 ) else if "%~1"=="--fe" (
     echo Deployment Mode: Frontend Only
     SET DEPLOY_BE=false
+) else if "%~1"=="--colab-url" (
+    SET COLAB_URL=%~2
+    shift
+) else if "%~1"=="--colab-secret" (
+    SET COLAB_SECRET=%~2
+    shift
 ) else (
     echo Deployment Mode: Full Stack
 )
+shift
+goto parse_args
+:end_parse
+
+if "!COLAB_URL!" NEQ "" echo [DUAL BACKEND] Detected Colab URL: !COLAB_URL!
+if "!COLAB_SECRET!" NEQ "" echo [DUAL BACKEND] Detected Colab Handshake Secret.
 
 if "%DEPLOY_BE%"=="true" (
     echo [1/4] Submitting Backend Build to Google Cloud...
@@ -64,7 +80,9 @@ if "%DEPLOY_FE%"=="true" (
 
     echo [3/4] Submitting Frontend Build to Google Cloud...
     pushd client
-    call %GCLOUD% builds submit --config cloudbuild.yaml --project %PROJECT_ID% --substitutions=_VITE_API_URL=!BACKEND_URL!
+    call %GCLOUD% builds submit --config cloudbuild.yaml ^
+        --project %PROJECT_ID% ^
+        --substitutions=_VITE_API_URL=!BACKEND_URL!,_VITE_COLAB_URL=!COLAB_URL!,_VITE_COLAB_SECRET=!COLAB_SECRET!
     popd
     if %ERRORLEVEL% NEQ 0 (
         echo Frontend build failed. Exiting.
