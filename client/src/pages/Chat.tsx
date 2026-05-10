@@ -15,6 +15,9 @@ import MessageList from '../components/chat/MessageList';
 import ChatInput from '../components/chat/ChatInput';
 import MetricsStrip from '../components/chat/MetricsStrip';
 import ModelTelemetryHUD from '../components/chat/ModelTelemetryHUD';
+import SpacesCatalog from '../components/SpacesCatalog';
+import TradingSpaceHeader from '../components/spaces/trading/TradingSpaceHeader';
+import '../spaces.css';
 
 // Types
 import type { Message, ThoughtLogEntry, Artifact, ModelTelemetry } from '../types/chat';
@@ -51,7 +54,20 @@ const Chat: React.FC = () => {
   const [agentMode, setAgentMode] = useState(true);
   
   // Global AI State
-  const { provider: activeProvider, model: activeModel, modelConfig, getApiKey } = useAI();
+  const { 
+    provider: activeProvider, 
+    model: activeModel, 
+    modelConfig, 
+    getApiKey, 
+    getAllApiKeys,
+    setProvider,
+    setModel,
+    viewSpacesCatalog, 
+    activeSpace, 
+    availableSpaces, 
+    setActiveSpace 
+  } = useAI();
+  const [spaceNote, setSpaceNote] = useState<string | null>(null);
   const activeProviderInfo = PROVIDER_MAP[activeProvider] || PROVIDER_MAP['local'];
 
   const ws = useRef<WebSocket | null>(null);
@@ -451,6 +467,26 @@ const Chat: React.FC = () => {
         }));
         setMessages(mappedMsgs);
         
+        // Update active space context based on conversation space_type
+        const space = availableSpaces.find(s => s.slug === data.space_type);
+        setActiveSpace(space || null);
+
+        // Auto-apply recommended settings if available
+        if (space && (space.recommended_provider || space.recommended_model)) {
+          const prevProvider = localStorage.getItem('ai_provider');
+          const prevModel = localStorage.getItem(`ai_model_${space.recommended_provider}`);
+
+          if (space.recommended_provider && prevProvider !== space.recommended_provider) {
+            setProvider(space.recommended_provider as any);
+          }
+          if (space.recommended_model && prevModel !== space.recommended_model) {
+            setModel(space.recommended_model, space.recommended_provider as any);
+          }
+
+          setSpaceNote(`Codex: Applied recommended settings for ${space.name}`);
+          setTimeout(() => setSpaceNote(null), 5000);
+        }
+        
         // Re-parse artifacts from history
         const allArtifacts: Artifact[] = [];
         data.messages.forEach((m: any) => {
@@ -474,7 +510,12 @@ const Chat: React.FC = () => {
 
   const handleNewChat = async () => {
     try {
-      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/conversations/`, {
+      let endpoint = `${config.API_BASE_URL}${config.API_V1_STR}/conversations/`;
+      if (activeSpace) {
+          endpoint = `${config.API_BASE_URL}${config.API_V1_STR}/spaces/${activeSpace.slug}/conversations`;
+      }
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -529,6 +570,7 @@ const Chat: React.FC = () => {
         provider: activeProvider,
         model: activeModel,
         api_key: apiKey,
+        api_keys: getAllApiKeys(),
         agent_mode: agentMode,
         local_backend_mode: getLocalBackendMode(),
         config: modelConfig,
@@ -562,8 +604,11 @@ const Chat: React.FC = () => {
     });
   };
 
+  // Dynamic styling based on active space
+  const themeClass = activeSpace && !viewSpacesCatalog ? `space-theme-${activeSpace.slug}` : '';
+
   return (
-    <div className="flex h-screen bg-transparent text-[#1A1D2E] font-[Poppins] overflow-hidden relative">
+    <div className={`flex h-screen bg-[#D8DCE4] font-sans overflow-hidden transition-colors duration-500 ${themeClass}`}>
       <div className="absolute inset-0 bg-[#C8CDD5]/30 pointer-events-none -z-10"></div>
       
       <Sidebar 
@@ -574,9 +619,13 @@ const Chat: React.FC = () => {
         onClose={() => setIsSidebarOpen(false)}
       />
 
-      {/* lets create a floating / fab button that wull be position on the top-left 20px down from the height of the ChatHeader so that we have an option to start new workspaces when the sidebar is hidden. */}
-
       <div className="flex-1 flex flex-col min-w-0 relative">
+        {spaceNote && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-[var(--accent-primary)] text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium animate-bounce border border-white/20 backdrop-blur-md">
+            ✨ {spaceNote}
+          </div>
+        )}
+        
         <ChatHeader 
           isSidebarOpen={isSidebarOpen}
           setIsSidebarOpen={setIsSidebarOpen}
@@ -592,9 +641,14 @@ const Chat: React.FC = () => {
           loading={loading}
           artifactCount={artifacts.length}
         />
+
+        {/* Trading Space Header — contextual sub-header */}
+        {activeSpace?.slug === 'trading-space' && !viewSpacesCatalog && (
+          <TradingSpaceHeader />
+        )}
         
         {/* Floating Hardware Telemetry — Moved to Top to prevent input obstruction */}
-        <div className="absolute top-16 left-0 right-0 pointer-events-none flex flex-col items-center gap-2 z-30">
+        <div className={`absolute left-0 right-0 pointer-events-none flex flex-col items-center gap-2 z-30 transition-all duration-500 ${activeSpace?.slug === 'trading-space' && !viewSpacesCatalog ? 'top-32' : 'top-16'}`}>
           <div className={`pointer-events-auto transition-all duration-300 transform ${showTelemetry ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-4 opacity-0 scale-95 pointer-events-none'}`}>
             <MetricsStrip 
               metrics={metrics}
@@ -609,33 +663,43 @@ const Chat: React.FC = () => {
           </div>
         </div>
 
-        <MessageList 
-          messages={messages}
-          loading={loading}
-          thoughtLog={thoughtLog}
-          thoughtStartTime={thoughtStartTime}
-          currentToolCalls={currentToolCalls}
-          currentContext={currentContext}
-          scrollRef={scrollRef}
-          currentConvId={currentConvId}
-          activeProvider={activeProvider}
-          activeModel={activeModel}
-          onCancel={handleCancel}
-          onViewInCanvas={handleViewInCanvas}
-        />
+        {viewSpacesCatalog ? (
+            <SpacesCatalog onSpaceSelected={() => {
+                setMessages([]);
+                setCurrentConvId(null);
+            }} />
+        ) : (
+            <>
+                <MessageList 
+                  messages={messages}
+                  loading={loading}
+                  thoughtLog={thoughtLog}
+                  thoughtStartTime={thoughtStartTime}
+                  currentToolCalls={currentToolCalls}
+                  currentContext={currentContext}
+                  scrollRef={scrollRef}
+                  currentConvId={currentConvId}
+                  activeProvider={activeProvider}
+                  activeModel={activeModel}
+                  activeSpace={activeSpace}
+                  onCancel={handleCancel}
+                  onViewInCanvas={handleViewInCanvas}
+                />
 
-        <ChatInput 
-          input={input}
-          setInput={setInput}
-          onSend={handleSend}
-          loading={loading}
-          currentConvId={currentConvId}
-          showTelemetry={showTelemetry}
-          setShowTelemetry={setShowTelemetry}
-          agentMode={agentMode}
-          setAgentMode={setAgentMode}
-          onExport={handleExport}
-        />
+                <ChatInput 
+                  input={input}
+                  setInput={setInput}
+                  onSend={handleSend}
+                  loading={loading}
+                  currentConvId={currentConvId}
+                  showTelemetry={showTelemetry}
+                  setShowTelemetry={setShowTelemetry}
+                  agentMode={agentMode}
+                  setAgentMode={setAgentMode}
+                  onExport={handleExport}
+                />
+            </>
+        )}
       </div>
 
       <AgentCanvas 

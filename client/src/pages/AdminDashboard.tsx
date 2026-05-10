@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAI } from '../contexts/AIContext';
+import { config } from '../config';
+import AdminSpaces from '../components/admin/AdminSpaces';
 
 interface AdminUser {
   id: number;
@@ -29,6 +31,7 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'users' | 'spaces'>('users');
 
   // RBAC Check
   useEffect(() => {
@@ -39,7 +42,7 @@ const AdminDashboard: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/v1/admin/users', {
+      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/admin/users`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -60,7 +63,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleUpdateUser = async (userId: number, updates: Partial<AdminUser>) => {
     try {
-      const response = await fetch(`/api/v1/admin/users/${userId}`, {
+      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/admin/users/${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -82,7 +85,7 @@ const AdminDashboard: React.FC = () => {
   const handleResetPassword = async (userId: number) => {
     if (!confirm('Are you sure you want to reset this user\'s password?')) return;
     try {
-      const response = await fetch(`/api/v1/admin/users/${userId}/reset-password`, {
+      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/admin/users/${userId}/reset-password`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -164,10 +167,35 @@ const AdminDashboard: React.FC = () => {
           ))}
         </div>
 
-        {/* User Table */}
-        <div className="bg-white/70 backdrop-blur-2xl rounded-[32px] border border-white/40 shadow-xl overflow-hidden">
-          <div className="p-6 border-b border-black/[0.05] flex items-center justify-between bg-white/30">
-            <div className="relative w-full max-w-md">
+        {/* Tab Selection */}
+        <div className="flex items-center gap-2 mb-6 bg-white/40 p-1.5 rounded-2xl w-fit border border-black/[0.05]">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${
+              activeTab === 'users'
+                ? 'bg-white shadow-sm text-[var(--accent)] border border-black/[0.05]'
+                : 'text-[#4A4D5E] hover:bg-black/5 hover:text-[#1A1D2E]'
+            }`}
+          >
+            User Management
+          </button>
+          <button
+            onClick={() => setActiveTab('spaces')}
+            className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${
+              activeTab === 'spaces'
+                ? 'bg-white shadow-sm text-[var(--accent)] border border-black/[0.05]'
+                : 'text-[#4A4D5E] hover:bg-black/5 hover:text-[#1A1D2E]'
+            }`}
+          >
+            Space Management
+          </button>
+        </div>
+
+        {/* Dynamic Content */}
+        {activeTab === 'users' ? (
+          <div className="bg-white/70 backdrop-blur-2xl rounded-[32px] border border-white/40 shadow-xl overflow-hidden">
+            <div className="p-6 border-b border-black/[0.05] flex items-center justify-between bg-white/30">
+              <div className="relative w-full max-w-md">
               <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
               <input 
                 type="text" 
@@ -264,6 +292,9 @@ const AdminDashboard: React.FC = () => {
             </table>
           </div>
         </div>
+        ) : (
+          <AdminSpaces />
+        )}
       </div>
     </div>
   );

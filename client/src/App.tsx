@@ -6,15 +6,16 @@ import Register from './pages/Register';
 import Chat from './pages/Chat';
 import AdminOverview from './pages/AdminOverview';
 import AdminDashboard from './pages/AdminDashboard';
-import { AIProvider } from './contexts/AIContext';
+import { AIProvider, useAI } from './contexts/AIContext';
 import P5Background from './components/P5Background';
 
 import './App.css';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { visualSettings } = useAI();
   return (
-    <AIProvider>
-      <P5Background />
+    <>
+      <P5Background key={JSON.stringify(visualSettings)} />
       <Router>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -27,6 +28,14 @@ const App: React.FC = () => {
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
       </Router>
+    </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AIProvider>
+      <AppContent />
     </AIProvider>
   );
 };

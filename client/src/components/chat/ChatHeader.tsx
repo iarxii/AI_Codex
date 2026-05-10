@@ -2,6 +2,7 @@ import React from "react";
 import AgentPulse from "../AgentPulse";
 import { useNavigate } from "react-router-dom";
 import ProviderIcon from "../ProviderIcon";
+import { useAI } from "../../contexts/AIContext";
 
 interface ChatHeaderProps {
   isSidebarOpen: boolean;
@@ -34,6 +35,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   artifactCount = 0,
 }) => {
   const navigate = useNavigate();
+  const { activeSpace } = useAI();
 
   return (
     <header className="h-14 flex items-center justify-between px-5 bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-20 shadow-sm w-full">
@@ -81,7 +83,14 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           className="text-left group/card hover:bg-black/5 p-1.5 rounded-lg transition-colors"
         >
           <h2 className="text-xs font-semibold uppercase tracking-widest text-[#4A4D5E] group-hover/card:text-[#fd3b12] flex items-center gap-2">
-            {currentConvId ? `Workspace #${currentConvId}` : "No Workspace"}
+            {activeSpace ? (
+              <span className="flex items-center gap-1">
+                <span className="text-[var(--accent)] font-bold">{activeSpace.name}</span>
+                {currentConvId ? ` / Session #${currentConvId}` : ""}
+              </span>
+            ) : (
+              currentConvId ? `Workspace #${currentConvId}` : "No Workspace"
+            )}
             {currentConvId && (
               <span className="opacity-0 group-hover/card:opacity-100 text-[9px] font-bold tracking-widest bg-[#fd3b12]/10 text-[#fd3b12] px-1.5 py-0.5 rounded transition-opacity">
                 PROFILE
