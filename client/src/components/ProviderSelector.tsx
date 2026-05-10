@@ -16,7 +16,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   showTelemetry,
   setShowTelemetry,
 }) => {
-  const { provider, setProvider, model, setModel } = useAI();
+  const { provider, setProvider, model, setModel, activeSpace, isPremiumSpace } = useAI();
   const [availableModels, setAvailableModels] = useState<
     { id: string; name: string }[]
   >([]);
@@ -42,6 +42,12 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       const url = `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=${provider}`;
       const headers: Record<string, string> = {};
       if (apiKey) headers["X-API-Key"] = apiKey;
+      
+      // Inject space awareness headers for backend enforcement
+      if (activeSpace) {
+        headers["X-Space-Slug"] = activeSpace.slug;
+      }
+      headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
 
       if (provider === "ollama_cloud") {
         const cloudUrl = localStorage.getItem("ollama_cloud_url");
@@ -200,7 +206,9 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               leaveTo="opacity-0"
             >
               <Listbox.Options className="absolute z-50 bottom-full mb-2 max-h-60 w-full overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide">
-                {PROVIDERS.map((p) => (
+                {PROVIDERS
+                  .filter(p => p.id !== "local" || activeSpace) // Hide local if not in a space
+                  .map((p) => (
                   <Listbox.Option
                     key={p.id}
                     className={({ active }) =>

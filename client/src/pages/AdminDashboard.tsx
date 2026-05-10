@@ -105,6 +105,33 @@ const AdminDashboard: React.FC = () => {
     u.surname?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // If loading user profile, show skeleton
+  if (!userProfile) return null;
+
+  // Final check for non-admin entry
+  if (!['admin', 'super_admin'].includes(userProfile.role as string)) {
+    return (
+      <div className="min-h-screen bg-[#D8DCE4] flex items-center justify-center p-8">
+        <div className="bg-white/80 backdrop-blur-2xl p-12 rounded-[40px] border border-white/40 shadow-2xl text-center max-w-md animate-in zoom-in duration-500">
+          <div className="w-20 h-20 bg-red-50 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-red-100 shadow-inner">
+            <XCircleIcon className="w-10 h-10 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-black text-[#1A1D2E] mb-2 tracking-tight">Access Denied</h2>
+          <p className="text-[#4A4D5E] text-sm font-medium leading-relaxed mb-8">
+            You have reached the Administrative Command Center. This sector is restricted to 
+            authorized architects only.
+          </p>
+          <button 
+            onClick={() => navigate('/chat')}
+            className="w-full py-4 bg-[#1A1D2E] text-white rounded-2xl font-bold shadow-xl hover:bg-black transition-all active:scale-95"
+          >
+            Return to Codex
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#D8DCE4] p-8 font-sans">
       <div className="max-w-6xl mx-auto">

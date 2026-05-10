@@ -126,6 +126,13 @@ async def register_user(
         except ValueError:
             pass
 
+    # Prevent squatting on reserved administrative usernames
+    if user_in.username.lower() in ["admin", "root", "superuser"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This username is reserved for system administration."
+        )
+
     # Create new user
     new_user = User(
         username=user_in.username,
@@ -138,7 +145,8 @@ async def register_user(
         pronouns=user_in.pronouns,
         country=user_in.country,
         profession=user_in.profession,
-        is_active=True
+        is_active=True,
+        role="user" # Explicitly set standard user role
     )
     db.add(new_user)
     await db.commit()
