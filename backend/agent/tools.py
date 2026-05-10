@@ -18,9 +18,10 @@ def skill_to_langchain_tool(skill: BaseSkill) -> StructuredTool:
         description=skill.description,
     )
 
-def get_agent_tools(conversation_id: str = None) -> List[StructuredTool]:
+def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = None) -> List[StructuredTool]:
     """
     Discovers all skills and returns them as a list of LangChain tools.
+    Filters by allowed_skills if provided.
     """
     # Ensure skills are discovered
     registry.discover_builtin_skills()
@@ -29,6 +30,8 @@ def get_agent_tools(conversation_id: str = None) -> List[StructuredTool]:
     tools = []
     
     for skill in skills:
+        if allowed_skills and "all" not in allowed_skills and skill.name not in allowed_skills:
+            continue
         try:
             # We must preserve the signature for StructuredTool.from_function to work.
             # For the workspace_writer, we know its specific signature.

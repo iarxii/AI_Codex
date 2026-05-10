@@ -26,3 +26,9 @@ class AgentState(TypedDict):
 
     # Model Telemetry & Capability Data
     telemetry: dict
+    
+    # Codex Space configuration parameters
+    space_config: dict
+    
+    # Optional domain-specific states
+    trading_context: Optional[dict]
