@@ -10,15 +10,17 @@ def get_model_capabilities(provider: str, model: str) -> List[str]:
     # Tool Support (Function Calling)
     if provider in ["groq", "gemini", "openrouter"]:
         capabilities.append("Tools")
-    elif provider == "local":
-        # Some local models might support tools, but our current NativeLocalClient 
-        # is optimized for llama-server which doesn't expose standard tool calling yet.
-        pass
+    elif provider == "local" or provider == "ollama_cloud":
+        # Gemma 4 supports native tool calling in local environments
+        if "gemma4" in (model or "").lower():
+            capabilities.append("Tools")
+    
     
     # Thinking / Reasoning Support
     thinking_models = [
         "gemini-1.5-pro", "gemini-2.0-flash-thinking", 
-        "llama-3.1-405b", "deepseek-reasoner", "o1-mini", "o1-preview"
+        "llama-3.1-405b", "deepseek-reasoner", "o1-mini", "o1-preview",
+        "gemma4"
     ]
     if any(m in (model or "").lower() for m in thinking_models):
         capabilities.append("Thinking")
@@ -29,7 +31,7 @@ def get_model_capabilities(provider: str, model: str) -> List[str]:
         capabilities.append("Multimodal")
     
     # Structured / JSON Mode Support
-    if provider in ["groq", "gemini"]:
+    if provider in ["groq", "gemini"] or "gemma4" in (model or "").lower():
         capabilities.append("Structured")
     
     return capabilities

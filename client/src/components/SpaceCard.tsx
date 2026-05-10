@@ -35,6 +35,7 @@ const SpaceCard: React.FC<SpaceCardProps> = ({ space, onEnter }) => {
       </p>
       
       <div className="flex gap-2 mb-6">
+        {/* add a badge indicating if the space is GPU enabled or noty */}
         {space.is_public ? (
           <span className="px-2 py-1 bg-green-500/10 text-green-500 text-[10px] font-bold uppercase tracking-wider rounded border border-green-500/20">Public</span>
         ) : (

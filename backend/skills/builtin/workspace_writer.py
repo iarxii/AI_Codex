@@ -32,6 +32,10 @@ class WorkspaceWriterSkill(BaseSkill):
                 "enum": ["code", "docs", "research"],
                 "description": "The type of content being written.",
                 "default": "code"
+            },
+            "tutor_explanation": {
+                "type": "string",
+                "description": "Educational explanation of the code/artifact by Spirit Bird."
             }
         },
         "required": ["filename", "content"]
@@ -53,6 +57,23 @@ class WorkspaceWriterSkill(BaseSkill):
                 content=content
             )
 
+            # Generate the CANVAS marker for the UI
+            # Format: [CANVAS:TYPE:TITLE:LANGUAGE:PATH] CONTENT [/CANVAS]
+            # We embed the [TUTOR] block inside if explanation is provided
+            
+            display_content = content
+            if tutor_explanation:
+                display_content = f"{content}\n\n[TUTOR]\n{tutor_explanation}\n[/TUTOR]"
+            
+            # Extract language from extension if not provided
+            lang = "text"
+            if "." in safe_filename:
+                ext = safe_filename.split(".")[-1]
+                lang_map = {"py": "python", "js": "javascript", "ts": "typescript", "tsx": "tsx", "html": "html", "css": "css"}
+                lang = lang_map.get(ext, ext)
+
+            canvas_marker = f"[CANVAS:{type}:{safe_filename}:{lang}] {display_content} [/CANVAS]"
+
             # Trigger non-blocking graphify update
             graph_skill = registry.get_skill("graphify")
             if graph_skill:
@@ -65,7 +86,8 @@ class WorkspaceWriterSkill(BaseSkill):
                 data={
                     "path": local_path,
                     "filename": safe_filename,
-                    "canvas_marker": canvas_tag
+                    "canvas_marker": canvas_marker,
+                    "tutor_explanation": tutor_explanation
                 }
             )
         except Exception as e:

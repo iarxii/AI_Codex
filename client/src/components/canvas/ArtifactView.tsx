@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Artifact } from '../../types/chat';
+import SpiritBird from './SpiritBird';
 
 interface ArtifactViewProps {
   artifact: Artifact;
@@ -29,9 +30,23 @@ const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact }) => {
             {artifact.type === 'research' && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
           </div>
           <div>
-            <h4 className="text-[11px] font-bold text-[var(--text-primary)] truncate max-w-[180px]">{artifact.title}</h4>
-            <p className="text-[9px] text-[var(--text-muted)] font-mono uppercase tracking-tighter">
-              {artifact.type} {artifact.language && `• ${artifact.language}`}
+            <h4 className="text-[11px] font-bold text-[var(--text-primary)] truncate max-w-[240px]">
+              {artifact.filePath ? artifact.filePath.split('/').pop() : artifact.title}
+            </h4>
+            <p className="text-[9px] text-[var(--text-muted)] font-mono uppercase tracking-tighter flex items-center gap-1.5">
+              <span>{artifact.type}</span>
+              {artifact.language && (
+                <>
+                  <span className="opacity-30">•</span>
+                  <span>{artifact.language}</span>
+                </>
+              )}
+              {artifact.filePath && (
+                <>
+                  <span className="opacity-30">•</span>
+                  <span className="opacity-60 lowercase">{artifact.filePath}</span>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -58,6 +73,11 @@ const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact }) => {
           <div className="prose prose-sm max-w-none prose-slate">
             <ReactMarkdown>{artifact.content}</ReactMarkdown>
           </div>
+        )}
+
+        {/* Spirit Bird Tutor Section */}
+        {artifact.tutorExplanation && (
+          <SpiritBird explanation={artifact.tutorExplanation} />
         )}
       </div>
       
