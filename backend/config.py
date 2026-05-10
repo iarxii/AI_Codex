@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week
     
+    # Premium Handshake
+    COLAB_SECRET: str = "" # Set this in Colab to enable handshake security
+    
     # Local LLM Backend
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     LLAMACPP_BASE_URL: str = "http://localhost:8080"

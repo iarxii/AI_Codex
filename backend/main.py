@@ -46,6 +46,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Premium Handshake Middleware
+@app.middleware("http")
+async def verify_premium_handshake(request, call_next):
+    if settings.COLAB_SECRET:
+        # Check for the secret key in headers
+        handshake_key = request.headers.get("X-Codex-Premium-Key")
+        if handshake_key != settings.COLAB_SECRET:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Premium Handshake Failed: Invalid or missing security key."}
+            )
+    return await call_next(request)
+
 # Set up CORS
 origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 

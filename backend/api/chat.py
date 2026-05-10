@@ -19,6 +19,11 @@ from sqlalchemy import select, update
 
 router = APIRouter()
 
+# Rate limiting state (In-memory for simplicity)
+# user_id -> last_request_timestamp
+user_cooldowns: dict[int, float] = {}
+RATE_LIMIT_SECONDS = 1.5
+
 # Simple connection manager for WebSockets
 class ConnectionManager:
     def __init__(self):
@@ -49,6 +54,18 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             await websocket.close(code=4401)
             manager.disconnect(websocket)
             return
+
+        # 2. Premium Handshake Verification (Secondary Security Layer)
+        from backend.config import settings
+        if settings.COLAB_SECRET:
+            # Check for handshake in query params (for WS) or headers
+            handshake = websocket.query_params.get("handshake")
+            if handshake != settings.COLAB_SECRET:
+                log_error(f"WS Handshake Failed for user {user.username}: Invalid secret", None)
+                await websocket.send_json({"type": "error", "message": "Premium Handshake Failed: Invalid security key."})
+                await websocket.close(code=4003) # Forbidden
+                manager.disconnect(websocket)
+                return
             
     print(f"DEBUG: WebSocket connected on /ws/agent for user: {user.username}")
     active_tasks: Set[asyncio.Task] = set()
@@ -429,6 +446,18 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         task.cancel()
                 active_tasks.clear()
                 continue
+            
+            # 3. Rate Limiting Check (Cooldown)
+            now = time.time()
+            last_req = user_cooldowns.get(user.id, 0)
+            if now - last_req < RATE_LIMIT_SECONDS:
+                await websocket.send_json({
+                    "type": "error", 
+                    "message": f"Neural Link Throttled: Please wait {RATE_LIMIT_SECONDS}s between thoughts."
+                })
+                continue
+            
+            user_cooldowns[user.id] = now
             
             # Start agent execution in a background task
             agent_task = asyncio.create_task(run_agent_task(payload))
