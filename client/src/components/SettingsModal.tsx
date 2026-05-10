@@ -19,7 +19,7 @@ type SettingsModalProps = {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const navigate = useNavigate();
-  const { provider, setProvider, setModel, visualSettings, updateVisualSetting } =
+  const { provider, setProvider, visualSettings, updateVisualSetting } =
     useAI();
   const [activeProvider, setActiveProvider] = useState<ProviderId>(provider);
   const [groqKey, setGroqKey] = useState("");
