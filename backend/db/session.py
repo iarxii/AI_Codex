@@ -76,8 +76,8 @@ async def init_db():
             from backend.db.models import CodexSpace
             spaces_to_seed = [
                 {"slug": "general", "name": "General", "description": "Default workspace", "is_public": True},
-                {"slug": "trading-space", "name": "Financial Trading Space", "description": "AI trading debate room", "is_public": False, "icon": "ChartBarIcon"},
-                {"slug": "code-lab", "name": "Gemma 4 Code Lab", "description": "Specialized coding environment optimized for the Gemma 4 family with MTP acceleration.", "is_public": False, "icon": "CodeBracketIcon"}
+                {"slug": "trading-space", "name": "Financial Trading Space", "description": "AI trading debate room", "is_public": False, "icon": "ChartBarIcon", "config_json": '{"premium": true}'},
+                {"slug": "code-lab", "name": "Code Lab (Gemma 4)", "description": "Specialized coding environment optimized for the Gemma 4 family with MTP acceleration.", "is_public": False, "icon": "CodeBracketIcon", "config_json": '{"premium": true}'}
             ]
             for space_data in spaces_to_seed:
                 result = await session.execute(select(CodexSpace).filter_by(slug=space_data["slug"]))

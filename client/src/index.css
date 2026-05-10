@@ -2,6 +2,14 @@
 
 @theme {
   --font-sans: 'Poppins', system-ui, sans-serif;
+  --font-display: 'Senior Service', cursive;
+}
+
+@font-face {
+  font-family: 'Senior Service';
+  src: url('/fonts/senior-service/Senior Service.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
 }
 
 :root {
