@@ -110,7 +110,21 @@ const MessageList: React.FC<MessageListProps> = ({
             );
           }
 
-          const config = {
+          // Specialized Space Overrides
+          const spaceOverrides: Record<string, { label: string; icon: string | null; desc: string }> = {
+            'code-lab': {
+              label: "Gemma Code Lab",
+              icon: "/media/brand-icons/gemma.svg",
+              desc: "High-performance agentic coding environment powered by Google's Gemma 4.",
+            },
+            'spirit-book': {
+              label: "SpiritBook",
+              icon: "/media/aicodex-spirit-bird-white.png",
+              desc: "Advanced linguistic analysis and creative writing suite for neural copywriting.",
+            }
+          };
+
+          const providerConfigs = {
             local: {
               label: "Neural Core",
               icon: "/media/brand-icons/ollama-color.svg",
@@ -136,11 +150,15 @@ const MessageList: React.FC<MessageListProps> = ({
               icon: "/media/brand-icons/gemini-logo_svgstack_com_37141777229654.svg",
               desc: "Leverage Google's most capable multimodal models for complex problem solving.",
             },
-          }[activeProvider] || {
-            label: "Neural Link",
-            icon: null,
-            desc: "Select a session from the shelf or create a new workspace to begin agentic execution.",
           };
+
+          const config = (activeSpace && spaceOverrides[activeSpace.slug])
+            ? spaceOverrides[activeSpace.slug]
+            : providerConfigs[activeProvider as keyof typeof providerConfigs] || {
+              label: "Neural Link",
+              icon: null,
+              desc: "Select a session from the shelf or create a new workspace to begin agentic execution.",
+            };
 
           return (
             <div className="h-full flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95 duration-700">

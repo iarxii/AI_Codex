@@ -9,7 +9,7 @@ interface P5BackgroundProps {
 const P5Background: React.FC<P5BackgroundProps> = ({
   isDynamic: propIsDynamic,
 }) => {
-  const { visualSettings } = useAI();
+  const { visualSettings, activeSpace } = useAI();
   const isDynamic = propIsDynamic ?? visualSettings.isDynamic;
   const {
     showTraces,
@@ -21,6 +21,24 @@ const P5Background: React.FC<P5BackgroundProps> = ({
     showNeuralStrings,
     stringColor,
   } = visualSettings;
+
+  // Space-specific backgrounds mapping
+  const spaceConfigs: Record<string, { still: string; video?: string }> = {
+    'trading-space': {
+      still: '/media/FinTraderWallpaper.png',
+    },
+    'code-lab': {
+      still: '/media/gemma_wallpaper.jpg',
+    },
+    'spirit-book': {
+      still: '/media/aicodex_spirit_bird_wallpaper.png',
+    }
+  };
+
+  const currentSpaceConfig = activeSpace ? spaceConfigs[activeSpace.slug] : null;
+  const stillBgPath = currentSpaceConfig?.still || '/media/thabang_vector_wallpaper_2.png';
+  const videoBgPath = currentSpaceConfig?.video || '/media/landscape_background.mp4';
+  const mobileBgPath = currentSpaceConfig?.still || '/media/aicodex_vector_wallpaper.png';
 
   // PENDING: isDynamic prop will eventually be wired to user preferences / low-power mode toggle.
   const containerRef = useRef<HTMLDivElement>(null);
@@ -491,7 +509,7 @@ const P5Background: React.FC<P5BackgroundProps> = ({
       <div
         className="mobile-bg absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: `url('/media/aicodex_vector_wallpaper.png')`,
+          backgroundImage: `url('${mobileBgPath}')`,
           opacity: 0.9,
           filter: "blur(0.5px)",
         }}
@@ -512,7 +530,7 @@ const P5Background: React.FC<P5BackgroundProps> = ({
             objectPosition: "center bottom",
           }}
         >
-          <source src="/media/landscape_background.mp4" type="video/mp4" />
+          <source src={videoBgPath} type="video/mp4" />
         </video>
       )}
 
@@ -521,8 +539,8 @@ const P5Background: React.FC<P5BackgroundProps> = ({
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat animate-in fade-in duration-700"
           style={{
-            backgroundImage: `url('/media/thabang_vector_wallpaper_2.png')`,
-            opacity: 0.25,
+            backgroundImage: `url('${stillBgPath}')`,
+            opacity: activeSpace?.slug === 'trading-space' ? 0.4 : 0.25,
             filter: "blur(0.5px)",
             objectPosition: "center",
           }}
