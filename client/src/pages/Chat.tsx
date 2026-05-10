@@ -6,7 +6,7 @@ import AgentCanvas from '../components/AgentCanvas';
 import SettingsModal from '../components/SettingsModal';
 import { PROVIDER_MAP, getLocalBackendMode } from '../components/providerMeta';
 import { useAI } from '../contexts/AIContext';
-import { config } from '../config';
+import { config, getApiUrl, getWsUrl } from '../config';
 import WorkspaceOnboardingModal from '../components/WorkspaceOnboardingModal';
 
 // Modular Components
@@ -91,11 +91,13 @@ const Chat: React.FC = () => {
     if (!token || !artifact.content) return;
 
     try {
-      await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/workspace/scratchpad`, {
+      const baseUrl = getApiUrl(activeSpace?.slug);
+      await fetch(`${baseUrl}${config.API_V1_STR}/workspace/scratchpad`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          ...(baseUrl === config.COLAB_URL && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
         },
         body: JSON.stringify({
           conversation_id: currentConvId,
@@ -171,7 +173,10 @@ const Chat: React.FC = () => {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const socket = new WebSocket(`${config.WS_BASE_URL}${config.API_V1_STR}/chat/ws/agent?token=${token}`);
+    const wsUrl = getWsUrl(activeSpace?.slug);
+    const handshakeQuery = (wsUrl.includes('ngrok') && config.COLAB_SECRET) ? `&handshake=${config.COLAB_SECRET}` : '';
+    
+    const socket = new WebSocket(`${wsUrl}${config.API_V1_STR}/chat/ws/agent?token=${token}${handshakeQuery}`);
     ws.current = socket;
 
     socket.onopen = () => {
@@ -402,7 +407,9 @@ const Chat: React.FC = () => {
     };
 
     // 2. Metrics Socket
-    const mSocket = new WebSocket(`${config.WS_BASE_URL}${config.API_V1_STR}/metrics/ws/metrics?token=${token}`);
+    const metricsWsUrl = getWsUrl(activeSpace?.slug);
+    const mHandshakeQuery = (metricsWsUrl.includes('ngrok') && config.COLAB_SECRET) ? `&handshake=${config.COLAB_SECRET}` : '';
+    const mSocket = new WebSocket(`${metricsWsUrl}${config.API_V1_STR}/metrics/ws/metrics?token=${token}${mHandshakeQuery}`);
     metricsWs.current = mSocket;
     
     mSocket.onclose = (event) => {
@@ -454,8 +461,12 @@ const Chat: React.FC = () => {
     setCurrentToolCalls([]);
 
     try {
-      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/conversations/${id}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      const baseUrl = getApiUrl(activeSpace?.slug);
+      const response = await fetch(`${baseUrl}${config.API_V1_STR}/conversations/${id}`, {
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          ...(baseUrl === config.COLAB_URL && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
+        }
       });
       if (response.ok) {
         const data = await response.json();
