@@ -4,7 +4,9 @@ import {
   ChartBarIcon,
   CodeBracketIcon,
   GlobeAltIcon,
-  SparklesIcon
+  SparklesIcon,
+  CpuChipIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline';
 
 interface SpaceCardProps {
@@ -13,7 +15,17 @@ interface SpaceCardProps {
 }
 
 const getIcon = (iconName: string | null) => {
+  if (!iconName) return <GlobeAltIcon className="w-8 h-8" />;
+  
+  // Custom Brand Icons
+  if (iconName.includes('.svg') || iconName.includes('.png')) {
+    return <img src={iconName} alt="Space Icon" className="w-10 h-10 object-contain" />;
+  }
+
   switch (iconName) {
+    case 'GlobeAltIcon': return <GlobeAltIcon className="w-8 h-8" />;
+    case 'CpuChipIcon': return <CpuChipIcon className="w-8 h-8" />;
+    case 'AcademicCapIcon': return <AcademicCapIcon className="w-8 h-8" />;
     case 'ChartBarIcon': return <ChartBarIcon className="w-8 h-8" />;
     case 'CodeBracketIcon': return <CodeBracketIcon className="w-8 h-8" />;
     case 'SparklesIcon': return <SparklesIcon className="w-8 h-8" />;
@@ -22,38 +34,78 @@ const getIcon = (iconName: string | null) => {
 };
 
 const SpaceCard: React.FC<SpaceCardProps> = ({ space, onEnter }) => {
+  const config = space.config_json ? JSON.parse(space.config_json) : {};
+  const isGpuEnabled = config.is_gpu_enabled || false;
+  const isPremium = ['trading-space', 'code-lab'].includes(space.slug);
+
   return (
-    <div className="bg-[var(--bg-surface)]/60 backdrop-blur-md border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all duration-300 hover:scale-[1.02] hover:bg-white/5 cursor-pointer shadow-xl" onClick={() => onEnter(space)}>
-      <div className={`p-4 rounded-2xl mb-4 text-white shadow-lg`} style={{ backgroundColor: space.color || 'var(--accent)' }}>
+    <div 
+      className={`relative group bg-[var(--bg-surface)]/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer shadow-2xl overflow-hidden`} 
+      onClick={() => onEnter(space)}
+    >
+      {/* Premium Glow Effect */}
+      {isPremium && (
+        <div 
+          className="absolute -top-24 -left-24 w-48 h-48 rounded-full opacity-20 blur-[60px] pointer-events-none transition-all duration-700 group-hover:opacity-40 group-hover:scale-150"
+          style={{ backgroundColor: space.color || 'var(--accent)' }}
+        ></div>
+      )}
+
+      {/* Icon Container */}
+      <div 
+        className={`p-4 rounded-2xl mb-5 text-white shadow-lg transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`} 
+        style={{ 
+          backgroundColor: space.color || 'var(--accent)',
+          boxShadow: `0 8px 24px -6px ${space.color || 'var(--accent)'}40`
+        }}
+      >
         {getIcon(space.icon)}
       </div>
-      <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2 tracking-tight">
-        {space.name}
-      </h3>
-      <p className="text-sm text-[var(--text-secondary)] mb-6 line-clamp-3">
+
+      <div className="flex items-center gap-2 mb-2">
+        <h3 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">
+          {space.name}
+        </h3>
+        {isPremium && (
+          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-500 shadow-sm">
+            <SparklesIcon className="w-3 h-3" />
+          </span>
+        )}
+      </div>
+
+      <p className="text-sm text-[var(--text-secondary)] mb-6 line-clamp-3 leading-relaxed opacity-80">
         {space.description}
       </p>
       
-      <div className="flex gap-2 mb-6">
-        {/* add a badge indicating if the space is GPU enabled or noty */}
-        {space.is_public ? (
-          <span className="px-2 py-1 bg-green-500/10 text-green-500 text-[10px] font-bold uppercase tracking-wider rounded border border-green-500/20">Public</span>
-        ) : (
-          <span className="px-2 py-1 bg-purple-500/10 text-purple-400 text-[10px] font-bold uppercase tracking-wider rounded border border-purple-500/20">Restricted</span>
+      <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
+        {isPremium && (
+            <span className="px-2 py-1 bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase tracking-widest rounded border border-amber-500/20">Premium</span>
         )}
-        <span className="px-2 py-1 bg-white/5 text-[var(--text-muted)] text-[10px] font-bold uppercase tracking-wider rounded border border-white/10">
-          Limit: {space.capacity}
-        </span>
+        
+        {isGpuEnabled ? (
+          <span className="px-2 py-1 bg-blue-500/10 text-blue-400 text-[9px] font-black uppercase tracking-widest rounded border border-blue-500/20 flex items-center gap-1">
+            <CpuChipIcon className="w-2.5 h-2.5" />
+            GPU Link
+          </span>
+        ) : (
+          <span className="px-2 py-1 bg-white/5 text-[var(--text-muted)] text-[9px] font-black uppercase tracking-widest rounded border border-white/10">Standard Compute</span>
+        )}
+        
+        {space.is_public ? (
+          <span className="px-2 py-1 bg-green-500/10 text-green-500 text-[9px] font-black uppercase tracking-widest rounded border border-green-500/20">Public</span>
+        ) : (
+          <span className="px-2 py-1 bg-purple-500/10 text-purple-400 text-[9px] font-black uppercase tracking-widest rounded border border-purple-500/20">Identity Locked</span>
+        )}
       </div>
       
       <button 
-        className="w-full py-2.5 bg-white/5 hover:bg-[var(--accent)] hover:text-white text-[var(--text-primary)] rounded-xl text-sm font-semibold transition-all"
+        className="w-full py-2.5 bg-white/5 hover:bg-[var(--accent)] hover:text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all border border-white/5 hover:border-transparent"
         onClick={(e) => {
             e.stopPropagation();
             onEnter(space);
         }}
       >
-        Enter Space
+        Enter Workspace
       </button>
     </div>
   );
