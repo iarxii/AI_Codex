@@ -163,12 +163,13 @@ const MessageList: React.FC<MessageListProps> = ({
           return (
             <div className="h-full flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95 duration-700">
               <div
-                className={`w-24 h-24 rounded-3xl flex items-center justify-center mb-8 border transition-all duration-500 shadow-xl shadow-black/[0.02] rotate-3 hover:rotate-0 ${
-                  "bg-white border-black/[0.04]"
-                  // activeProvider === 'groq'
-                  //   ? 'bg-[#0A0A0C] border-white/10'
-                  //   : 'bg-white border-black/[0.04]'
+                className={`w-24 h-24 rounded-3xl flex items-center justify-center mb-8 border transition-all duration-500 shadow-xl rotate-3 hover:rotate-0 ${
+                  activeSpace ? "border-white/10" : "bg-white border-black/[0.04] shadow-black/[0.02]"
                 }`}
+                style={activeSpace ? {
+                  backgroundColor: activeSpace.color || 'var(--accent)',
+                  boxShadow: `0 20px 40px -12px ${activeSpace.color || 'var(--accent)'}60`
+                } : {}}
               >
                 {config.icon ? (
                   <img
