@@ -56,22 +56,8 @@ async def init_db():
             await migrate_db(conn)
             
         async with AsyncSessionLocal() as session:
-            # Seed admin user if not exists
-            from sqlalchemy import select
-            if settings.SEED_ADMIN:
-                result = await session.execute(select(User).filter_by(username="admin"))
-                existing_admin = result.scalar_one_or_none()
-                if not existing_admin:
-                    admin_user = User(
-                        username="admin",
-                        hashed_password=pwd_context.hash("admin123"),
-                        role="super_admin"
-                    )
-                    session.add(admin_user)
-                    print("Seeded admin user (admin / admin123)")
-                else:
-                    existing_admin.role = "super_admin"
-                    print("Updated existing admin user to super_admin.")
+            # Admin seeding is disabled for production security. 
+            # Use established Administrator accounts (e.g. nexus-architect).
             
             # Seed Spaces (Independent of SEED_ADMIN to ensure catalog availability)
             from backend.db.models import CodexSpace

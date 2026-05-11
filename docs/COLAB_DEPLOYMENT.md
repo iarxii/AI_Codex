@@ -67,6 +67,7 @@ print(f"🚀 Colab Backend URL: {public_url}")
 os.environ['PYTHONPATH'] = "/content/AI_Codex"
 os.environ['DATABASE_URL'] = "sqlite+aiosqlite:///./test.db"
 os.environ['SECRET_KEY'] = "colab_development_key_123"
+os.environ['COLAB_SECRET'] = "YOUR_JWT_TOKEN_HERE" # Use the RS512 JWT provided
 
 # 3. Start Backend as Background Process
 %cd /content/AI_Codex
