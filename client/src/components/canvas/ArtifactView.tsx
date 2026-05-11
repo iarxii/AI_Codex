@@ -77,7 +77,17 @@ const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact }) => {
 
         {/* Spirit Bird Tutor Section */}
         {artifact.tutorExplanation && (
-          <SpiritBird explanation={artifact.tutorExplanation} />
+          <div className="mt-12">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="h-[1px] flex-1 bg-black/[0.05]"></div>
+              <div className="flex items-center gap-2">
+                <svg className="w-3 h-3 text-[var(--accent)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--text-muted)]">Neural Insights</span>
+              </div>
+              <div className="h-[1px] flex-1 bg-black/[0.05]"></div>
+            </div>
+            <SpiritBird explanation={artifact.tutorExplanation} />
+          </div>
         )}
       </div>
       
