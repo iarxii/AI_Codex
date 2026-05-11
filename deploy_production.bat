@@ -11,6 +11,7 @@ SET FRONTEND_IMAGE=us-central1-docker.pkg.dev/%PROJECT_ID%/aicodex-repo/frontend
 :: Default to deploying both
 SET DEPLOY_BE=true
 SET DEPLOY_FE=true
+SET DEPLOY_PREMIUM=false
 SET COLAB_URL=
 SET COLAB_SECRET=
 
@@ -22,6 +23,11 @@ if "%~1"=="--be" (
     SET DEPLOY_FE=false
 ) else if "%~1"=="--fe" (
     echo Deployment Mode: Frontend Only
+    SET DEPLOY_BE=false
+) else if "%~1"=="--premium" (
+    echo Deployment Mode: Premium Backend
+    SET DEPLOY_PREMIUM=true
+    SET DEPLOY_FE=false
     SET DEPLOY_BE=false
 ) else if "%~1"=="--colab-url" (
     SET COLAB_URL=%~2
@@ -58,13 +64,30 @@ if "%DEPLOY_BE%"=="true" (
         --allow-unauthenticated ^
         --memory 1Gi ^
         --timeout 600 ^
-        --set-env-vars "SECRET_KEY=AICODEX_SUPER_SECRET_KEY_CHANGEME,DB_TYPE=sqlite,CORS_ORIGINS=*,GCS_BUCKET_NAME=aicodex-data-1096425756328,SEED_ADMIN=True"
+        --set-env-vars "SECRET_KEY=AICODEX_SUPER_SECRET_KEY_CHANGEME,DB_TYPE=sqlite,CORS_ORIGINS=*,GCS_BUCKET_NAME=aicodex-data-1096425756328,SEED_ADMIN=False"
     if %ERRORLEVEL% NEQ 0 (
         echo Backend deployment failed. Exiting.
         exit /b %ERRORLEVEL%
     )
 ) else (
     echo [SKIP] Skipping backend deployment steps.
+)
+
+if "%DEPLOY_PREMIUM%"=="true" (
+    echo [2.5/4] Deploying Premium Backend to Cloud Run as 'aicodex-premium'...
+    call %GCLOUD% run deploy aicodex-premium ^
+        --image %BACKEND_IMAGE% ^
+        --platform managed ^
+        --region %REGION% ^
+        --project %PROJECT_ID% ^
+        --allow-unauthenticated ^
+        --memory 2Gi ^
+        --timeout 3600 ^
+        --set-env-vars "SECRET_KEY=AICODEX_SUPER_SECRET_KEY_CHANGEME,DB_TYPE=sqlite,CORS_ORIGINS=*,GCS_BUCKET_NAME=aicodex-data-1096425756328,SEED_ADMIN=False,COLAB_SECRET=!COLAB_SECRET!"
+    if %ERRORLEVEL% NEQ 0 (
+        echo Premium Backend deployment failed. Exiting.
+        exit /b %ERRORLEVEL%
+    )
 )
 
 if "%DEPLOY_FE%"=="true" (
@@ -101,31 +124,45 @@ if "%DEPLOY_FE%"=="true" (
         exit /b %ERRORLEVEL%
     )
 
-    echo [5/5] Generating Route Map JSON...
-    for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-lab --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set FRONTEND_URL=%%i
-    
-    SET ROUTE_MAP_PATH=..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-react\src\data\route_map.json
-    (
-        echo {
-        echo   "project": "%PROJECT_ID%",
-        echo   "region": "%REGION%",
-        echo   "backend_url": "!BACKEND_URL!",
-        echo   "frontend_url": "!FRONTEND_URL!",
-        echo   "last_deployed": "%DATE% %TIME%"
-        echo }
-    ) > !ROUTE_MAP_PATH!
-    (
-        echo {
-        echo   "project": "%PROJECT_ID%",
-        echo   "region": "%REGION%",
-        echo   "backend_url": "!BACKEND_URL!",
-        echo   "frontend_url": "!FRONTEND_URL!",
-        echo   "last_deployed": "%DATE% %TIME%"
-        echo }
     ) > route_map.json
     echo Route map generated in website and local project.
-) else (
-    echo [SKIP] Skipping frontend deployment steps.
+)
+
+echo [5/6] Generating/Updating Route Map JSON...
+for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-be --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set BACKEND_URL=%%i
+for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-lab --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set FRONTEND_URL=%%i
+for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-premium --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set PREMIUM_URL=%%i
+
+SET ROUTE_MAP_PATH=..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-react\src\data\route_map.json
+(
+    echo {
+    echo   "project": "%PROJECT_ID%",
+    echo   "region": "%REGION%",
+    echo   "backend_url": "!BACKEND_URL!",
+    echo   "frontend_url": "!FRONTEND_URL!",
+    echo   "premium_url": "!PREMIUM_URL!",
+    echo   "last_deployed": "%DATE% %TIME%"
+    echo }
+) > !ROUTE_MAP_PATH!
+(
+    echo {
+    echo   "project": "%PROJECT_ID%",
+    echo   "region": "%REGION%",
+    echo   "backend_url": "!BACKEND_URL!",
+    echo   "frontend_url": "!FRONTEND_URL!",
+    echo   "premium_url": "!PREMIUM_URL!",
+    echo   "last_deployed": "%DATE% %TIME%"
+    echo }
+) > route_map.json
+echo Route map updated.
+
+echo [6/6] Cleaning up old revisions...
+for %%s in (aicodex-be aicodex-lab aicodex-premium) do (
+    echo Cleaning revisions for %%s...
+    for /f "skip=1" %%r in ('%GCLOUD% run revisions list --service %%s --project %PROJECT_ID% --region %REGION% --format^="value(metadata.name)" --filter^="status.traffic.percent != 100"') do (
+        echo Deleting old revision: %%r
+        call %GCLOUD% run revisions delete %%r --project %PROJECT_ID% --region %REGION% --quiet
+    )
 )
 
 echo Deployment task complete!

@@ -95,6 +95,31 @@ async def update_user(
         "created_at": user.created_at.isoformat()
     }
 
+@router.delete("/users/{user_id}", response_model=dict)
+async def delete_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    result = await db.execute(select(User).filter_by(id=user_id))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Only super_admins can delete users
+    if admin.role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admins can delete users")
+        
+    # Prevent self-deletion
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
+    await db.delete(user)
+    await db.commit()
+    
+    return {"message": f"User {user.username} deleted successfully"}
+
 @router.post("/users/{user_id}/reset-password")
 async def reset_password(
     user_id: int,
