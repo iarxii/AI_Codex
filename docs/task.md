@@ -14,11 +14,12 @@
 # Phase 2: Deployment & Premium Polishing
 
 - [x] Fix space seeding logic (move out of `SEED_ADMIN`)
-- [x] Refactor `ChatHeader` functions into `NeuralFunctionSwitch`
-- [x] Implement Premium Handshake verification middleware
-- [x] Pass `COLAB_URL` and `COLAB_SECRET` through CI/CD
-- [/] Execute full stack deployment to Cloud Run
-- [x] Create FastAPI skeleton
+- [x] Integrate Neural Function Switch in `ChatHeader.tsx`
+- [x] Refine `ChatHeader` with Headless UI dropdown
+- [x] Implement secure handshake for Colab backend
+- [x] Fix space catalog seeding in `session.py`
+- [/] Deploy full stack to production (Backend + Frontend)
+- [ ] Final validation of Colab connectivity from live site
     - [x] `backend/main.py`
     - [x] `backend/config.py`
     - [x] `backend/db/session.py` (with admin seed)
