@@ -70,7 +70,8 @@ async def init_db():
                     session.add(admin_user)
                     print("Seeded admin user (admin / admin123)")
                 else:
-                    print("Admin user already exists. Skipping seed.")
+                    existing_admin.role = "super_admin"
+                    print("Updated existing admin user to super_admin.")
             
             # Seed Spaces (Independent of SEED_ADMIN to ensure catalog availability)
             from backend.db.models import CodexSpace
@@ -81,10 +82,16 @@ async def init_db():
             ]
             for space_data in spaces_to_seed:
                 result = await session.execute(select(CodexSpace).filter_by(slug=space_data["slug"]))
-                if not result.scalar_one_or_none():
+                existing_space = result.scalar_one_or_none()
+                if not existing_space:
                     new_space = CodexSpace(**space_data)
                     session.add(new_space)
-                    print(f"Seeded space: {space_data['slug']}")
+                    print(f"Seeded new space: {space_data['slug']}")
+                else:
+                    # Update existing space metadata
+                    for key, value in space_data.items():
+                        setattr(existing_space, key, value)
+                    print(f"Updated existing space: {space_data['slug']}")
             
             await session.commit()
     except Exception as e:
