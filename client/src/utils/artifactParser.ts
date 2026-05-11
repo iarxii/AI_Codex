@@ -63,7 +63,16 @@ export const parseArtifacts = (content: string, messageId?: string): Artifact[] 
     while ((cbMatch = codeBlockRegex.exec(content)) !== null) {
       const language = (cbMatch[1] || 'text').toLowerCase();
       const artifactContent = cbMatch[2].trim();
-      const title = `Generated Code ${count > 1 ? `(${count})` : ''}`;
+      
+      // Attempt to infer filename from preceding text (e.g., "File: main.py" or "### index.ts")
+      const preText = content.substring(Math.max(0, cbMatch.index - 100), cbMatch.index);
+      const filenameRegex = /(?:###|File:|Path:)\s*([a-zA-Z0-9._/-]+\.[a-zA-Z0-9]+)/i;
+      const fnMatch = filenameRegex.exec(preText);
+      
+      const title = fnMatch 
+        ? fnMatch[1] 
+        : `Generated Snippet ${count > 1 ? `(${count})` : ''}`;
+        
       const id = `code-gen-${messageId || 'anon'}-${count}`;
 
       artifacts.push({

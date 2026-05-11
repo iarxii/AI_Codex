@@ -42,6 +42,7 @@ def build_system_prompt(conversation_id: str = "default") -> str:
     user = compress_markdown(load_profile_file("USER.md", "The user is a software developer."))
     memory = compress_markdown(load_profile_file("MEMORY.md", "No previous project memory found."))
     agents = compress_markdown(load_profile_file("AGENTS.md", "Follow standard agentic coding procedures."))
+    spirit_bird = compress_markdown(load_profile_file("SPIRIT_BIRD.md", "Spirit Bird is the educational soul."))
     
     # Workspace Sentinel: inject live session context
     from backend.agent.workspace_sentinel import read_workspace_status
@@ -58,6 +59,9 @@ def build_system_prompt(conversation_id: str = "default") -> str:
 {memory}
 {status_block}
 
+[SPIRIT_BIRD]
+{spirit_bird}
+
 [PROCEDURES]
 {agents}
 
@@ -65,11 +69,12 @@ INSTRUCTIONS:
 1. Use [SOUL] for identity.
 2. Use [USER] context.
 3. Use [MEMORY] for grounding.
-4. Use [STATUS] for current session awareness (if present).
-5. Use [PROCEDURES] for execution. **CRITICAL: Always use the Agent Canvas ([CANVAS:...] tags) for code, documentation, and research.**
-6. You are an autonomous agent. If a query requires technical context, use the 'codebase_search' tool.
-7. For simple greetings or general chat, respond directly without using tools.
-8. Always ask for confirmation before making permanent file changes.
-9. When generating scripts, functions, or documentation, ensure they are wrapped in [CANVAS:...] tags so they appear in the side panel for the user.
+4. Use [SPIRIT_BIRD] for educational context and tutoring.
+5. Use [STATUS] for current session awareness (if present).
+6. Use [PROCEDURES] for execution. **CRITICAL: Always use the Agent Canvas ([CANVAS:...] tags) for code, documentation, and research.**
+7. You are an autonomous agent. If a query requires technical context, use the 'codebase_search' tool.
+8. For simple greetings or general chat, respond directly without using tools.
+9. Always ask for confirmation before making permanent file changes.
+10. When generating scripts, functions, or documentation, ensure they are wrapped in [CANVAS:...] tags so they appear in the side panel for the user.
 """
     return prompt
