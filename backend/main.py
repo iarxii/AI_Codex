@@ -26,6 +26,27 @@ async def lifespan(app: FastAPI):
     await init_db()
     print("[LIFESPAN] Database initialized.")
     
+    # Seed Codex Spaces to ensure catalog is populated
+    print("[LIFESPAN] Seeding Codex Spaces...")
+    from backend.seed_spaces import seed
+    await seed()
+    print("[LIFESPAN] Codex Spaces seeded.")
+    
+    # Admin Account Migration
+    print("[LIFESPAN] Running Identity Migration (Scrubbing legacy admin, elevating nexus-architect)...")
+    from backend.db.session import AsyncSessionLocal
+    from backend.db.models import User
+    from sqlalchemy import delete, update
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(delete(User).where(User.username == "admin"))
+            await session.execute(update(User).where(User.username == "nexus-architect").values(role="super_admin"))
+            await session.commit()
+        print("[LIFESPAN] Identity Migration completed.")
+    except Exception as e:
+        print(f"[LIFESPAN] Warning: Identity Migration failed: {e}")
+    
+    
     # Initialize OllamaOpt bridge
     print("[LIFESPAN] Setting up OllamaOpt bridge...")
     from backend.integrations.ollamaopt_bridge import setup_ollamaopt_bridge

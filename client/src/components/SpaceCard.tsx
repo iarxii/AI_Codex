@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAI } from '../contexts/AIContext';
 import type { CodexSpace } from '../contexts/AIContext';
 import {
   ChartBarIcon,
@@ -34,17 +35,20 @@ const getIcon = (iconName: string | null) => {
 };
 
 const SpaceCard: React.FC<SpaceCardProps> = ({ space, onEnter }) => {
+  const { userProfile } = useAI();
   const config = space.config_json ? JSON.parse(space.config_json) : {};
   const isGpuEnabled = config.is_gpu_enabled || false;
-  const isPremium = ['trading-space', 'code-lab'].includes(space.slug);
+  const isExclusive = !['general', 'spirit-book'].includes(space.slug);
+  const isAdmin = ['admin', 'super_admin'].includes(userProfile?.role || '');
+  const showDonateCTA = isExclusive && !isAdmin;
 
   return (
     <div 
       className={`relative group bg-[var(--bg-surface)]/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer shadow-2xl overflow-hidden`} 
       onClick={() => onEnter(space)}
     >
-      {/* Premium Glow Effect */}
-      {isPremium && (
+      {/* Exclusive Glow Effect */}
+      {isExclusive && (
         <div 
           className="absolute -top-24 -left-24 w-48 h-48 rounded-full opacity-20 blur-[60px] pointer-events-none transition-all duration-700 group-hover:opacity-40 group-hover:scale-150"
           style={{ backgroundColor: space.color || 'var(--accent)' }}
@@ -66,8 +70,8 @@ const SpaceCard: React.FC<SpaceCardProps> = ({ space, onEnter }) => {
         <h3 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">
           {space.name}
         </h3>
-        {isPremium && (
-          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-500 shadow-sm">
+        {isExclusive && (
+          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-500 shadow-sm" title="Exclusive Space">
             <SparklesIcon className="w-3 h-3" />
           </span>
         )}
@@ -78,8 +82,8 @@ const SpaceCard: React.FC<SpaceCardProps> = ({ space, onEnter }) => {
       </p>
       
       <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
-        {isPremium && (
-            <span className="px-2 py-1 bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase tracking-widest rounded border border-amber-500/20">Premium</span>
+        {isExclusive && (
+            <span className="px-2 py-1 bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase tracking-widest rounded border border-amber-500/20">Exclusive</span>
         )}
         
         {isGpuEnabled ? (
@@ -98,15 +102,27 @@ const SpaceCard: React.FC<SpaceCardProps> = ({ space, onEnter }) => {
         )}
       </div>
       
-      <button 
-        className="w-full py-2.5 bg-white/5 hover:bg-[var(--accent)] hover:text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all border border-white/5 hover:border-transparent"
-        onClick={(e) => {
-            e.stopPropagation();
-            onEnter(space);
-        }}
-      >
-        Enter Workspace
-      </button>
+      {showDonateCTA ? (
+        <button 
+          className="w-full py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-xl text-sm font-bold transition-all border border-amber-500/20"
+          onClick={(e) => {
+              e.stopPropagation();
+              alert("Exclusive Space: A $5 one-time donation is required to unlock this workspace.");
+          }}
+        >
+          Donate $5 to Unlock
+        </button>
+      ) : (
+        <button 
+          className="w-full py-2.5 bg-white/5 hover:bg-[var(--accent)] hover:text-white text-[var(--text-primary)] rounded-xl text-sm font-bold transition-all border border-white/5 hover:border-transparent"
+          onClick={(e) => {
+              e.stopPropagation();
+              onEnter(space);
+          }}
+        >
+          Enter Workspace
+        </button>
+      )}
     </div>
   );
 };
