@@ -39,7 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { provider, userProfile, activeSpace, setActiveSpace, setAvailableSpaces, setViewSpacesCatalog, isPremiumSpace } = useAI();
+  const { provider, userProfile, activeSpace, setActiveSpace, setAvailableSpaces, setViewSpacesCatalog, isPremiumSpace, isPremiumBackendOnline } = useAI();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [spaceConversations, setSpaceConversations] = useState<Conversation[]>([]);
   const [activeTab, setActiveTab] = useState<'workspaces' | 'spaces'>('workspaces');
@@ -205,7 +205,18 @@ const Sidebar: React.FC<SidebarProps> = ({
             <h1 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
               AI<span className="text-[var(--accent)]">Codex</span>
             </h1>
-            <div className="flex items-center gap-1.5 justify-center mt-1">
+            <div className="flex flex-col items-center gap-1.5 justify-center mt-1">
+              {isPremiumSpace && (
+                <div 
+                  className={`flex items-center gap-1.5 mb-1 px-2 py-0.5 rounded-full border transition-all duration-500 ${isPremiumBackendOnline ? 'bg-green-500/10 border-green-500/30' : 'bg-orange-500/10 border-orange-500/30'}`}
+                  title={isPremiumBackendOnline ? "T4 GPU Backend is active" : "Premium instances are synchronizing..."}
+                >
+                  <div className={`w-1.5 h-1.5 rounded-full ${isPremiumBackendOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-orange-500 shadow-[0_0_8px_rgba(253,59,18,0.6)]'}`} />
+                  <span className={`text-[8px] font-bold uppercase tracking-[0.1em] ${isPremiumBackendOnline ? 'text-green-500' : 'text-orange-500'}`}>
+                    {isPremiumBackendOnline ? 'Neural Pulse Active' : 'Pulse Syncing'}
+                  </span>
+                </div>
+              )}
               <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-[var(--text-muted)] flex items-center gap-1.5">
                 {provider === "local" && (
                   <>

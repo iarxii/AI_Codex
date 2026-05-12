@@ -1,9 +1,11 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:9173';
+const PREMIUM_API_URL = import.meta.env.VITE_PREMIUM_URL || '';
 const COLAB_URL = import.meta.env.VITE_COLAB_URL || '';
 const COLAB_SECRET = import.meta.env.VITE_COLAB_SECRET || '';
 
 export const config = {
   API_BASE_URL,
+  PREMIUM_API_URL,
   COLAB_URL,
   COLAB_SECRET,
   API_V1_STR: '/api',
@@ -11,11 +13,14 @@ export const config = {
 
 /**
  * Resolves the backend URL based on the active space status.
- * Default is Cloud Run, but Premium CodexSpaces use Colab.
+ * Prioritizes: Colab (GPU) -> Cloud Run Premium (Dedicated) -> Cloud Run Base.
  */
 export const getApiUrl = (isPremium?: boolean) => {
-  if (isPremium && config.COLAB_URL) {
-    return config.COLAB_URL;
+  if (isPremium) {
+    // If we have an active Colab instance, use it for GPU acceleration
+    if (config.COLAB_URL) return config.COLAB_URL;
+    // Fallback to dedicated Premium Cloud Run instance
+    if (config.PREMIUM_API_URL) return config.PREMIUM_API_URL;
   }
   return config.API_BASE_URL;
 };
