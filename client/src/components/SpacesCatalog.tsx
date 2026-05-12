@@ -13,6 +13,19 @@ const SpacesCatalog: React.FC<SpacesCatalogProps> = ({ onSpaceSelected }) => {
     const [spaces, setSpaces] = useState<CodexSpace[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const generalSpace: CodexSpace = {
+        id: 0,
+        slug: 'general',
+        name: 'Codex Space',
+        description: 'The general-purpose default workspace for standard interactions and queries.',
+        icon: 'GlobeAltIcon',
+        color: '#3b82f6',
+        is_active: true,
+        is_public: true,
+        capacity: 100,
+        config_json: JSON.stringify({ is_gpu_enabled: true })
+    };
+
     useEffect(() => {
         fetchSpaces();
     }, []);
@@ -25,7 +38,17 @@ const SpacesCatalog: React.FC<SpacesCatalogProps> = ({ onSpaceSelected }) => {
             });
             if (res.ok) {
                 const data = await res.json();
-                setSpaces(data);
+                
+                const allSpaces = [generalSpace, ...data.filter((s: CodexSpace) => s.slug !== 'general')];
+                allSpaces.sort((a, b) => {
+                    if (a.slug === 'general') return -1;
+                    if (b.slug === 'general') return 1;
+                    if (a.slug === 'spirit-book') return -1;
+                    if (b.slug === 'spirit-book') return 1;
+                    return 0;
+                });
+                
+                setSpaces(allSpaces);
             }
         } catch (e) {
             console.error("Failed to fetch spaces catalog", e);
@@ -35,7 +58,11 @@ const SpacesCatalog: React.FC<SpacesCatalogProps> = ({ onSpaceSelected }) => {
     }
 
     const handleEnterSpace = (space: CodexSpace) => {
-        setActiveSpace(space);
+        if (space.slug === 'general') {
+            setActiveSpace(null);
+        } else {
+            setActiveSpace(space);
+        }
         setViewSpacesCatalog(false);
         onSpaceSelected();
     };

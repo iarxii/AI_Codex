@@ -16,7 +16,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   showTelemetry,
   setShowTelemetry,
 }) => {
-  const { provider, setProvider, model, setModel, activeSpace, isPremiumSpace } = useAI();
+  const { provider, setProvider, model, setModel, activeSpace, isPremiumSpace, userProfile } = useAI();
   const [availableModels, setAvailableModels] = useState<
     { id: string; name: string }[]
   >([]);
@@ -96,6 +96,14 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 
   const selectedModel =
     availableModels.find((m) => m.id === model) || availableModels[0];
+
+  const isAdmin = ['admin', 'super_admin'].includes(userProfile?.role || '');
+  const isLocalLocked = provider === 'local' && !isAdmin;
+
+  // If local is locked, only allow the default model (e.g. llama3.2:3b)
+  const finalModels = isLocalLocked 
+    ? filteredModels.filter(m => m.id.includes('llama3.2') || m.id.includes('llama3.5')) 
+    : filteredModels;
 
   const handleBackendModeChange = (mode: LocalBackendMode) => {
     setBackendMode(mode);
@@ -207,7 +215,6 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
             >
               <Listbox.Options className="absolute z-50 bottom-full mb-2 max-h-60 w-full overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide">
                 {PROVIDERS
-                  .filter(p => p.id !== "local" || activeSpace) // Hide local if not in a space
                   .map((p) => (
                   <Listbox.Option
                     key={p.id}
@@ -304,16 +311,17 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                   <div className="py-4 px-4 text-center text-xs text-[#7A7D8E] animate-pulse">
                     Fetching available models...
                   </div>
-                ) : filteredModels.length === 0 ? (
+                ) : finalModels.length === 0 ? (
                   <div className="py-4 px-4 text-center text-xs text-[#7A7D8E]">
-                    No models found matching "{modelSearch}"
+                    {isLocalLocked ? "Model switching is locked for Standard Accounts." : `No models found matching "${modelSearch}"`}
                   </div>
                 ) : (
-                  filteredModels.map((m) => (
+                  finalModels.map((m) => (
                     <Listbox.Option
                       key={m.id}
-                      className={({ active }) =>
-                        `relative cursor-pointer select-none py-2.5 pl-10 pr-4 transition-colors ${active ? "bg-[#fd3b12]/10 text-[#fd3b12]" : "text-[#4A4D5E]"}`
+                      disabled={isLocalLocked && finalModels.length === 1 && m.id !== finalModels[0].id}
+                      className={({ active, disabled }) =>
+                        `relative cursor-pointer select-none py-2.5 pl-10 pr-4 transition-colors ${active && !disabled ? "bg-[#fd3b12]/10 text-[#fd3b12]" : disabled ? "opacity-50 cursor-not-allowed text-[#7A7D8E]" : "text-[#4A4D5E]"}`
                       }
                       value={m.id}
                     >
@@ -358,6 +366,11 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                               />
                             </span>
                           ) : null}
+                          {isLocalLocked && (
+                            <span className="block mt-1 text-[9px] text-[#7A7D8E] font-medium leading-tight opacity-75">
+                               Standard Access Locked
+                            </span>
+                          )}
                         </>
                       )}
                     </Listbox.Option>

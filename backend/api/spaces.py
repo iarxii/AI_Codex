@@ -46,26 +46,12 @@ async def list_accessible_spaces(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    is_admin = current_user.role in ["admin", "super_admin"]
-    
-    if is_admin:
-        stmt = select(CodexSpace)
-    else:
-        stmt = select(CodexSpace).outerjoin(
-            CodexSpaceAccess, 
-            and_(CodexSpaceAccess.space_id == CodexSpace.id, CodexSpaceAccess.user_id == current_user.id)
-        ).where(
-            and_(
-                CodexSpace.is_active == True,
-                or_(
-                    CodexSpace.is_public == True,
-                    CodexSpaceAccess.id != None
-                )
-            )
-        )
+    # All users can preview all active spaces
+    stmt = select(CodexSpace).where(CodexSpace.is_active == True)
         
     result = await db.execute(stmt)
     spaces = result.scalars().unique().all()
+
     
     # Inject recommendations
     for s in spaces:
@@ -117,10 +103,16 @@ async def create_space_conversation(
         raise HTTPException(status_code=404, detail="Space not found")
         
     is_admin = current_user.role in ["admin", "super_admin"]
-    if not is_admin and not space.is_public:
-        access = await db.execute(select(CodexSpaceAccess).filter_by(space_id=space.id, user_id=current_user.id))
-        if not access.scalar_one_or_none():
-            raise HTTPException(status_code=403, detail="Access denied to this space")
+    
+    # Exclusive Spaces Rule:
+    # Only SpiritBook is accessible to standard users. All other specialized spaces are Exclusive.
+    is_exclusive = slug not in ["spirit-book", "general"]
+    
+    if is_exclusive and not is_admin:
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied to this Exclusive Space. A donation is required to unlock."
+        )
             
     new_conv = Conversation(
         title=payload.title,
@@ -145,10 +137,13 @@ async def list_space_conversations(
         raise HTTPException(status_code=404, detail="Space not found")
         
     is_admin = current_user.role in ["admin", "super_admin"]
-    if not is_admin and not space.is_public:
-        access = await db.execute(select(CodexSpaceAccess).filter_by(space_id=space.id, user_id=current_user.id))
-        if not access.scalar_one_or_none():
-            raise HTTPException(status_code=403, detail="Access denied to this space")
+    
+    is_exclusive = slug not in ["spirit-book", "general"]
+    if is_exclusive and not is_admin:
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied to this Exclusive Space. A donation is required to unlock."
+        )
 
     result = await db.execute(
         select(Conversation)
