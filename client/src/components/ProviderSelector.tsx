@@ -2,7 +2,7 @@ import React, { Fragment, useEffect, useState } from "react";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { useAI } from "../contexts/AIContext";
-import { config } from "../config";
+import { config, getApiUrl } from "../config";
 import { PROVIDERS, PROVIDER_MAP, getLocalBackendMode, setLocalBackendMode } from "./providerMeta";
 import type { LocalBackendMode } from "./providerMeta";
 import ProviderIcon from "./ProviderIcon";
@@ -28,6 +28,13 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
     fetchModels();
   }, [provider, backendMode]);
 
+  // Fallback to Groq if user is in Standard Workspace and tries to use local models
+  useEffect(() => {
+    if (!activeSpace && (provider === "local" || provider === "ollama_cloud")) {
+      setProvider("groq");
+    }
+  }, [activeSpace, provider, setProvider]);
+
   const fetchModels = async () => {
     setLoading(true);
     let apiKey = "";
@@ -39,7 +46,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       apiKey = localStorage.getItem("gemini_api_key") || "";
 
     try {
-      const url = `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=${provider}`;
+      const url = `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/models?provider=${provider}`;
       const headers: Record<string, string> = {};
       if (apiKey) headers["X-API-Key"] = apiKey;
       
@@ -215,6 +222,13 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
             >
               <Listbox.Options className="absolute z-50 bottom-full mb-2 max-h-60 w-full overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide">
                 {PROVIDERS
+                  .filter((p) => {
+                    // Restrict local LLM options if no active Codex Space (Standard Workspace)
+                    if (!activeSpace && (p.id === 'local' || p.id === 'ollama_cloud')) {
+                      return false;
+                    }
+                    return true;
+                  })
                   .map((p) => (
                   <Listbox.Option
                     key={p.id}

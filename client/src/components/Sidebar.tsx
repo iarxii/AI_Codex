@@ -12,7 +12,7 @@ import {
   RectangleStackIcon
 } from "@heroicons/react/24/outline";
 import { useAI } from "../contexts/AIContext";
-import { config } from "../config";
+import { config, getApiUrl } from "../config";
 
 type Conversation = {
   id: number;
@@ -39,7 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { provider, userProfile, activeSpace, setActiveSpace, setAvailableSpaces, setViewSpacesCatalog } = useAI();
+  const { provider, userProfile, activeSpace, setActiveSpace, setAvailableSpaces, setViewSpacesCatalog, isPremiumSpace } = useAI();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [spaceConversations, setSpaceConversations] = useState<Conversation[]>([]);
   const [activeTab, setActiveTab] = useState<'workspaces' | 'spaces'>('workspaces');
@@ -64,7 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleUpdateTitle = async (id: number, newTitle: string) => {
     try {
       const res = await fetch(
-        `${config.API_BASE_URL}${config.API_V1_STR}/conversations/${id}`,
+        `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/conversations/${id}`,
         {
           method: "PUT",
           headers: {
@@ -116,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const fetchSpaceConversations = async (slug: string) => {
       setLoading(true);
       try {
-          const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/spaces/${slug}/conversations`, {
+          const res = await fetch(`${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/spaces/${slug}/conversations`, {
               headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
           });
           if (res.ok) {
@@ -151,7 +151,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     setLoading(true);
     try {
       const response = await fetch(
-        `${config.API_BASE_URL}${config.API_V1_STR}/conversations/`,
+        `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/conversations/`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -282,11 +282,15 @@ const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={async () => {
-              await onNewChat();
-              if (activeSpace) {
-                await fetchSpaceConversations(activeSpace.slug);
+              if (activeTab === 'spaces' && !activeSpace) {
+                setViewSpacesCatalog(true);
               } else {
-                await fetchConversations();
+                await onNewChat();
+                if (activeSpace) {
+                  await fetchSpaceConversations(activeSpace.slug);
+                } else {
+                  await fetchConversations();
+                }
               }
               if (window.innerWidth < 1024) onClose();
             }}

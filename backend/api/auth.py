@@ -22,6 +22,8 @@ class Token(BaseModel):
 class UserCreate(BaseModel):
     username: str
     password: str
+    email: str | None = None
+    phone: str | None = None
     title: str | None = None
     first_name: str | None = None
     surname: str | None = None
@@ -117,6 +119,22 @@ async def register_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already registered"
         )
+        
+    if user_in.email:
+        result = await db.execute(select(User).filter_by(email=user_in.email))
+        if result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+            
+    if user_in.phone:
+        result = await db.execute(select(User).filter_by(phone=user_in.phone))
+        if result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Phone number already registered"
+            )
     
     # Parse DOB if provided
     dob_dt = None
@@ -126,6 +144,7 @@ async def register_user(
         except ValueError:
             pass
 
+    import re
     # Prevent squatting on reserved administrative usernames
     if user_in.username.lower() in ["admin", "root", "superuser"]:
         raise HTTPException(
@@ -133,10 +152,19 @@ async def register_user(
             detail="This username is reserved for system administration."
         )
 
-    # Create new user
+    # STRICTLY restrict variations of 'nexus-architect'
+    normalized_username = re.sub(r'[^a-zA-Z0-9]', '', user_in.username).lower()
+    if "nexusarchitect" in normalized_username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This username pattern is strictly reserved."
+        )
+
     new_user = User(
         username=user_in.username,
         hashed_password=pwd_context.hash(user_in.password),
+        email=user_in.email,
+        phone=user_in.phone,
         title=user_in.title,
         first_name=user_in.first_name,
         surname=user_in.surname,
@@ -165,6 +193,8 @@ async def read_users_me(current_user: Annotated[User, Depends(get_current_user)]
         "id": current_user.id,
         "username": current_user.username,
         "profile": {
+            "email": current_user.email,
+            "phone": current_user.phone,
             "title": current_user.title,
             "first_name": current_user.first_name,
             "surname": current_user.surname,

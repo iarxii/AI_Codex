@@ -36,15 +36,32 @@ async def lifespan(app: FastAPI):
     print("[LIFESPAN] Running Identity Migration (Scrubbing legacy admin, elevating nexus-architect)...")
     from backend.db.session import AsyncSessionLocal
     from backend.db.models import User
-    from sqlalchemy import delete, update
+    from sqlalchemy import update
+    import uuid
+    
+    # 1. Deactivate legacy admin
     try:
         async with AsyncSessionLocal() as session:
-            await session.execute(delete(User).where(User.username == "admin"))
+            scrambled_hash = f"disabled_{uuid.uuid4().hex}"
+            await session.execute(
+                update(User).where(User.username == "admin").values(
+                    is_active=False, 
+                    hashed_password=scrambled_hash
+                )
+            )
+            await session.commit()
+        print("[LIFESPAN] Admin account deactivated.")
+    except Exception as e:
+        print(f"[LIFESPAN] Warning: Admin deactivation failed: {e}")
+
+    # 2. Elevate nexus-architect
+    try:
+        async with AsyncSessionLocal() as session:
             await session.execute(update(User).where(User.username == "nexus-architect").values(role="super_admin"))
             await session.commit()
-        print("[LIFESPAN] Identity Migration completed.")
+        print("[LIFESPAN] nexus-architect elevated to super_admin.")
     except Exception as e:
-        print(f"[LIFESPAN] Warning: Identity Migration failed: {e}")
+        print(f"[LIFESPAN] Warning: nexus-architect elevation failed: {e}")
     
     
     # Initialize OllamaOpt bridge
