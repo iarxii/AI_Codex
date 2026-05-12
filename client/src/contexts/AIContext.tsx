@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { config } from '../config';
+import { config, getApiUrl } from '../config';
 
 export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud';
 
@@ -82,6 +82,7 @@ interface AIContextType {
   modelConfig: ModelConfig;
   activeSpace: CodexSpace | null;
   isPremiumSpace: boolean;
+  isPremiumBackendOnline: boolean;
   availableSpaces: CodexSpace[];
   setActiveSpace: (space: CodexSpace | null) => void;
   setAvailableSpaces: (spaces: CodexSpace[]) => void;
@@ -133,6 +134,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   const [availableSpaces, setAvailableSpaces] = useState<CodexSpace[]>([]);
   const [viewSpacesCatalog, setViewSpacesCatalog] = useState<boolean>(false);
+  const [isPremiumBackendOnline, setIsPremiumBackendOnline] = useState<boolean>(false);
 
   const updateActiveSpace = (space: CodexSpace | null) => {
     setActiveSpace(space);
@@ -183,6 +185,43 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   useEffect(() => {
     refreshProfile();
   }, []);
+
+  // Premium Backend Pulse (Neural Keep-Alive)
+  useEffect(() => {
+    let pulseInterval: ReturnType<typeof setInterval>;
+    
+    const sendPulse = async () => {
+      // getApiUrl(true) will return Colab URL if available, then Premium URL, then Base URL
+      const premiumUrl = getApiUrl(true);
+      
+      // We only pulse if it's actually a separate premium/colab endpoint
+      if (!premiumUrl || premiumUrl === config.API_BASE_URL) return;
+      
+      try {
+        await fetch(`${premiumUrl}/healthz`, {
+          headers: { 
+            'X-Codex-Premium-Key': config.COLAB_SECRET || 'fallback_key' 
+          }
+        });
+        setIsPremiumBackendOnline(true);
+        console.log("[Neural Pulse] Premium connection maintained.");
+      } catch (e) {
+        setIsPremiumBackendOnline(false);
+        console.warn("[Neural Pulse] Heartbeat failed - Premium instance may be sleeping.");
+      }
+    };
+
+    // Initial pulse after 5s, then every 45s
+    const timeout = setTimeout(() => {
+      sendPulse();
+      pulseInterval = setInterval(sendPulse, 45000);
+    }, 5000);
+
+    return () => {
+      clearTimeout(timeout);
+      if (pulseInterval) clearInterval(pulseInterval);
+    };
+  }, [activeSpace]); // Re-initialize pulse if activeSpace changes (to ensure we hit the right endpoint)
 
   const syncSettingsToCloud = async (visual?: VisualSettings, models?: Record<string, ModelConfig>) => {
     const token = localStorage.getItem('token');
@@ -298,6 +337,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       modelConfig: activeModelConfig,
       activeSpace,
       isPremiumSpace,
+      isPremiumBackendOnline,
       availableSpaces,
       setActiveSpace: updateActiveSpace,
       setAvailableSpaces,

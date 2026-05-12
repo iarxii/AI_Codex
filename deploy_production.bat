@@ -100,12 +100,16 @@ if "%DEPLOY_FE%"=="true" (
         exit /b 1
     )
     echo Backend URL detected: !BACKEND_URL!
+    
+    echo Retrieving Premium URL for Frontend build...
+    for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-premium --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set PREMIUM_URL=%%i
+    echo Premium URL detected: !PREMIUM_URL!
 
     echo [3/4] Submitting Frontend Build to Google Cloud...
     pushd client
     call %GCLOUD% builds submit --config cloudbuild.yaml ^
         --project %PROJECT_ID% ^
-        --substitutions=_VITE_API_URL=!BACKEND_URL!,_VITE_COLAB_URL=!COLAB_URL!,_VITE_COLAB_SECRET=!COLAB_SECRET!
+        --substitutions=_VITE_API_URL=!BACKEND_URL!,_VITE_PREMIUM_URL=!PREMIUM_URL!,_VITE_COLAB_URL=!COLAB_URL!,_VITE_COLAB_SECRET=!COLAB_SECRET!
     popd
     if %ERRORLEVEL% NEQ 0 (
         echo Frontend build failed. Exiting.
