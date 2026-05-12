@@ -41,7 +41,7 @@ const MessageList: React.FC<MessageListProps> = ({
 
   return (
     <main className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide relative z-10">
-      {!currentConvId &&
+      {(!currentConvId || messages.length === 0) &&
         (() => {
           if (activeSpace?.slug === 'trading-space') {
             return (
