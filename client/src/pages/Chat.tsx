@@ -522,9 +522,9 @@ const Chat: React.FC = () => {
 
   const handleNewChat = async () => {
     try {
-      let endpoint = `${config.API_BASE_URL}${config.API_V1_STR}/conversations/`;
+      let endpoint = `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/conversations/`;
       if (activeSpace) {
-          endpoint = `${config.API_BASE_URL}${config.API_V1_STR}/spaces/${activeSpace.slug}/conversations`;
+          endpoint = `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/spaces/${activeSpace.slug}/conversations`;
       }
       
       const response = await fetch(endpoint, {

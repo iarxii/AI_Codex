@@ -16,6 +16,9 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # Contact Info
+    email: Mapped[Optional[str]] = mapped_column(String(150), unique=True, index=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(50), unique=True, index=True)
     
     # Profile Info
     title: Mapped[Optional[str]] = mapped_column(String(20)) # Mr, Ms, Mx, Dr, etc.
