@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import AppLogo from "../components/layout/AppLogo";
 import ExternalNavbar from "../components/layout/ExternalNavbar";
 import ExternalFooter from "../components/layout/ExternalFooter";
 
@@ -9,20 +10,7 @@ const Landing: React.FC = () => (
 
     <div className="flex-1 flex items-center justify-center p-6 mt-20">
       <div className="relative z-10 bg-[var(--bg-surface)]/60 backdrop-blur-2xl rounded-4xl border border-black/[0.05] p-12 max-w-2xl w-full text-center shadow-2xl">
-        <div className="w-24 h-24 mx-auto mb-4 flex flex-col items-center justify-center drop-shadow-2xl">
-          <img
-            src="/media/aicodex-spirit-bird.png"
-            alt="AICodex Logo"
-            className="w-full h-full object-contain rounded-3xl border-2 border-[var(--accent)]"
-          />{/*  */}
-          <span className="text-[6px] my-2 font-display uppercase tracking-[0.2em] text-[var(--accent)] flex items-center gap-1.5 opacity-90">
-            Spirit Bird&trade;
-          </span>
-        </div>
-
-        <h1 className="text-5xl font-extrabold mb-4 text-[var(--text-primary)]">
-          AI<span className="text-[var(--accent)]">Codex</span>
-        </h1>
+        <AppLogo size="lg" className="mb-2" />
         <p className="text-xl text-slate-400 mb-10 font-medium">
           Advanced Agentic Intelligence for Developers and Architects.
         </p>

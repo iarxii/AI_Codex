@@ -30,7 +30,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 
   // Fallback to Groq if user is in Standard Workspace and tries to use local models
   useEffect(() => {
-    if (!activeSpace && (provider === "local" || provider === "ollama_cloud")) {
+    if (!activeSpace && provider === "local") {
       setProvider("groq");
     }
   }, [activeSpace, provider, setProvider]);
@@ -44,6 +44,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       apiKey = localStorage.getItem("openrouter_api_key") || "";
     else if (provider === "gemini")
       apiKey = localStorage.getItem("gemini_api_key") || "";
+    else if (provider === "ollama_cloud")
+      apiKey = localStorage.getItem("ollama_cloud_key") || "";
 
     try {
       const url = `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/models?provider=${provider}`;
@@ -223,8 +225,14 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               <Listbox.Options className="absolute z-50 bottom-full mb-2 max-h-60 w-full overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide">
                 {PROVIDERS
                   .filter((p) => {
+                    const isAdmin = ["admin", "super_admin"].includes(userProfile?.role || "");
+                    
+                    // Always allow Ollama Cloud (it's BYOK)
+                    if (p.id === 'ollama_cloud') return true;
+
                     // Restrict local LLM options if no active Codex Space (Standard Workspace)
-                    if (!activeSpace && (p.id === 'local' || p.id === 'ollama_cloud')) {
+                    // But allow them for admins for debugging/universal access
+                    if (!activeSpace && p.id === 'local' && !isAdmin) {
                       return false;
                     }
                     return true;

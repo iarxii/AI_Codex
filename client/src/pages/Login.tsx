@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { config } from "../config";
 import ExternalNavbar from "../components/layout/ExternalNavbar";
 import ExternalFooter from "../components/layout/ExternalFooter";
+import AppLogo from "../components/layout/AppLogo";
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState("");
@@ -74,16 +75,7 @@ const Login: React.FC = () => {
       <div className="flex-1 flex items-center justify-center p-6 mt-20">
         <div className="relative z-10 w-full max-w-md p-10 bg-[var(--bg-surface)]/90 backdrop-blur-xl rounded-3xl border border-white/40 shadow-2xl">
           <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-24 h-24 mb-6 drop-shadow-2xl">
-              <img
-                src="/media/aicodex-spirit-bird.png"
-                alt="AICodex Logo"
-                className="w-full h-full object-contain rounded-3xl border-2 border-[var(--accent)]"
-              />
-            </div>
-            <h1 className="text-4xl font-black tracking-tight text-[var(--text-primary)] mb-2">
-              AI<span className="text-[var(--accent)]">Codex</span>
-            </h1>
+            <AppLogo size="md" className="mb-6" />
             <p className="text-[var(--text-secondary)] font-medium">
               Welcome back, Architect.
             </p>
