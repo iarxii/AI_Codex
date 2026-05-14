@@ -16,9 +16,13 @@ async def migrate_db(conn):
 
     from sqlalchemy import text
     result = await conn.execute(text("PRAGMA table_info(users)"))
-    existing_columns = {row[1] for row in result.fetchall()}
+    rows = result.fetchall()
+    existing_columns = {row[1] for row in rows}
+    print(f"[MIGRATION] Found existing columns in 'users': {existing_columns}")
     
     required_columns = {
+        "email": "VARCHAR(150)",
+        "phone": "VARCHAR(50)",
         "title": "VARCHAR(20)",
         "first_name": "VARCHAR(100)",
         "surname": "VARCHAR(100)",

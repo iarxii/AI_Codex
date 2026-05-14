@@ -1,9 +1,11 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+from sqlalchemy import select, update
 from backend.config import settings
 from backend.db.session import init_db
 from backend.utils.logger import mask_uvicorn_logs
@@ -16,27 +18,47 @@ async def lifespan(app: FastAPI):
     print("[LIFESPAN] Starting initialization...")
     # Sync SQLite from GCS if in Cloud Run
     is_cloud_run = os.getenv("K_SERVICE") is not None
+    force_restart = os.getenv("FORCE_RESTART") == "1" or os.getenv("FORCE_RESTART") == "true"
+    
     if is_cloud_run and settings.DB_TYPE == "sqlite":
-        print("[LIFESPAN] Cloud Run detected, syncing DB from GCS...")
-        from backend.utils.storage import download_db_from_gcs
-        download_db_from_gcs()
+        if not force_restart:
+            print("[LIFESPAN] Cloud Run detected, syncing DB from GCS...")
+            from backend.utils.storage import download_db_from_gcs
+            download_db_from_gcs()
+        else:
+            print("[LIFESPAN] FORCE_RESTART enabled, skipping GCS sync to trigger fresh schema.")
 
     # Initialize DB on startup
     print(f"[LIFESPAN] Initializing database: {settings.async_database_url}")
     await init_db()
+    
+    # Verify User table schema in logs
+    try:
+        from backend.db.session import engine
+        from sqlalchemy import text
+        async with engine.connect() as conn:
+            result = await conn.execute(text("PRAGMA table_info(users)"))
+            columns = [row[1] for row in result.fetchall()]
+            print(f"[LIFESPAN] Verified User columns: {columns}")
+    except Exception as e:
+        print(f"[LIFESPAN] Warning: Schema verification failed: {e}")
+
     print("[LIFESPAN] Database initialized.")
     
     # Seed Codex Spaces to ensure catalog is populated
-    print("[LIFESPAN] Seeding Codex Spaces...")
     from backend.seed_spaces import seed
     await seed()
     print("[LIFESPAN] Codex Spaces seeded.")
+    
+    if is_cloud_run and settings.DB_TYPE == "sqlite" and force_restart:
+        print("[LIFESPAN] Schema updated via FORCE_RESTART. Performing immediate GCS sync...")
+        from backend.utils.storage import upload_db_to_gcs
+        upload_db_to_gcs()
     
     # Admin Account Migration
     print("[LIFESPAN] Running Identity Migration (Scrubbing legacy admin, elevating nexus-architect)...")
     from backend.db.session import AsyncSessionLocal
     from backend.db.models import User
-    from sqlalchemy import update
     import uuid
     
     # 1. Deactivate legacy admin
@@ -54,14 +76,31 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[LIFESPAN] Warning: Admin deactivation failed: {e}")
 
-    # 2. Elevate nexus-architect
+    # 2. Seed/Elevate nexus-architect
     try:
         async with AsyncSessionLocal() as session:
-            await session.execute(update(User).where(User.username == "nexus-architect").values(role="super_admin"))
+            result = await session.execute(select(User).filter_by(username="nexus-architect"))
+            architect = result.scalar_one_or_none()
+            if not architect:
+                print("[LIFESPAN] Seeding nexus-architect super-user...")
+                from backend.db.session import pwd_context
+                new_architect = User(
+                    username="nexus-architect",
+                    hashed_password=pwd_context.hash("GOD_MODE_ON"), # Standard fallback, but GOD_MODE_ON bypasses anyway
+                    role="super_admin",
+                    first_name="Nexus",
+                    surname="Architect",
+                    profession="System Sovereign",
+                    is_active=True
+                )
+                session.add(new_architect)
+            else:
+                print("[LIFESPAN] nexus-architect exists, ensuring super_admin elevation...")
+                await session.execute(update(User).where(User.username == "nexus-architect").values(role="super_admin"))
             await session.commit()
-        print("[LIFESPAN] nexus-architect elevated to super_admin.")
+        print("[LIFESPAN] nexus-architect identity verified.")
     except Exception as e:
-        print(f"[LIFESPAN] Warning: nexus-architect elevation failed: {e}")
+        print(f"[LIFESPAN] Warning: nexus-architect seeding/elevation failed: {e}")
     
     
     # Initialize OllamaOpt bridge
@@ -71,9 +110,10 @@ async def lifespan(app: FastAPI):
     print("[LIFESPAN] Initialization complete. Server ready.")
     yield
     
-    # Sync SQLite back to GCS on shutdown
+    # Shutdown logic
+    print("[LIFESPAN] Shutting down...")
     if is_cloud_run and settings.DB_TYPE == "sqlite":
-        print("[LIFESPAN] Shutdown detected, syncing DB back to GCS...")
+        print("[LIFESPAN] Cloud Run detected, uploading DB to GCS before shutdown...")
         from backend.utils.storage import upload_db_to_gcs
         upload_db_to_gcs()
     print("[LIFESPAN] Shutdown complete.")
@@ -87,6 +127,11 @@ app = FastAPI(
 # Premium Handshake Middleware
 @app.middleware("http")
 async def verify_premium_handshake(request, call_next):
+    # Exclude login and healthz from handshake
+    path = request.url.path.rstrip("/")
+    if path.endswith("/login") or path.endswith("/healthz") or path == "" or path == "/api":
+        return await call_next(request)
+
     if settings.COLAB_SECRET:
         # Check for the secret key in headers
         handshake_key = request.headers.get("X-Codex-Premium-Key")
@@ -100,14 +145,40 @@ async def verify_premium_handshake(request, call_next):
 
 # Set up CORS
 origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+effective_origins = [o for o in origins if o != "*"]
+local_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://localhost:9000"]
+for lo in local_origins:
+    if lo not in effective_origins:
+        effective_origins.append(lo)
+
+lab_origin = "https://aicodex-lab-1096425756328.us-central1.run.app"
+if lab_origin not in effective_origins:
+    effective_origins.append(lab_origin)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins else ["*"],
+    allow_origins=effective_origins if effective_origins else [lab_origin],
+    allow_origin_regex="https://.*\.a\.run\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global Exception Handler to ensure CORS headers on 500s
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    print(f"[ERROR] Unhandled exception: {exc}")
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal Server Error: {str(exc)}"},
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Credentials": "true"
+        }
+    )
+
 
 @app.get("/")
 async def root():

@@ -128,8 +128,7 @@ if "%DEPLOY_FE%"=="true" (
         exit /b %ERRORLEVEL%
     )
 
-    ) > route_map.json
-    echo Route map generated in website and local project.
+    echo Frontend deployment complete.
 )
 
 echo [5/6] Generating/Updating Route Map JSON...

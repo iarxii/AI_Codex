@@ -188,7 +188,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   // Premium Backend Pulse (Neural Keep-Alive)
   useEffect(() => {
-    let pulseInterval: ReturnType<typeof setInterval>;
+    let pulseInterval: any;
     
     const sendPulse = async () => {
       // getApiUrl(true) will return Colab URL if available, then Premium URL, then Base URL
