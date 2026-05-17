@@ -154,7 +154,8 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     return {};
   });
 
-  const isPremiumSpace = !!(activeSpace?.config_json && JSON.parse(activeSpace.config_json).premium);
+  let isPremiumSpace = false;
+  try { isPremiumSpace = !!(activeSpace?.config_json && JSON.parse(activeSpace.config_json).premium); } catch { /* malformed config_json */ }
 
   const activeModel = models[provider];
 

@@ -19,7 +19,7 @@ def route_after_init(state: AgentState):
     space_config = state.get("space_config", {})
     slug = space_config.get("slug", "")
     
-    if slug == "financial_trading":
+    if slug == "trading-space":
         return "trading_debate"
     
     return "reason"

@@ -96,7 +96,7 @@ class CodexSpace(Base):
     slug: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(100))
     description: Mapped[str] = mapped_column(Text)
-    icon: Mapped[Optional[str]] = mapped_column(String(50))
+    icon: Mapped[Optional[str]] = mapped_column(String(255))
     color: Mapped[Optional[str]] = mapped_column(String(20))
     is_active: Mapped[bool] = mapped_column(default=True)
     is_public: Mapped[bool] = mapped_column(default=False)
