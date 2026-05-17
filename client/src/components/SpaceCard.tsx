@@ -36,7 +36,8 @@ const getIcon = (iconName: string | null) => {
 
 const SpaceCard: React.FC<SpaceCardProps> = ({ space, onEnter }) => {
   const { userProfile } = useAI();
-  const config = space.config_json ? JSON.parse(space.config_json) : {};
+  let config: Record<string, any> = {};
+  try { config = space.config_json ? JSON.parse(space.config_json) : {}; } catch { config = {}; }
   const isGpuEnabled = config.is_gpu_enabled || false;
   const isExclusive = !['general', 'spirit-book'].includes(space.slug);
   const isAdmin = ['admin', 'super_admin'].includes(userProfile?.role || '');
