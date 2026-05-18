@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface SpiritBirdProps {
   explanation: string;
@@ -43,6 +44,7 @@ const SpiritBird: React.FC<SpiritBirdProps> = ({ explanation }) => {
 
             <div className="prose prose-sm max-w-none prose-slate text-[13px] leading-relaxed text-[#4A4D5E] font-medium italic">
               <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
                 components={{
                   p: ({ children }) => <p className="mb-4 last:mb-0 leading-relaxed">"{children}"</p>,
                   strong: ({ children }) => <strong className="text-[var(--accent)] font-black">{children}</strong>,

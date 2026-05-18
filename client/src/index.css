@@ -280,3 +280,51 @@ body {
   border-radius: 0 8px 8px 0;
   margin: 1.5em 0;
 }
+
+/* Premium Responsive Table Styling */
+.prose-chat table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1.5rem 0;
+  font-size: 11.5px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+.prose-chat thead {
+  background: rgba(255, 102, 0, 0.05);
+}
+
+.prose-chat th {
+  padding: 10px 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  color: #1A1D2E;
+  text-align: left;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.prose-chat td {
+  padding: 10px 14px;
+  color: #4A4D5E;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.prose-chat tr:last-child td {
+  border-bottom: none;
+}
+
+.prose-chat tr:hover td {
+  background: rgba(255, 102, 0, 0.02);
+  color: #1A1D2E;
+}
+

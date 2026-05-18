@@ -1,5 +1,6 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { Message, ThoughtLogEntry } from "../../types/chat";
 import ThinkingTrace from "./ThinkingTrace";
 import { PROVIDER_MAP } from "../providerMeta";
@@ -340,6 +341,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
                     <>
                       {toolHeader}
                       <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
                         components={{
                           pre: ({ children }) => (
                             <React.Fragment>{children}</React.Fragment>
