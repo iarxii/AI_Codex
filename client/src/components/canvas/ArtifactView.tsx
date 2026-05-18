@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { Artifact } from '../../types/chat';
 import SpiritBird from './SpiritBird';
 
@@ -71,7 +72,7 @@ const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact }) => {
           </pre>
         ) : (
           <div className="prose prose-sm max-w-none prose-slate">
-            <ReactMarkdown>{artifact.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.content}</ReactMarkdown>
           </div>
         )}
 

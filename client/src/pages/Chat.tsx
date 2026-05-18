@@ -318,6 +318,7 @@ const Chat: React.FC = () => {
         isProcessing.current = false;
         
         let extractedArtifacts: Artifact[] = [];
+        let shouldAutoOpenCanvas = false;
         
         setMessages(prev => {
           const updated = [...prev];
@@ -336,6 +337,11 @@ const Chat: React.FC = () => {
 
             // Parse artifacts from final response (once, not on every token)
             extractedArtifacts = parseArtifacts(lastMsg.content, lastMsg.id);
+
+            // Check for explicit CANVAS tags in the raw response text
+            if (typeof lastMsg.content === 'string' && lastMsg.content.includes('[CANVAS:')) {
+              shouldAutoOpenCanvas = true;
+            }
 
             // Extract artifacts from tool calls (multi-modular aware)
             const toolArtifacts: Artifact[] = [];
@@ -372,6 +378,7 @@ const Chat: React.FC = () => {
               inferDependencies(toolArtifacts);
               assignModuleFromBatch(toolArtifacts);
               extractedArtifacts.push(...toolArtifacts);
+              shouldAutoOpenCanvas = true;
             }
           }
           return updated;
@@ -395,7 +402,7 @@ const Chat: React.FC = () => {
 
             setSelectedArtifactId(prev => prev || extractedArtifacts[0].id);
 
-            if (!isCanvasOpenRef.current) {
+            if (shouldAutoOpenCanvas && !isCanvasOpenRef.current) {
               setIsCanvasOpen(true);
             }
           }
