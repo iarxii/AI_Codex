@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Artifact } from '../types/chat';
+import { useAI } from '../contexts/AIContext';
 import ArtifactView from './canvas/ArtifactView';
 import GraphView from './canvas/GraphView';
 import ModuleTree from './canvas/ModuleTree';
@@ -15,9 +16,24 @@ interface AgentCanvasProps {
 
 type TabType = 'Code' | 'Docs' | 'Research' | 'Graph';
 
+/** Standard-mode tabs (no Graph or deep IDE features) */
+const STANDARD_TABS: TabType[] = ['Code', 'Docs', 'Research'];
+/** CodeSpace-mode tabs (full IDE integration) */
+const CODESPACE_TABS: TabType[] = ['Code', 'Docs', 'Research', 'Graph'];
+
 const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, externalSelectedId, conversationId }) => {
+  const { isPremiumSpace } = useAI();
   const [activeTab, setActiveTab] = useState<TabType>('Code');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const availableTabs = isPremiumSpace ? CODESPACE_TABS : STANDARD_TABS;
+
+  // Reset to valid tab if current tab is hidden
+  useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab('Code');
+    }
+  }, [isPremiumSpace, activeTab, availableTabs]);
 
   // Sync with external selection
   useEffect(() => {
@@ -60,6 +76,12 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse"></div>
           <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Agent Canvas</h3>
+          {/* Space mode badge */}
+          {isPremiumSpace && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[var(--accent)]/10 text-[7px] font-black uppercase tracking-wider text-[var(--accent)] border border-[var(--accent)]/20">
+              CodeSpace
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button 
@@ -81,9 +103,9 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — dynamically rendered based on space mode */}
       <div className="px-5 py-3 flex items-center gap-4 border-b border-black/[0.02] bg-black/[0.01]">
-        {(['Code', 'Docs', 'Research', 'Graph'] as TabType[]).map((tab) => {
+        {availableTabs.map((tab) => {
           const count = artifacts.filter(a => a.type === tab.toLowerCase()).length;
           return (
             <button
@@ -112,15 +134,19 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
       {/* Content Area */}
       <div className="flex-1 overflow-hidden flex flex-col">
         {activeTab === 'Graph' ? (
+          /* Graph is only available in CodeSpace mode */
           <div className="flex-1 flex flex-col p-5 overflow-hidden">
             <GraphView workspaceId={conversationId || 'unknown'} />
           </div>
         ) : filteredArtifacts.length > 0 ? (
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Multi-file: Module Tree Sidebar + Detail Pane */}
-            {isMultiFile ? (
+            {/* 
+              CodeSpace: Full ModuleTree + DependencyMinimap for IDE workflow.
+              Standard:  Flat snippet list for simple browsing.
+            */}
+            {isMultiFile && isPremiumSpace ? (
+              /* === CodeSpace Multi-File View === */
               <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Module Tree (collapsible file browser) */}
                 <div className="max-h-[220px] overflow-y-auto scrollbar-hide border-b border-black/[0.04] bg-black/[0.01]">
                   <ModuleTree
                     artifacts={filteredArtifacts}
@@ -129,7 +155,6 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
                   />
                 </div>
 
-                {/* Selected Artifact Detail */}
                 <div className="flex-1 overflow-hidden flex flex-col p-4">
                   {selectedArtifact ? (
                     <div className="flex-1 overflow-hidden">
@@ -142,7 +167,6 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
                   )}
                 </div>
 
-                {/* Dependency Minimap (only if deps exist) */}
                 <div className="px-4 pb-3 shrink-0">
                   <DependencyMinimap
                     artifacts={filteredArtifacts}
@@ -151,8 +175,59 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
                   />
                 </div>
               </div>
+            ) : isMultiFile ? (
+              /* === Standard Multi-Snippet View (Flat List) === */
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Clean flat snippet list */}
+                <div className="max-h-[200px] overflow-y-auto scrollbar-hide border-b border-black/[0.04]">
+                  <div className="py-2 px-3 space-y-0.5">
+                    {filteredArtifacts.map((art) => {
+                      const isActive = selectedId === art.id;
+                      const timeAgo = getRelativeTime(art.timestamp);
+                      return (
+                        <button
+                          key={art.id}
+                          onClick={() => setSelectedId(art.id)}
+                          className={`w-full flex items-center gap-3 py-2 px-3 rounded-xl transition-all text-left group ${
+                            isActive
+                              ? 'bg-[var(--accent)]/8 ring-1 ring-[var(--accent)]/20 shadow-sm'
+                              : 'hover:bg-black/[0.03]'
+                          }`}
+                        >
+                          {/* Language badge */}
+                          <LanguageBadge language={art.language} type={art.type} />
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className={`text-[10px] font-bold truncate ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
+                              {art.title}
+                            </span>
+                            <span className="text-[8px] text-[var(--text-muted)] font-mono uppercase tracking-tight">
+                              {art.language || art.type} • {timeAgo}
+                            </span>
+                          </div>
+                          {isActive && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_6px_rgba(255,102,0,0.5)] shrink-0"></div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Selected Artifact Detail */}
+                <div className="flex-1 overflow-hidden flex flex-col p-4">
+                  {selectedArtifact ? (
+                    <div className="flex-1 overflow-hidden">
+                      <ArtifactView artifact={selectedArtifact} />
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-[10px] uppercase tracking-widest font-bold opacity-30">
+                      Select a snippet to view
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : (
-              /* Single file: Classic view */
+              /* Single file/snippet: Classic view */
               <div className="flex-1 flex flex-col p-5 space-y-5 overflow-y-auto scrollbar-hide">
                 {selectedArtifact ? (
                   <div className="flex-1">
@@ -210,5 +285,58 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
     </aside>
   );
 };
+
+/* ── Helper Components ── */
+
+/** Colored badge for file language/type */
+const LanguageBadge: React.FC<{ language?: string; type: Artifact['type'] }> = ({ language, type }) => {
+  const lang = (language || '').toLowerCase();
+  
+  const badgeConfig: Record<string, { bg: string; text: string; label: string }> = {
+    'python': { bg: 'bg-blue-500/15', text: 'text-blue-500', label: 'PY' },
+    'py': { bg: 'bg-blue-500/15', text: 'text-blue-500', label: 'PY' },
+    'javascript': { bg: 'bg-yellow-500/15', text: 'text-yellow-600', label: 'JS' },
+    'js': { bg: 'bg-yellow-500/15', text: 'text-yellow-600', label: 'JS' },
+    'typescript': { bg: 'bg-blue-400/15', text: 'text-blue-400', label: 'TS' },
+    'ts': { bg: 'bg-blue-400/15', text: 'text-blue-400', label: 'TS' },
+    'tsx': { bg: 'bg-cyan-500/15', text: 'text-cyan-500', label: 'TSX' },
+    'jsx': { bg: 'bg-cyan-500/15', text: 'text-cyan-500', label: 'JSX' },
+    'json': { bg: 'bg-orange-500/15', text: 'text-orange-500', label: 'JSON' },
+    'jsonc': { bg: 'bg-orange-500/15', text: 'text-orange-500', label: 'JSON' },
+    'bash': { bg: 'bg-green-500/15', text: 'text-green-500', label: 'SH' },
+    'sh': { bg: 'bg-green-500/15', text: 'text-green-500', label: 'SH' },
+    'shell': { bg: 'bg-green-500/15', text: 'text-green-500', label: 'SH' },
+    'sql': { bg: 'bg-indigo-500/15', text: 'text-indigo-500', label: 'SQL' },
+    'yaml': { bg: 'bg-rose-500/15', text: 'text-rose-500', label: 'YML' },
+    'yml': { bg: 'bg-rose-500/15', text: 'text-rose-500', label: 'YML' },
+    'html': { bg: 'bg-red-500/15', text: 'text-red-500', label: 'HTML' },
+    'css': { bg: 'bg-purple-500/15', text: 'text-purple-500', label: 'CSS' },
+    'rust': { bg: 'bg-orange-600/15', text: 'text-orange-600', label: 'RS' },
+    'go': { bg: 'bg-teal-500/15', text: 'text-teal-500', label: 'GO' },
+  };
+
+  const config = badgeConfig[lang] || (
+    type === 'docs' ? { bg: 'bg-orange-500/10', text: 'text-orange-500', label: 'DOC' } :
+    type === 'research' ? { bg: 'bg-purple-500/10', text: 'text-purple-500', label: 'RES' } :
+    { bg: 'bg-slate-400/10', text: 'text-slate-400', label: 'TXT' }
+  );
+
+  return (
+    <div className={`${config.bg} ${config.text} w-8 h-8 rounded-lg flex items-center justify-center text-[8px] font-black tracking-tight shrink-0 border border-current/10`}>
+      {config.label}
+    </div>
+  );
+};
+
+/** Relative time helper */
+function getRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
 
 export default AgentCanvas;

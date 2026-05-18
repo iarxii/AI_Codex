@@ -55,7 +55,7 @@ export const parseArtifacts = (content: string, messageId?: string): Artifact[] 
     });
   }
 
-  // Fallback: standard markdown code blocks
+  // Fallback: standard markdown code blocks with context-aware naming
   if (artifacts.length === 0) {
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/gi;
     let cbMatch;
@@ -64,15 +64,7 @@ export const parseArtifacts = (content: string, messageId?: string): Artifact[] 
       const language = (cbMatch[1] || 'text').toLowerCase();
       const artifactContent = cbMatch[2].trim();
       
-      // Attempt to infer filename from preceding text (e.g., "File: main.py" or "### index.ts")
-      const preText = content.substring(Math.max(0, cbMatch.index - 100), cbMatch.index);
-      const filenameRegex = /(?:###|File:|Path:)\s*([a-zA-Z0-9._/-]+\.[a-zA-Z0-9]+)/i;
-      const fnMatch = filenameRegex.exec(preText);
-      
-      const title = fnMatch 
-        ? fnMatch[1] 
-        : `Generated Snippet ${count > 1 ? `(${count})` : ''}`;
-        
+      const title = inferSmartTitle(content, cbMatch, language, artifactContent, count);
       const id = `code-gen-${messageId || 'anon'}-${count}`;
 
       artifacts.push({
@@ -93,6 +85,101 @@ export const parseArtifacts = (content: string, messageId?: string): Artifact[] 
 
   return artifacts;
 };
+
+/**
+ * Multi-tiered context-aware title inference for fallback code block artifacts.
+ * 
+ * Tier 1: Extract nearest preceding markdown header from the message text.
+ * Tier 2: Scan the code block content for domain-specific keywords/patterns.
+ * Tier 3: Generate a descriptive title from the detected language.
+ */
+function inferSmartTitle(
+  fullContent: string,
+  cbMatch: RegExpExecArray,
+  language: string,
+  snippetContent: string,
+  index: number
+): string {
+  // --- Tier 1: Nearest Markdown Header ---
+  const preText = fullContent.substring(Math.max(0, cbMatch.index - 400), cbMatch.index);
+
+  // Check for explicit file references first (e.g., "File: main.py" or "### index.ts")
+  const filenameRegex = /(?:###?|File:|Path:)\s*`?([a-zA-Z0-9._/-]+\.[a-zA-Z0-9]+)`?/i;
+  const fnMatch = filenameRegex.exec(preText);
+  if (fnMatch) return fnMatch[1];
+
+  // Check for nearest markdown heading (any level)
+  const headingMatches = [...preText.matchAll(/^(?:#{1,4})\s+(?:\d+\.\s*)?(.+)$/gm)];
+  if (headingMatches.length > 0) {
+    const lastHeading = headingMatches[headingMatches.length - 1][1].trim();
+    const cleaned = lastHeading
+      .replace(/[*_`~]/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .trim();
+    if (cleaned.length > 2 && cleaned.length <= 60) return cleaned;
+  }
+
+  // --- Tier 2: Content Keyword Heuristics ---
+  const lower = snippetContent.toLowerCase();
+
+  // Trading / Financial signals
+  if (/\[ai\s*(?:frt|alert)\]|long\s*trigger|short\s*trigger|confidence:\s*\d/i.test(snippetContent)) {
+    const pairMatch = snippetContent.match(/(?:USD|EUR|GBP|JPY|AUD|NZD|CHF|CAD)\/(?:USD|EUR|GBP|JPY|AUD|NZD|CHF|CAD)/i);
+    return pairMatch ? `Trading Alert: ${pairMatch[0].toUpperCase()}` : 'AI Trading Signals';
+  }
+
+  // API configuration / keys
+  if (lower.includes('api_key') || lower.includes('api-key') || lower.includes('apikey') ||
+      lower.includes('oanda') || lower.includes('alpaca') || lower.includes('broker')) {
+    return 'API Configuration';
+  }
+
+  // Environment / .env files
+  if (lower.includes('export ') && lower.includes('=') && !lower.includes('function')) {
+    return 'Environment Variables';
+  }
+
+  // Installation commands
+  if (lower.startsWith('pip install') || lower.startsWith('npm install') || lower.startsWith('npm i ') ||
+      lower.startsWith('yarn add') || lower.startsWith('conda install')) {
+    return 'Package Installation';
+  }
+
+  // Shell/CLI commands
+  if (language === 'bash' || language === 'sh' || language === 'shell' || language === 'zsh') {
+    if (lower.includes('curl ') || lower.includes('wget ')) return 'API Request';
+    if (lower.includes('docker ')) return 'Docker Command';
+    if (lower.includes('git ')) return 'Git Command';
+    return 'Shell Command';
+  }
+
+  // JSON configuration
+  if (language === 'json' || language === 'jsonc') {
+    if (lower.includes('"model"') || lower.includes('"provider"')) return 'Model Configuration';
+    if (lower.includes('"host"') || lower.includes('"port"') || lower.includes('"url"')) return 'Connection Config';
+    return 'JSON Document';
+  }
+
+  if (language === 'sql') return 'SQL Query';
+  if (language === 'yaml' || language === 'yml' || language === 'toml') return 'Configuration File';
+
+  // --- Tier 3: Language-Based Descriptive Fallback ---
+  const langTitleMap: Record<string, string> = {
+    'python': 'Python Script', 'py': 'Python Script',
+    'javascript': 'JavaScript Snippet', 'js': 'JavaScript Snippet',
+    'typescript': 'TypeScript Module', 'ts': 'TypeScript Module',
+    'tsx': 'React Component', 'jsx': 'React Component',
+    'html': 'HTML Template', 'css': 'Stylesheet', 'scss': 'Stylesheet',
+    'rust': 'Rust Module', 'go': 'Go Module', 'java': 'Java Class',
+    'c': 'C Source', 'cpp': 'C++ Source',
+    'ruby': 'Ruby Script', 'php': 'PHP Script',
+    'markdown': 'Documentation', 'md': 'Documentation',
+    'text': 'Text Snippet',
+  };
+
+  const baseName = langTitleMap[language] || `${language.charAt(0).toUpperCase() + language.slice(1)} Snippet`;
+  return index > 1 ? `${baseName} (${index})` : baseName;
+}
 
 /**
  * Infers dependency relationships between artifacts by scanning
