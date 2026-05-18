@@ -40,21 +40,43 @@ function buildTree(artifacts: Artifact[]): TreeNode {
   return root;
 }
 
-const FileIcon: React.FC<{ type: Artifact['type'] }> = ({ type }) => {
-  const color = type === 'code'
-    ? 'text-blue-500'
-    : type === 'docs'
-    ? 'text-orange-500'
-    : 'text-purple-500';
+/** Language-specific colored badge for the file tree */
+const FileTypeBadge: React.FC<{ language?: string; type: Artifact['type'] }> = ({ language, type }) => {
+  const lang = (language || '').toLowerCase();
+  
+  const badges: Record<string, { bg: string; text: string; label: string }> = {
+    'python': { bg: 'bg-blue-500/15', text: 'text-blue-500', label: 'PY' },
+    'py': { bg: 'bg-blue-500/15', text: 'text-blue-500', label: 'PY' },
+    'javascript': { bg: 'bg-yellow-500/15', text: 'text-yellow-600', label: 'JS' },
+    'js': { bg: 'bg-yellow-500/15', text: 'text-yellow-600', label: 'JS' },
+    'typescript': { bg: 'bg-blue-400/15', text: 'text-blue-400', label: 'TS' },
+    'ts': { bg: 'bg-blue-400/15', text: 'text-blue-400', label: 'TS' },
+    'tsx': { bg: 'bg-cyan-500/15', text: 'text-cyan-500', label: 'TSX' },
+    'jsx': { bg: 'bg-cyan-500/15', text: 'text-cyan-500', label: 'JSX' },
+    'json': { bg: 'bg-orange-500/15', text: 'text-orange-500', label: 'JSON' },
+    'bash': { bg: 'bg-green-500/15', text: 'text-green-500', label: 'SH' },
+    'sh': { bg: 'bg-green-500/15', text: 'text-green-500', label: 'SH' },
+    'shell': { bg: 'bg-green-500/15', text: 'text-green-500', label: 'SH' },
+    'sql': { bg: 'bg-indigo-500/15', text: 'text-indigo-500', label: 'SQL' },
+    'yaml': { bg: 'bg-rose-500/15', text: 'text-rose-500', label: 'YML' },
+    'yml': { bg: 'bg-rose-500/15', text: 'text-rose-500', label: 'YML' },
+    'html': { bg: 'bg-red-500/15', text: 'text-red-500', label: 'HTML' },
+    'css': { bg: 'bg-purple-500/15', text: 'text-purple-500', label: 'CSS' },
+    'rust': { bg: 'bg-orange-600/15', text: 'text-orange-600', label: 'RS' },
+    'go': { bg: 'bg-teal-500/15', text: 'text-teal-500', label: 'GO' },
+    'text': { bg: 'bg-slate-400/10', text: 'text-slate-400', label: 'TXT' },
+  };
+
+  const cfg = badges[lang] || (
+    type === 'docs' ? { bg: 'bg-orange-500/10', text: 'text-orange-500', label: 'DOC' } :
+    type === 'research' ? { bg: 'bg-purple-500/10', text: 'text-purple-500', label: 'RES' } :
+    { bg: 'bg-slate-400/10', text: 'text-slate-400', label: 'TXT' }
+  );
 
   return (
-    <svg className={`w-3.5 h-3.5 ${color} shrink-0`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      {type === 'code' ? (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-      ) : (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      )}
-    </svg>
+    <div className={`${cfg.bg} ${cfg.text} w-6 h-6 rounded-md flex items-center justify-center text-[7px] font-black tracking-tight shrink-0`}>
+      {cfg.label}
+    </div>
   );
 };
 
@@ -114,16 +136,16 @@ const DirNode: React.FC<{
             <button
               key={art.id}
               onClick={() => onSelect(art.id)}
-              className={`w-full flex items-center gap-2 py-1.5 px-2 rounded-lg transition-all text-left ${
+              className={`w-full flex items-center gap-2.5 py-1.5 px-2 rounded-xl transition-all text-left ${
                 selectedId === art.id
-                  ? 'bg-[var(--accent)]/10 border-l-2 border-[var(--accent)]'
-                  : 'hover:bg-black/[0.03] border-l-2 border-transparent'
+                  ? 'bg-[var(--accent)]/8 ring-1 ring-[var(--accent)]/20 shadow-sm'
+                  : 'hover:bg-black/[0.03]'
               }`}
               style={{ paddingLeft: `${(depth + 1) * 12 + 4}px` }}
             >
-              <FileIcon type={art.type} />
+              <FileTypeBadge language={art.language} type={art.type} />
               <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-[9px] font-bold text-[var(--text-primary)] truncate">{art.title}</span>
+                <span className={`text-[9px] font-bold truncate ${selectedId === art.id ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>{art.title}</span>
                 <span className="text-[7px] text-[var(--text-muted)] font-mono uppercase tracking-tighter truncate">
                   {art.language || art.type}
                   {art.dependencies && art.dependencies.length > 0 && (
@@ -131,6 +153,9 @@ const DirNode: React.FC<{
                   )}
                 </span>
               </div>
+              {selectedId === art.id && (
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_6px_rgba(255,102,0,0.5)] shrink-0"></div>
+              )}
             </button>
           ))}
         </div>
@@ -189,17 +214,20 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({ artifacts, selectedId, onSelect
             <button
               key={art.id}
               onClick={() => onSelect(art.id)}
-              className={`w-full flex items-center gap-2 py-1.5 px-4 rounded-lg transition-all text-left ${
+              className={`w-full flex items-center gap-2.5 py-1.5 px-4 rounded-xl transition-all text-left ${
                 selectedId === art.id
-                  ? 'bg-[var(--accent)]/10 border-l-2 border-[var(--accent)]'
-                  : 'hover:bg-black/[0.03] border-l-2 border-transparent'
+                  ? 'bg-[var(--accent)]/8 ring-1 ring-[var(--accent)]/20 shadow-sm'
+                  : 'hover:bg-black/[0.03]'
               }`}
             >
-              <FileIcon type={art.type} />
+              <FileTypeBadge language={art.language} type={art.type} />
               <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-[9px] font-bold text-[var(--text-primary)] truncate">{art.title}</span>
+                <span className={`text-[9px] font-bold truncate ${selectedId === art.id ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>{art.title}</span>
                 <span className="text-[7px] text-[var(--text-muted)] font-mono uppercase">{art.language || art.type}</span>
               </div>
+              {selectedId === art.id && (
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_6px_rgba(255,102,0,0.5)] shrink-0"></div>
+              )}
             </button>
           ))}
         </div>
