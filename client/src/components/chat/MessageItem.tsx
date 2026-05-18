@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import type { Message, ThoughtLogEntry } from "../../types/chat";
 import ThinkingTrace from "./ThinkingTrace";
 import { PROVIDER_MAP } from "../providerMeta";
+import { TradingChart } from "./TradingChart";
 
 interface MessageItemProps {
   msg: Message;
@@ -337,6 +338,18 @@ const MessageItem: React.FC<MessageItemProps> = ({
                     }
                   }
 
+                  // Preprocess to support [TRADING_CHART:...] syntax by mapping it to a trading-chart code block
+                  displayContent = displayContent.replace(
+                    /\[TRADING_CHART:([^:\]\s]+)(?::([^:\]\s]+))?(?::([^:\]\s]+))?(?::([^:\]\s]+))?\]/gi,
+                    (match, symbol, entry, sl, tp) => {
+                      const config: any = { symbol: symbol || "BTCUSD" };
+                      if (entry) config.entry = Number(entry);
+                      if (sl) config.sl = Number(sl);
+                      if (tp) config.tp = Number(tp);
+                      return `\n\n\`\`\`trading-chart\n${JSON.stringify(config, null, 2)}\n\`\`\`\n\n`;
+                    }
+                  );
+
                   return (
                     <>
                       {toolHeader}
@@ -359,11 +372,36 @@ const MessageItem: React.FC<MessageItemProps> = ({
                             const match = /language-(\w+)/.exec(
                               className || "",
                             );
+                            const isTradingChart = match && match[1] === "trading-chart";
                             return !inline ? (
-                              <CodeBlock
-                                language={match ? match[1] : ""}
-                                value={String(children).replace(/\n$/, "")}
-                              />
+                              isTradingChart ? (
+                                (() => {
+                                  try {
+                                    const data = JSON.parse(String(children));
+                                    return (
+                                      <div className="my-5">
+                                        <TradingChart 
+                                          symbol={data.symbol} 
+                                          initialEntry={data.entry} 
+                                          initialSL={data.sl} 
+                                          initialTP={data.tp} 
+                                        />
+                                      </div>
+                                    );
+                                  } catch (e) {
+                                    return (
+                                      <div className="my-5">
+                                        <TradingChart />
+                                      </div>
+                                    );
+                                  }
+                                })()
+                              ) : (
+                                <CodeBlock
+                                  language={match ? match[1] : ""}
+                                  value={String(children).replace(/\n$/, "")}
+                                />
+                              )
                             ) : (
                               <code className={className} {...props}>
                                 {children}

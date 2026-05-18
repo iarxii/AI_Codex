@@ -66,7 +66,7 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
     }
   }, [activeTab, artifacts, selectedId]);
 
-  const selectedArtifact = artifacts.find(a => a.id === selectedId);
+  const selectedArtifact = filteredArtifacts.find(a => a.id === selectedId) || filteredArtifacts[0];
   const isMultiFile = filteredArtifacts.length > 1;
 
   const handleExport = async () => {
