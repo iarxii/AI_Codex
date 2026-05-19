@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   TrendingUp, 
-  TrendingDown, 
-  Settings, 
   Play, 
   ShieldAlert, 
   CheckCircle, 
-  Percent, 
   MousePointer, 
   Sliders, 
   ChevronUp, 
@@ -39,7 +36,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   initialTP = 97200,
   timeframe = "H1",
 }) => {
-  const [entry, setEntry] = useState(initialEntry);
+  const [entry] = useState(initialEntry);
   const [sl, setSl] = useState(initialSL);
   const [tp, setTp] = useState(initialTP);
   const [currentPrice, setCurrentPrice] = useState(initialEntry);
@@ -108,7 +105,6 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   }, [isLive]);
 
   // Calculate Metrics
-  const isBullish = currentPrice >= entry;
   const potentialProfit = Math.abs(tp - entry);
   const potentialLoss = Math.abs(entry - sl);
   const riskRewardRatio = potentialLoss > 0 ? (potentialProfit / potentialLoss).toFixed(2) : "0.00";
@@ -116,7 +112,6 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   // Discipline Check Rules (MQL5 Part 5 Risk Enforcement)
   const isRRCompliant = Number(riskRewardRatio) >= 1.5;
   const isDrawdownSafe = potentialLoss < entry * 0.03; // Under 3% risk on account
-  const isONNXValidated = true; // Preprocessing is exact match
 
   // Click handler to adjust TP/SL precisely
   const adjustTP = (amount: number) => setTp(prev => Number((prev + amount).toFixed(2)));
