@@ -57,11 +57,17 @@ export const parseArtifacts = (content: string, messageId?: string): Artifact[] 
 
   // Fallback: standard markdown code blocks with context-aware naming
   if (artifacts.length === 0) {
-    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/gi;
+    const codeBlockRegex = /```([\w-]+)?\n([\s\S]*?)```/gi;
     let cbMatch;
     let count = 1;
     while ((cbMatch = codeBlockRegex.exec(content)) !== null) {
       const language = (cbMatch[1] || 'text').toLowerCase();
+      
+      // Skip interactive UI components that render natively in the chat feed
+      if (['trading-chart', 'alert', 'flashcard', 'interactive'].includes(language)) {
+        continue;
+      }
+
       const artifactContent = cbMatch[2].trim();
       
       const title = inferSmartTitle(content, cbMatch, language, artifactContent, count);

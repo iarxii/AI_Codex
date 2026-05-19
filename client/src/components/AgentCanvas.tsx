@@ -98,6 +98,8 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
           const ext = art.language === 'python' || art.language === 'py' ? 'py' :
                       art.language === 'javascript' || art.language === 'js' ? 'js' :
                       art.language === 'typescript' || art.language === 'ts' ? 'ts' :
+                      art.language === 'json' ? 'json' :
+                      art.language === 'bash' || art.language === 'sh' ? 'sh' :
                       art.language === 'tsx' ? 'tsx' : 'txt';
           fileName = `${fileName}.${ext}`;
         } else if ((art.type === 'docs' || art.type === 'research') && !fileName.includes('.')) {
