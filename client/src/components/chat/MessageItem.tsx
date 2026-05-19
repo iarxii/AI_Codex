@@ -362,6 +362,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
                           p: ({ children }) => (
                             <div className="mb-4 last:mb-0">{children}</div>
                           ),
+                          blockquote: ({ children }) => (
+                            <div className="my-4 border-l-4 border-indigo-500 bg-indigo-500/10 p-4 rounded-r-xl shadow-sm text-sm text-indigo-200">
+                              {children}
+                            </div>
+                          ),
                           code({
                             node,
                             inline,
@@ -369,7 +374,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
                             children,
                             ...props
                           }: any) {
-                            const match = /language-(\w+)/.exec(
+                            const match = /language-([\w-]+)/.exec(
                               className || "",
                             );
                             const isTradingChart = match && match[1] === "trading-chart";
