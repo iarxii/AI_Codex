@@ -212,7 +212,7 @@ async def health_check():
     return {"status": "healthy", "timestamp": str(datetime.now())}
 
 # Include routers
-from backend.api import auth, chat, metrics, rag, skills, conversations, models, workspace, profile, admin, spaces
+from backend.api import auth, chat, metrics, rag, skills, conversations, models, workspace, profile, admin, spaces, market
 app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
 app.include_router(profile.router, prefix=settings.API_V1_STR + "/profile", tags=["profile"])
 app.include_router(admin.router, prefix=settings.API_V1_STR + "/admin", tags=["admin"])
@@ -221,6 +221,7 @@ app.include_router(spaces.router, prefix=settings.API_V1_STR + "/spaces", tags=[
 app.include_router(chat.router, prefix=settings.API_V1_STR + "/chat", tags=["chat"])
 app.include_router(workspace.router, prefix=settings.API_V1_STR + "/workspace", tags=["workspace"])
 app.include_router(metrics.router, prefix=settings.API_V1_STR + "/metrics", tags=["metrics"])
+app.include_router(market.router, prefix=settings.API_V1_STR + "/market", tags=["market"])
 app.include_router(rag.router, prefix=settings.API_V1_STR + "/rag", tags=["rag"])
 app.include_router(skills.router, prefix=settings.API_V1_STR + "/skills", tags=["skills"])
 app.include_router(models.router, prefix=settings.API_V1_STR + "/models", tags=["models"])
