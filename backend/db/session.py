@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from .models import Base, User
+from .models import Base, User, ArcadeScore
 from sqlalchemy import select
 from backend.config import settings
 from passlib.context import CryptContext

@@ -113,3 +113,16 @@ class CodexSpaceAccess(Base):
     space_id: Mapped[int] = mapped_column(ForeignKey("codex_spaces.id"), index=True)
     granted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     granted_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+
+class ArcadeScore(Base):
+    __tablename__ = "arcade_scores"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    game_id: Mapped[str] = mapped_column(String(50), index=True)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    stars_earned: Mapped[int] = mapped_column(Integer, default=0)
+    accuracy: Mapped[Optional[float]] = mapped_column(default=100.0)
+    time_spent_sec: Mapped[int] = mapped_column(Integer, default=0)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
