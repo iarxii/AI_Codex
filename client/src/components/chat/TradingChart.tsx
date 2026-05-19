@@ -50,14 +50,15 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   // Generate initial historical candles
   useEffect(() => {
     const data: Candle[] = [];
-    let basePrice = initialEntry - 800;
+    const vol = initialEntry * 0.005; // 0.5% volatility base
+    let basePrice = initialEntry - (vol * 2);
     const now = new Date();
 
     for (let i = 24; i > 0; i--) {
-      const open = basePrice + (Math.random() - 0.5) * 400;
-      const close = open + (Math.random() - 0.45) * 500; // slightly bullish bias
-      const high = Math.max(open, close) + Math.random() * 200;
-      const low = Math.min(open, close) - Math.random() * 200;
+      const open = basePrice + (Math.random() - 0.5) * vol;
+      const close = open + (Math.random() - 0.45) * vol * 1.2; // slightly bullish bias
+      const high = Math.max(open, close) + Math.random() * (vol * 0.5);
+      const low = Math.min(open, close) - Math.random() * (vol * 0.5);
       
       const timeStr = new Date(now.getTime() - i * 60 * 60 * 1000).toLocaleTimeString([], {
         hour: "2-digit",
@@ -77,8 +78,12 @@ export const TradingChart: React.FC<TradingChartProps> = ({
 
     const interval = setInterval(() => {
       setCurrentPrice((prev) => {
-        const change = (Math.random() - 0.48) * 150; // slight bullish bias
-        const nextPrice = Math.max(1000, Number((prev + change).toFixed(2)));
+        const vol = initialEntry * 0.005;
+        const change = (Math.random() - 0.48) * (vol * 0.4); // slight bullish bias
+        
+        // determine decimal precision
+        const precision = initialEntry < 10 ? 4 : initialEntry < 1000 ? 2 : 2;
+        const nextPrice = Math.max(0.0001, Number((prev + change).toFixed(precision)));
         
         // Update the last candle in real time
         setCandles((prevCandles) => {
@@ -101,7 +106,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isLive]);
+  }, [isLive, initialEntry]);
 
   // Calculate Metrics
   const potentialProfit = Math.abs(tp - entry);
@@ -112,9 +117,14 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   const isRRCompliant = Number(riskRewardRatio) >= 1.5;
   const isDrawdownSafe = potentialLoss < entry * 0.03; // Under 3% risk on account
 
+  // Dynamic step sizing based on asset class
+  const stepSize = initialEntry < 10 ? 0.0005 : initialEntry < 1000 ? 0.5 : 50;
+  const displayDecimals = initialEntry < 10 ? 4 : 2;
+  const volRange = initialEntry * 0.005;
+
   // Click handler to adjust TP/SL precisely
-  const adjustTP = (amount: number) => setTp(prev => Number((prev + amount).toFixed(2)));
-  const adjustSL = (amount: number) => setSl(prev => Number((prev + amount).toFixed(2)));
+  const adjustTP = (amount: number) => setTp(prev => Number((prev + amount).toFixed(displayDecimals)));
+  const adjustSL = (amount: number) => setSl(prev => Number((prev + amount).toFixed(displayDecimals)));
 
   // Simulated MQL5 Tool Drawing (Part 31)
   const handleChartClick = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -317,7 +327,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
               textAnchor="middle"
               fontFamily="monospace"
             >
-              TP: {tp.toFixed(0)}
+              TP: {tp.toFixed(displayDecimals)}
             </text>
           </g>
 
@@ -352,7 +362,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
               textAnchor="middle"
               fontFamily="monospace"
             >
-              ENTRY: {entry}
+              ENTRY: {entry.toFixed(displayDecimals)}
             </text>
           </g>
 
@@ -384,7 +394,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
               textAnchor="middle"
               fontFamily="monospace"
             >
-              SL: {sl.toFixed(0)}
+              SL: {sl.toFixed(displayDecimals)}
             </text>
           </g>
 
@@ -451,33 +461,35 @@ export const TradingChart: React.FC<TradingChartProps> = ({
             <div>
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[10px] font-bold text-slate-400">Take Profit</span>
-                <span className="text-[10px] font-bold text-emerald-400 font-mono">+{potentialProfit.toFixed(0)} USD</span>
+                <span className="text-[10px] font-bold text-emerald-400 font-mono">+{potentialProfit.toFixed(displayDecimals)} USD</span>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => adjustTP(-50)} className="p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300"><ChevronDown className="w-3 h-3" /></button>
+                <button onClick={() => adjustTP(-stepSize)} className="p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300"><ChevronDown className="w-3 h-3" /></button>
                 <input 
                   type="range" 
-                  min={entry + 100} 
-                  max={entry + 5000} 
+                  min={entry + (volRange * 0.5)} 
+                  max={entry + (volRange * 20)} 
+                  step={stepSize}
                   value={tp} 
                   onChange={(e) => setTp(Number(e.target.value))} 
                   className="flex-1 accent-[#10B981] h-1 bg-white/10 rounded-lg cursor-pointer"
                 />
-                <button onClick={() => adjustTP(50)} className="p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300"><ChevronUp className="w-3 h-3" /></button>
+                <button onClick={() => adjustTP(stepSize)} className="p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300"><ChevronUp className="w-3 h-3" /></button>
               </div>
             </div>
 
             <div>
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[10px] font-bold text-slate-400">Stop Loss</span>
-                <span className="text-[10px] font-bold text-rose-400 font-mono">-{potentialLoss.toFixed(0)} USD</span>
+                <span className="text-[10px] font-bold text-rose-400 font-mono">-{potentialLoss.toFixed(displayDecimals)} USD</span>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => adjustSL(-50)} className="p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300"><ChevronDown className="w-3 h-3" /></button>
+                <button onClick={() => adjustSL(-stepSize)} className="p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300"><ChevronDown className="w-3 h-3" /></button>
                 <input 
                   type="range" 
-                  min={entry - 5000} 
-                  max={entry - 100} 
+                  min={entry - (volRange * 20)} 
+                  max={entry - (volRange * 0.5)} 
+                  step={stepSize}
                   value={sl} 
                   onChange={(e) => setSl(Number(e.target.value))} 
                   className="flex-1 accent-[#EF4444] h-1 bg-white/10 rounded-lg cursor-pointer"
