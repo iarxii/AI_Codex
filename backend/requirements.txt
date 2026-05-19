@@ -26,3 +26,4 @@ rich
 google-genai
 aiosqlite
 google-cloud-storage
+yfinance
