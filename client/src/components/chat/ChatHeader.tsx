@@ -81,19 +81,21 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onClick={() => {
             if (currentConvId) setIsOnboardingOpen(true);
           }}
-          className="text-left group/card hover:bg-black/5 p-1.5 rounded-lg transition-colors"
+          className="text-left group/card hover:bg-black/5 p-1.5 rounded-lg transition-colors flex-1 min-w-0 max-w-[200px] sm:max-w-[250px] md:max-w-none"
         >
           <h2 className="text-xs font-semibold uppercase tracking-widest text-[#4A4D5E] group-hover/card:text-[#fd3b12] flex items-center gap-2">
             {activeSpace ? (
-              <span className="flex items-center gap-1">
-                <span className="text-[var(--accent)] font-bold">{activeSpace.name}</span>
-                {currentConvId ? ` / Session #${currentConvId}` : ""}
+              <span className="flex items-center gap-1 truncate w-full">
+                <span className="text-[var(--accent)] font-bold truncate">{activeSpace.name}</span>
+                {currentConvId ? <span className="shrink-0">/ Session #{currentConvId}</span> : ""}
               </span>
             ) : (
-              currentConvId ? `Workspace #${currentConvId}` : "No Workspace"
+              <span className="truncate w-full">
+                {currentConvId ? `Workspace #${currentConvId}` : "No Workspace"}
+              </span>
             )}
             {currentConvId && (
-              <span className="opacity-0 group-hover/card:opacity-100 text-[9px] font-bold tracking-widest bg-[#fd3b12]/10 text-[#fd3b12] px-1.5 py-0.5 rounded transition-opacity">
+              <span className="hidden md:inline opacity-0 group-hover/card:opacity-100 text-[9px] font-bold tracking-widest bg-[#fd3b12]/10 text-[#fd3b12] px-1.5 py-0.5 rounded transition-opacity shrink-0">
                 PROFILE
               </span>
             )}

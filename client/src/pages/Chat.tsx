@@ -633,7 +633,7 @@ const Chat: React.FC = () => {
         currentConversationId={currentConvId} 
         onSelectConversation={loadConversation} 
         onNewChat={handleNewChat}
-        isOpen={isSidebarOpen}
+        isOpen={isSidebarOpen && !isCanvasOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
 

@@ -32,7 +32,10 @@ const NeuralFunctionSwitch: React.FC<NeuralFunctionSwitchProps> = ({
                <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#fd3b12] rounded-full animate-pulse border border-white" />
              )}
           </div>
-          <span className="text-[11px] font-black uppercase tracking-[0.15em] text-[#1A1D2E]">System Functions</span>
+          <span className="text-[11px] font-black uppercase tracking-[0.15em] text-[#1A1D2E]">
+            <span className="hidden sm:inline">System Functions</span>
+            <span className="inline sm:hidden">Sys.Func</span>
+          </span>
           <ChevronDownIcon className="w-3.5 h-3.5 text-[#7A7D8E] group-hover:text-[#1A1D2E] transition-colors" />
         </Menu.Button>
       </div>
