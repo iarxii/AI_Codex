@@ -341,7 +341,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
                   // Preprocess to support [TRADING_CHART:...] syntax by mapping it to a trading-chart code block
                   displayContent = displayContent.replace(
                     /\[TRADING_CHART:([^:\]\s]+)(?::([^:\]\s]+))?(?::([^:\]\s]+))?(?::([^:\]\s]+))?\]/gi,
-                    (match, symbol, entry, sl, tp) => {
+                    (_match, symbol, entry, sl, tp) => {
                       const config: any = { symbol: symbol || "BTCUSD" };
                       if (entry) config.entry = Number(entry);
                       if (sl) config.sl = Number(sl);
