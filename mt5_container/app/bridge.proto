@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package fintrader.mt5;
+
+service MT5Bridge {
+  rpc GetHistoricalTicks(TickRequest) returns (stream TickResponse);
+  rpc ExecuteOrder(OrderRequest) returns (OrderResponse);
+  rpc GetAccountInfo(AccountRequest) returns (AccountResponse);
+}
+
+message TickRequest {
+  string symbol = 1;
+  int64 start_time = 2; // Epoch timestamp
+  int64 end_time = 3;   // Epoch timestamp
+}
+
+message TickResponse {
+  int64 time = 1;
+  double bid = 2;
+  double ask = 3;
+  double last = 4;
+  uint64 volume = 5;
+}
+
+message OrderRequest {
+  string symbol = 1;
+  string order_type = 2; // "BUY", "SELL"
+  double volume = 3;
+  double price = 4;
+  int32 slippage = 5;
+}
+
+message OrderResponse {
+  bool success = 1;
+  uint64 ticket = 2;
+  string comment = 3;
+  double price = 4;
+}
+
+message AccountRequest {}
+
+message AccountResponse {
+  int64 login = 1;
+  double balance = 2;
+  double equity = 3;
+  string broker = 4;
+}
