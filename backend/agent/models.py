@@ -52,6 +52,17 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
             temperature=temperature
         )
         
+    elif provider == "ollama_cloud":
+        base_url = "https://ollama.com"
+        if not base_url.endswith("/v1"):
+            base_url = f"{base_url.rstrip('/')}/v1"
+        return ChatOpenAI(
+            model=model or "llama3",
+            openai_api_key=api_key or "sk-ollama",
+            openai_api_base=base_url,
+            temperature=temperature
+        )
+        
     else:
         # Default fallback
         logger.warning(f"Unknown provider {provider}, falling back to local llama3")
