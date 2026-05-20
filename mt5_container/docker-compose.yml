@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  mt5-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fintrader-mt5-engine
+    restart: unless-stopped
+    ports:
+      - "50051:50051"  # gRPC Python Bridge
+      - "5900:5900"    # VNC Debugging Port
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 2048M
+        reservations:
+          memory: 512M
+    volumes:
+      # Persist MT5 installations, user profiles, terminal logs, and data files
+      - mt5_terminal_data:/opt/wineprefix/drive_c/Program Files/MetaTrader 5
+      - mt5_user_config:/opt/wineprefix/drive_c/users/trader/AppData/Roaming/MetaQuotes
+    networks:
+      - fintrader-network
+
+volumes:
+  mt5_terminal_data:
+    driver: local
+  mt5_user_config:
+    driver: local
+
+networks:
+  fintrader-network:
+    driver: bridge
+    internal: true  # Isolate from external network; exposing only via mapped ports
