@@ -25,7 +25,7 @@ async def test_db_operations():
         result = await session.execute(stmt)
         user = result.scalars().first()
         if not user:
-            print("⚠️ No users found in database! Creating a test user...")
+            print("[WARN] No users found in database! Creating a test user...")
             test_user = User(
                 username="test_arcade_dev",
                 email="arcade_dev@aicodex.io",
@@ -49,6 +49,10 @@ async def test_db_operations():
             ArcadeScore(user_id=user.id, game_id="logicgrid", score=2500, stars_earned=3, accuracy=100.0, time_spent_sec=95),
             ArcadeScore(user_id=user.id, game_id="chromasync", score=3200, stars_earned=3, accuracy=95.0, time_spent_sec=42),
             ArcadeScore(user_id=user.id, game_id="chromasync", score=3500, stars_earned=3, accuracy=97.0, time_spent_sec=35),
+            ArcadeScore(user_id=user.id, game_id="patternforge", score=2800, stars_earned=3, accuracy=100.0, time_spent_sec=30),
+            ArcadeScore(user_id=user.id, game_id="patternforge", score=3100, stars_earned=3, accuracy=100.0, time_spent_sec=24),
+            ArcadeScore(user_id=user.id, game_id="nodeflow", score=2900, stars_earned=3, accuracy=100.0, time_spent_sec=35),
+            ArcadeScore(user_id=user.id, game_id="nodeflow", score=3200, stars_earned=3, accuracy=100.0, time_spent_sec=28),
         ]
         session.add_all(scores_to_add)
         await session.commit()
@@ -145,6 +149,68 @@ async def test_db_operations():
         rows_chromasync = leaderboard_chromasync_result.all()
         print(f"--- LEADERBOARD FOR 'chromasync' (Total entries: {len(rows_chromasync)}) ---")
         for row in rows_chromasync:
+            score_rec, name = row
+            print(f"Player: {name} | Score: {score_rec.score} | Stars: {score_rec.stars_earned} | Accuracy: {score_rec.accuracy}% | Time: {score_rec.time_spent_sec}s")
+
+        # 6. Retrieve leaderboard for 'patternforge'
+        print("\nFetching leaderboard for 'patternforge'...")
+        subquery_patternforge = (
+            select(
+                ArcadeScore.user_id,
+                func.max(ArcadeScore.score).label("max_score")
+            )
+            .filter(ArcadeScore.game_id == "patternforge")
+            .group_by(ArcadeScore.user_id)
+            .subquery()
+        )
+
+        stmt_patternforge = (
+            select(ArcadeScore, User.username)
+            .join(User, ArcadeScore.user_id == User.id)
+            .join(
+                subquery_patternforge,
+                (ArcadeScore.user_id == subquery_patternforge.c.user_id) & 
+                (ArcadeScore.score == subquery_patternforge.c.max_score)
+            )
+            .filter(ArcadeScore.game_id == "patternforge")
+            .order_by(ArcadeScore.score.desc())
+        )
+
+        leaderboard_patternforge_result = await session.execute(stmt_patternforge)
+        rows_patternforge = leaderboard_patternforge_result.all()
+        print(f"--- LEADERBOARD FOR 'patternforge' (Total entries: {len(rows_patternforge)}) ---")
+        for row in rows_patternforge:
+            score_rec, name = row
+            print(f"Player: {name} | Score: {score_rec.score} | Stars: {score_rec.stars_earned} | Accuracy: {score_rec.accuracy}% | Time: {score_rec.time_spent_sec}s")
+
+        # 7. Retrieve leaderboard for 'nodeflow'
+        print("\nFetching leaderboard for 'nodeflow'...")
+        subquery_nodeflow = (
+            select(
+                ArcadeScore.user_id,
+                func.max(ArcadeScore.score).label("max_score")
+            )
+            .filter(ArcadeScore.game_id == "nodeflow")
+            .group_by(ArcadeScore.user_id)
+            .subquery()
+        )
+
+        stmt_nodeflow = (
+            select(ArcadeScore, User.username)
+            .join(User, ArcadeScore.user_id == User.id)
+            .join(
+                subquery_nodeflow,
+                (ArcadeScore.user_id == subquery_nodeflow.c.user_id) & 
+                (ArcadeScore.score == subquery_nodeflow.c.max_score)
+            )
+            .filter(ArcadeScore.game_id == "nodeflow")
+            .order_by(ArcadeScore.score.desc())
+        )
+
+        leaderboard_nodeflow_result = await session.execute(stmt_nodeflow)
+        rows_nodeflow = leaderboard_nodeflow_result.all()
+        print(f"--- LEADERBOARD FOR 'nodeflow' (Total entries: {len(rows_nodeflow)}) ---")
+        for row in rows_nodeflow:
             score_rec, name = row
             print(f"Player: {name} | Score: {score_rec.score} | Stars: {score_rec.stars_earned} | Accuracy: {score_rec.accuracy}% | Time: {score_rec.time_spent_sec}s")
             

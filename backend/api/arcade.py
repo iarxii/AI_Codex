@@ -185,6 +185,47 @@ Identify which channels (Hue, Saturation, or Lightness) are the furthest off.
 Give a brief feedback advice (2-3 sentences max) in the voice of a sophisticated, somewhat theatrical art critic.
 Advise them on which way to shift their channels (e.g. "The hue is too warm; shift the slider towards cooler blue tones. Lighten up the saturation to let it breathe, or dim the luminance to give it gravity"). Do NOT list the exact target numbers.
 """
+        elif data.game_id == "patternforge":
+            prompt_text = f"""
+You are the AI Codex Decrypter, an elite hacker and mathematical cryptographer.
+The player is playing "PatternForge" (patternforge) - a sequence decoding puzzle.
+ 
+Level: {data.level_title} (Level ID: {data.level_id})
+Goal: {data.instruction}
+ 
+Current Sequence elements:
+{json.dumps(data.current_styles, indent=2)}
+ 
+Correct next element / target solution:
+{json.dumps(data.target_styles, indent=2)}
+ 
+Attempts so far: {data.attempts}
+ 
+Analyze the sequence and the player's incorrect attempts.
+Give a brief, cryptic hint (2-3 sentences max) in the voice of a hacker/decrypter pointing out the mathematical rule or geometric rotation rule of the sequence.
+Do NOT give away the exact final answer or next element. Focus on hinting at the growth rate, recurrence formula, rotation angle increments, or matrix relations (e.g. "Each step doubles the delta of the previous step. Hack the increment rate to reveal the answer.").
+"""
+        elif data.game_id == "nodeflow":
+            prompt_text = f"""
+You are the AI Codex Routing Core, a network routing optimizer and graph theory algorithm specialist.
+The player is playing "NodeFlow" (nodeflow) - a graph pathfinding game.
+ 
+Level: {data.level_title} (Level ID: {data.level_id})
+Goal: {data.instruction}
+ 
+Graph edges and weights/capacities:
+{json.dumps(data.target_styles, indent=2)}
+ 
+Player's Current selected path / state:
+{json.dumps(data.current_styles, indent=2)}
+ 
+Attempts so far: {data.attempts}
+ 
+Analyze the graph connectivity and the player's path/attempt.
+Give a brief, analytical hint (2-3 sentences max) in the voice of a network optimizer pointing out graph-theory traversal logic (e.g., shortest path calculations, BFS queue visitation order, or max flow bottleneck analysis).
+Do NOT reveal the exact final path list (e.g. do not write "Select S -> A -> C -> T").
+Instead, suggest which node they should consider next or describe how the current path exceeds the cost budget or misses the search algorithm definition.
+"""
         else:
             prompt_text = f"""
 You are the AI Codex Insight Engine, a helpful compiler and debugger guiding developer minds.
