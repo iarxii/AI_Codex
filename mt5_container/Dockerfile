@@ -5,6 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV WINEPREFIX=/opt/wineprefix
 ENV WINEARCH=win64
 ENV DISPLAY=:1
+ENV WINEDEBUG=-all
 
 # Install Wine, Xvfb, VNC, and utilities
 RUN dpkg --add-architecture i386 && \
@@ -42,17 +43,22 @@ RUN useradd -m -s /bin/bash trader && \
 USER trader
 WORKDIR /home/trader
 
-# Initialize WinePrefix and download MT5 & Python installers
-RUN winecfg && \
-    curl -fsSL "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe" -o mt5setup.exe && \
-    curl -fsSL "https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe" -o python-setup.exe
+# Initialize WinePrefix and download MT5 installer
+RUN wineboot --init && \
+    curl -fsSL "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe" -o mt5setup.exe
 
-# Silent install Python for Windows inside Wine
-RUN wine python-setup.exe /quiet PrependPath=1 TargetDir=C:\Python310
+# Install Python for Windows using the Embeddable Zip and setup pip
+RUN mkdir -p /opt/wineprefix/drive_c/Python310 && \
+    curl -fsSL "https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip" -o python-embed.zip && \
+    unzip python-embed.zip -d /opt/wineprefix/drive_c/Python310 && \
+    rm python-embed.zip && \
+    sed -i 's/#import site/import site/' /opt/wineprefix/drive_c/Python310/python310._pth && \
+    curl -fsSL "https://bootstrap.pypa.io/get-pip.py" -o get-pip.py && \
+    wine C:\\Python310\\python.exe get-pip.py && \
+    rm get-pip.py
 
 # Install dependencies inside Wine Python
-RUN wine C:\\Python310\\python.exe -m pip install --upgrade pip && \
-    wine C:\\Python310\\python.exe -m pip install MetaTrader5 grpcio grpcio-tools
+RUN wine C:\\Python310\\python.exe -m pip install MetaTrader5 grpcio grpcio-tools
 
 COPY --chown=trader:trader app/ /home/trader/app/
 COPY --chown=trader:trader supervisor.conf /home/trader/supervisor.conf
