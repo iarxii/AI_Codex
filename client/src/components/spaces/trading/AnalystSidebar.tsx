@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, TrendingDown, Activity, AlertTriangle, ShieldAlert, Terminal } from 'lucide-react';
 import { useDiscipline } from '../../../contexts/DisciplineContext';
-import { MiniContextChat } from '../MiniContextChat';
+import { MiniContextChat } from '../../chat/MiniContextChat';
 
 interface AnalystSidebarProps {
   symbol: string;
