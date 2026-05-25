@@ -472,7 +472,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         log_error("WS General Error", e)
         manager.disconnect(websocket)
 
-@router.post("/chat/quick")
+@router.post("/quick")
 async def quick_chat(payload: dict, current_user = Depends(get_current_user)):
     from backend.agent.models import get_model
     system_context = payload.get("system_context", "")
