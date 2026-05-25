@@ -18,14 +18,14 @@ interface DisciplineContextType {
 }
 
 const defaultState: DisciplineState = {
-  dailyLimitRemaining: 3.0, // 3% daily drawdown limit
+  dailyLimitRemaining: 2.8, // 2.8% remaining of 3% limit (drawdown = 0.2%)
   activeSessionRules: {
     isOpen: true,
     name: "London/NY Overlap"
   },
   allowedSymbolsWhitelist: ["BTCUSD", "ETHUSD", "EURUSD", "GBPUSD", "XAUUSD", "SPX500"],
   isGateLocked: false,
-  activeExposurePercent: 0,
+  activeExposurePercent: 7.5, // 7.5% active exposure initial state
 };
 
 const DisciplineContext = createContext<DisciplineContextType | undefined>(undefined);
