@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TrendingUpIcon, ActivityIcon, X, BarChart2 } from 'lucide-react';
 import { TradingChart } from '../../chat/TradingChart';
+import { AnalystSidebar } from './AnalystSidebar';
 
 const ASSETS = [
   { symbol: "EURUSD", price: "1.0852", change: "+0.12%" },
@@ -85,26 +86,42 @@ const TradingSpaceHeader: React.FC = () => {
 
       {/* Global Chart Modal */}
       {activeChart && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-4xl max-h-full overflow-y-auto bg-[#1A1D27] rounded-3xl border border-white/10 shadow-2xl relative">
-            <button 
-              onClick={() => setActiveChart(null)}
-              className="absolute top-4 right-4 p-2 bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 rounded-full transition-colors z-20"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="p-6">
-              <h2 className="text-lg font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full h-full max-h-[95vh] max-w-[95vw] 2xl:max-w-[1600px] flex flex-col bg-[#0B0D14] rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden">
+            
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#1A1D27]/50">
+              <h2 className="text-lg font-black text-white uppercase tracking-widest flex items-center gap-2">
                 <BarChart2 className="w-5 h-5 text-[#fd3b12]" /> Global Chart Module
               </h2>
-              <TradingChart 
-                key={activeChart.symbol}
-                symbol={activeChart.symbol} 
-                initialEntry={activeChart.entry} 
-                initialSL={activeChart.entry * 0.99} 
-                initialTP={activeChart.entry * 1.02} 
-              />
+              <button 
+                onClick={() => setActiveChart(null)}
+                className="p-2 bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 rounded-full transition-colors z-20"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
+
+            <div className="flex-1 flex flex-col lg:flex-row min-h-0">
+              {/* Main Chart Area (70%) */}
+              <div className="flex-1 lg:w-[70%] p-4 overflow-y-auto">
+                <TradingChart 
+                  key={activeChart.symbol}
+                  symbol={activeChart.symbol} 
+                  initialEntry={activeChart.entry} 
+                  initialSL={activeChart.entry * 0.99} 
+                  initialTP={activeChart.entry * 1.02} 
+                  onSymbolChange={(newSymbol: string, basePrice: number) => {
+                    setActiveChart({ symbol: newSymbol, entry: basePrice });
+                  }}
+                />
+              </div>
+
+              {/* Analyst Sidebar (30%) */}
+              <div className="w-full lg:w-[350px] xl:w-[400px] border-t lg:border-t-0 lg:border-l border-white/5 bg-[#090B0F]">
+                <AnalystSidebar symbol={activeChart.symbol} />
+              </div>
+            </div>
+
           </div>
         </div>
       )}

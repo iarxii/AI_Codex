@@ -8,6 +8,7 @@ import AdminOverview from './pages/AdminOverview';
 import AdminDashboard from './pages/AdminDashboard';
 import { AIProvider, useAI } from './contexts/AIContext';
 import P5Background from './components/P5Background';
+import { DisciplineProvider } from './contexts/DisciplineContext';
 
 import './App.css';
 
@@ -35,7 +36,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AIProvider>
-      <AppContent />
+      <DisciplineProvider>
+        <AppContent />
+      </DisciplineProvider>
     </AIProvider>
   );
 };
