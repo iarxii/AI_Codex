@@ -58,3 +58,49 @@ async def bull_bear_debate_node(state: AgentState) -> Dict[str, Any]:
         "messages": [new_message],
         "trading_context": trading_context
     }
+
+async def mql5_execution_enforcer_node(state: AgentState) -> Dict[str, Any]:
+    """
+    Middleware that intercepts tool execution. If a trading tool is called, it checks the internal risk ledger.
+    Functions similarly to MQL5's OnTradeTransaction by providing a final hook before order transmission.
+    """
+    last_message = state["messages"][-1]
+    trading_context = state.get("trading_context", {})
+    space_config = state.get("space_config", {})
+    
+    # Dynamic risk limits: pull from space_config > trading_context > default
+    daily_drawdown = trading_context.get("daily_drawdown_percent", 0.0)
+    max_drawdown = (
+        space_config.get("max_daily_drawdown_percent")
+        or trading_context.get("max_drawdown_percent")
+        or 3.0  # Sensible default if neither source provides a value
+    )
+    gate_locked = daily_drawdown >= max_drawdown
+    
+    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        vetoed_calls = []
+        for call in last_message.tool_calls:
+            # If the tool is trade execution, intercept it
+            if call["name"] in ["execute_trade", "mt5_dispatch_signal"]:
+                if gate_locked:
+                    vetoed_calls.append({
+                        "name": call["name"],
+                        "reason": f"TRADE VETOED: Daily drawdown limit ({max_drawdown}%) exceeded. Current: {daily_drawdown}%."
+                    })
+        
+        # If vetoed, we might want to return an error or inject a system message overriding the tool
+        if vetoed_calls:
+            veto_msg = (
+                f"[MQL5 ENFORCER NODE VETO]\n"
+                f"The following executions were blocked by the central risk ledger:\n"
+                f"{json.dumps(vetoed_calls, indent=2)}\n"
+                f"Agent must inform the user that the Trading Gate is locked."
+            )
+            # Override tool calls by returning a system message to stop actual execution
+            # Or we can just let `execute_tool` handle the veto. For strict middleware, we override here.
+            return {
+                "error": "MQL5_GATE_LOCKED",
+                "messages": [SystemMessage(content=veto_msg)]
+            }
+            
+    return state

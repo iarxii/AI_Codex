@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, END
 from .state import AgentState
 from .nodes import reason_node, execute_tool_node, init_node
-from .trading_nodes import bull_bear_debate_node
+from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node
 
 def should_continue(state: AgentState):
     """
@@ -9,6 +9,10 @@ def should_continue(state: AgentState):
     """
     last_message = state["messages"][-1]
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        # If in trading space, we route to the enforcer first
+        slug = state.get("space_config", {}).get("slug", "")
+        if slug == "trading-space":
+            return "mql5_enforcer"
         return "execute_tool"
     return END
 
@@ -35,6 +39,7 @@ def create_agent_graph():
     workflow.add_node("reason", reason_node)
     workflow.add_node("execute_tool", execute_tool_node)
     workflow.add_node("trading_debate", bull_bear_debate_node)
+    workflow.add_node("mql5_enforcer", mql5_execution_enforcer_node)
     
     # Set entry point
     workflow.set_entry_point("init")
@@ -57,8 +62,24 @@ def create_agent_graph():
         "reason",
         should_continue,
         {
+            "mql5_enforcer": "mql5_enforcer",
             "execute_tool": "execute_tool",
             END: END
+        }
+    )
+    
+    # After enforcer, if not vetoed (no error), go to execute tool. If vetoed, go back to reason.
+    def after_enforcer(state: AgentState):
+        if state.get("error") == "MQL5_GATE_LOCKED":
+            return "reason"
+        return "execute_tool"
+
+    workflow.add_conditional_edges(
+        "mql5_enforcer",
+        after_enforcer,
+        {
+            "reason": "reason",
+            "execute_tool": "execute_tool"
         }
     )
     
