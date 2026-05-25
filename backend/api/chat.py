@@ -7,7 +7,7 @@ from typing import List, Annotated, Set
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from backend.utils.logger import log_debug, log_error
-from backend.api.auth import get_user_from_token
+from backend.api.auth import get_user_from_token, get_current_user
 from backend.utils.telemetry import get_model_capabilities, estimate_tokens
 
 from datetime import datetime
@@ -472,6 +472,22 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         log_error("WS General Error", e)
         manager.disconnect(websocket)
 
-@router.post("/chat")
-async def simple_chat(payload: dict):
-    return {"bot": "Simple chat not implemented yet, use WebSocket for agent."}
+@router.post("/chat/quick")
+async def quick_chat(payload: dict, current_user = Depends(get_current_user)):
+    from backend.agent.models import get_model
+    system_context = payload.get("system_context", "")
+    message = payload.get("message", "")
+    
+    # We use a fast model for quick chat
+    try:
+        model = get_model(provider="groq", model_name="llama3-8b-8192", api_key=None) # Uses default if available, fallback to something else if needed
+        messages = [
+            {"role": "system", "content": system_context},
+            {"role": "user", "content": message}
+        ]
+        
+        response = await model.ainvoke(messages)
+        return {"reply": response.content}
+    except Exception as e:
+        log_error(f"Quick Chat Error: {str(e)}", e)
+        return {"reply": f"Sorry, I encountered an error: {str(e)}"}
