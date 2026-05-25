@@ -81,7 +81,7 @@ export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol, onInte
   };
 
   return (
-    <div className="flex flex-col h-48 border-t border-white/5 bg-[#0D0F16]">
+    <div className="flex flex-col h-full w-full bg-[#0D0F16]">
       {/* Mini Chat Feed */}
       <div 
         ref={scrollRef}
