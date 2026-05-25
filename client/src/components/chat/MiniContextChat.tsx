@@ -3,6 +3,7 @@ import { Send, Bot, Loader2 } from 'lucide-react';
 import { useAI } from '../../contexts/AIContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { getApiUrl } from '../../config';
 
 interface MiniContextChatProps {
   symbol: string;
@@ -44,9 +45,9 @@ export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol, onInte
       
       // Phase 7.3: Real backend call instead of setTimeout mock
       const token = localStorage.getItem('token');
-      const baseUrl = import.meta.env.VITE_API_URL || 'https://aicodex-be-5yrzhangwq-uc.a.run.app';
+      const baseUrl = getApiUrl();
       
-      const response = await fetch(`${baseUrl}/api/v1/chat/quick`, {
+      const response = await fetch(`${baseUrl}/api/chat/quick`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

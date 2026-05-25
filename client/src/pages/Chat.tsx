@@ -15,6 +15,7 @@ import MessageList from '../components/chat/MessageList';
 import ChatInput from '../components/chat/ChatInput';
 import MetricsStrip from '../components/chat/MetricsStrip';
 import ModelTelemetryHUD from '../components/chat/ModelTelemetryHUD';
+import { SpiritBirdHarness } from '../components/chat/SpiritBirdHarness';
 import SpacesCatalog from '../components/SpacesCatalog';
 import TradingSpaceHeader from '../components/spaces/trading/TradingSpaceHeader';
 import '../spaces.css';
@@ -749,16 +750,7 @@ const Chat: React.FC = () => {
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                           </button>
                         </div>
-                        <div className="flex-1 p-4 overflow-y-auto flex flex-col items-center justify-center">
-                          <div className="w-16 h-16 border border-white/10 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500/50 animate-ping"></div>
-                          </div>
-                          <p className="text-[10px] text-slate-500 font-medium text-center leading-relaxed">
-                            {/* Stub Prompt for Backend Agentic Pipeline */}
-                            System UI Components and Interactive Tools for <strong>{activeSpace?.name}</strong> will mount here. <br/><br/>
-                            <span className="opacity-60 text-[8px] font-mono">PROMPT_STUB: "Generate interactive UI Tool components that allow the user to trigger actions (e.g. trades, limits, analysis) directly via button clicks within this projection space, maintaining context with the chat stream."</span>
-                          </p>
-                        </div>
+                          <SpiritBirdHarness spaceName={activeSpace?.name || 'FinTrader Analytics'} />
                       </div>
                     </div>
                   )}
@@ -769,16 +761,7 @@ const Chat: React.FC = () => {
                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#fd3b12]">Spirit Bird Interaction ({activeSpace?.name || 'FinTrader Analytics'})</h3>
                       <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">Agent UI Projection Space</p>
                     </div>
-                    <div className="flex-1 p-4 flex flex-col items-center justify-center">
-                      <div className="w-16 h-16 border border-white/10 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500/50 animate-ping"></div>
-                      </div>
-                      <p className="text-[10px] text-slate-500 font-medium text-center leading-relaxed">
-                        {/* Stub Prompt for Backend Agentic Pipeline */}
-                        System UI Components and Interactive Tools for <strong>{activeSpace?.name}</strong> will mount here. <br/><br/>
-                        <span className="opacity-60 text-[8px] font-mono">PROMPT_STUB: "Generate interactive UI Tool components that allow the user to trigger actions (e.g. trades, limits, analysis) directly via button clicks within this projection space, maintaining context with the chat stream."</span>
-                      </p>
-                    </div>
+                    <SpiritBirdHarness spaceName={activeSpace?.name || 'FinTrader Analytics'} />
                   </div>
                 </>
               )}
