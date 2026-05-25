@@ -721,58 +721,67 @@ const Chat: React.FC = () => {
                 />
               </div>
 
-              {/* Mobile Bottom-Sheet Toggle (Phase 6.1) */}
-              <button 
-                onClick={() => setIsHarnessOpen(prev => !prev)}
-                className="lg:hidden fixed bottom-20 right-4 z-40 p-3 rounded-full bg-[#fd3b12] text-white shadow-lg shadow-[#fd3b12]/30 hover:scale-105 active:scale-95 transition-transform"
-                aria-label="Toggle Tools Harness"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-              </button>
-
-              {/* Mobile Bottom-Sheet Drawer (Phase 6.1) */}
-              {isHarnessOpen && (
-                <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/50 backdrop-blur-sm" onClick={() => setIsHarnessOpen(false)}>
-                  <div 
-                    className="bg-[#090A0E] border-t border-white/10 rounded-t-3xl max-h-[60vh] flex flex-col animate-in slide-in-from-bottom duration-300"
-                    onClick={e => e.stopPropagation()}
+              {/* Spirit Bird Interaction Harness — ONLY render for FinTrader */}
+              {activeSpace?.slug === 'trading-space' && (
+                <>
+                  {/* Mobile Bottom-Sheet Toggle (Phase 6.1) */}
+                  <button 
+                    onClick={() => setIsHarnessOpen(prev => !prev)}
+                    className="lg:hidden fixed bottom-20 right-4 z-40 p-3 rounded-full bg-[#fd3b12] text-white shadow-lg shadow-[#fd3b12]/30 hover:scale-105 active:scale-95 transition-transform"
+                    aria-label="Toggle Spirit Bird Interaction"
                   >
-                    <div className="flex items-center justify-between p-4 border-b border-white/5">
-                      <div>
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#fd3b12]">Interactive Harness</h3>
-                        <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">Agent UI Projection Space</p>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                  </button>
+
+                  {/* Mobile Bottom-Sheet Drawer (Phase 6.1) */}
+                  {isHarnessOpen && (
+                    <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end bg-black/50 backdrop-blur-sm" onClick={() => setIsHarnessOpen(false)}>
+                      <div 
+                        className="bg-[#090A0E] border-t border-white/10 rounded-t-3xl max-h-[60vh] flex flex-col animate-in slide-in-from-bottom duration-300"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between p-4 border-b border-white/5">
+                          <div>
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#fd3b12]">Spirit Bird Interaction ({activeSpace?.name || 'FinTrader Analytics'})</h3>
+                            <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">Agent UI Projection Space</p>
+                          </div>
+                          <button onClick={() => setIsHarnessOpen(false)} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
+                        </div>
+                        <div className="flex-1 p-4 overflow-y-auto flex flex-col items-center justify-center">
+                          <div className="w-16 h-16 border border-white/10 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500/50 animate-ping"></div>
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-medium text-center leading-relaxed">
+                            {/* Stub Prompt for Backend Agentic Pipeline */}
+                            System UI Components and Interactive Tools for <strong>{activeSpace?.name}</strong> will mount here. <br/><br/>
+                            <span className="opacity-60 text-[8px] font-mono">PROMPT_STUB: "Generate interactive UI Tool components that allow the user to trigger actions (e.g. trades, limits, analysis) directly via button clicks within this projection space, maintaining context with the chat stream."</span>
+                          </p>
+                        </div>
                       </div>
-                      <button onClick={() => setIsHarnessOpen(false)} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                      </button>
                     </div>
-                    <div className="flex-1 p-4 overflow-y-auto flex flex-col items-center justify-center">
+                  )}
+
+                  {/* Right Column: Contextual Tools Harness — Desktop (Phase 5.2) */}
+                  <div className="hidden lg:flex lg:w-[350px] xl:w-[400px] border-l border-white/5 bg-[#090A0E] flex-col z-10 overflow-y-auto">
+                    <div className="p-4 border-b border-white/5 sticky top-0 bg-[#090A0E]/80 backdrop-blur-md">
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#fd3b12]">Spirit Bird Interaction ({activeSpace?.name || 'FinTrader Analytics'})</h3>
+                      <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">Agent UI Projection Space</p>
+                    </div>
+                    <div className="flex-1 p-4 flex flex-col items-center justify-center">
                       <div className="w-16 h-16 border border-white/10 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
                         <div className="w-2 h-2 rounded-full bg-emerald-500/50 animate-ping"></div>
                       </div>
                       <p className="text-[10px] text-slate-500 font-medium text-center leading-relaxed">
-                        Agent-generated dynamic components and execution tools will mount here alongside the main dialogue stream.
+                        {/* Stub Prompt for Backend Agentic Pipeline */}
+                        System UI Components and Interactive Tools for <strong>{activeSpace?.name}</strong> will mount here. <br/><br/>
+                        <span className="opacity-60 text-[8px] font-mono">PROMPT_STUB: "Generate interactive UI Tool components that allow the user to trigger actions (e.g. trades, limits, analysis) directly via button clicks within this projection space, maintaining context with the chat stream."</span>
                       </p>
                     </div>
                   </div>
-                </div>
+                </>
               )}
-
-              {/* Right Column: Contextual Tools Harness — Desktop (Phase 5.2) */}
-              <div className="hidden lg:flex lg:w-[350px] xl:w-[400px] border-l border-white/5 bg-[#090A0E] flex-col z-10 overflow-y-auto">
-                <div className="p-4 border-b border-white/5 sticky top-0 bg-[#090A0E]/80 backdrop-blur-md">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#fd3b12]">Interactive Harness</h3>
-                  <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">Agent UI Projection Space</p>
-                </div>
-                <div className="flex-1 p-4 flex flex-col items-center justify-center">
-                  <div className="w-16 h-16 border border-white/10 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500/50 animate-ping"></div>
-                  </div>
-                  <p className="text-[10px] text-slate-500 font-medium text-center leading-relaxed">
-                    Agent-generated dynamic components and execution tools will mount here alongside the main dialogue stream.
-                  </p>
-                </div>
-              </div>
             </div>
         )}
       </div>

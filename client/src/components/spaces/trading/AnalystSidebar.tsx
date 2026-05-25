@@ -9,6 +9,7 @@ interface AnalystSidebarProps {
 
 export const AnalystSidebar: React.FC<AnalystSidebarProps> = ({ symbol }) => {
   const { state: disciplineState } = useDiscipline();
+  const [isChatActive, setIsChatActive] = useState(false);
   
   // Mock Data for Phase 1
   const [logs, setLogs] = useState<{ id: number; time: string; msg: string; type: 'info' | 'warn' | 'alert' }[]>([]);
@@ -87,14 +88,15 @@ export const AnalystSidebar: React.FC<AnalystSidebarProps> = ({ symbol }) => {
       </div>
 
       {/* LIVE SYSTEM LOGS */}
-      <div className="flex-1 flex flex-col min-h-[250px]">
+      <div className={`flex flex-col transition-all duration-300 ${isChatActive ? 'h-24 min-h-0' : 'flex-1 min-h-[250px]'}`}>
         <div className="px-4 py-3 border-b border-white/5 bg-white/[0.02]">
-          <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-            <Terminal className="w-3.5 h-3.5" /> Analyst Log Stream
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 flex items-center justify-between">
+            <span className="flex items-center gap-2"><Terminal className="w-3.5 h-3.5" /> Analyst Log Stream</span>
+            {isChatActive && <span className="text-[8px] bg-[#fd3b12]/20 text-[#fd3b12] px-2 py-0.5 rounded-full">Collapsed</span>}
           </h4>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide font-mono">
-          {logs.map(log => (
+          {(isChatActive ? logs.slice(0, 1) : logs).map(log => (
             <div key={log.id} className={`flex flex-col gap-1 p-2 rounded border-l-2 ${
               log.type === 'alert' ? 'border-rose-500 bg-rose-500/5' : 
               log.type === 'warn' ? 'border-amber-500 bg-amber-500/5' : 
@@ -117,7 +119,9 @@ export const AnalystSidebar: React.FC<AnalystSidebarProps> = ({ symbol }) => {
       </div>
 
       {/* MINI CONTEXT CHAT */}
-      <MiniContextChat symbol={symbol} />
+      <div className={isChatActive ? 'flex-1 flex flex-col' : ''}>
+        <MiniContextChat symbol={symbol} onInteractionChange={setIsChatActive} />
+      </div>
 
     </div>
   );

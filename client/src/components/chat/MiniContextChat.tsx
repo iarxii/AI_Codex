@@ -5,13 +5,20 @@ import remarkGfm from 'remark-gfm';
 
 interface MiniContextChatProps {
   symbol: string;
+  onInteractionChange?: (isActive: boolean) => void;
 }
 
-export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol }) => {
+export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol, onInteractionChange }) => {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [localMessages, setLocalMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (onInteractionChange) {
+      onInteractionChange(localMessages.length > 0 || isSending);
+    }
+  }, [localMessages.length, isSending, onInteractionChange]);
 
   useEffect(() => {
     if (scrollRef.current) {
