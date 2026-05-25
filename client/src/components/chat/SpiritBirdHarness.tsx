@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, TrendingUp, AlertTriangle } from 'lucide-react';
+import { TrendingUp, AlertTriangle } from 'lucide-react';
 
 interface SpiritBirdHarnessProps {
   spaceName: string;
