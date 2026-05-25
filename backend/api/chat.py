@@ -474,16 +474,16 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
 @router.post("/quick")
 async def quick_chat(payload: dict, current_user = Depends(get_current_user)):
-    from backend.agent.models import get_model
     system_context = payload.get("system_context", "")
     message = payload.get("message", "")
     
-    provider = payload.get("provider", "groq")
+    provider = payload.get("provider", "groq").lower()
     model_name = payload.get("model", "llama3-8b-8192")
     api_key = payload.get("api_key", None)
     
     try:
-        model = get_model(provider=provider, model_name=model_name, api_key=api_key)
+        from backend.agent.models import get_llm
+        model = get_llm(provider=provider, model=model_name, api_key=api_key)
         messages = [
             {"role": "system", "content": system_context},
             {"role": "user", "content": message}
