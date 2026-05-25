@@ -478,9 +478,12 @@ async def quick_chat(payload: dict, current_user = Depends(get_current_user)):
     system_context = payload.get("system_context", "")
     message = payload.get("message", "")
     
-    # We use a fast model for quick chat
+    provider = payload.get("provider", "groq")
+    model_name = payload.get("model", "llama3-8b-8192")
+    api_key = payload.get("api_key", None)
+    
     try:
-        model = get_model(provider="groq", model_name="llama3-8b-8192", api_key=None) # Uses default if available, fallback to something else if needed
+        model = get_model(provider=provider, model_name=model_name, api_key=api_key)
         messages = [
             {"role": "system", "content": system_context},
             {"role": "user", "content": message}
