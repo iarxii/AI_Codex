@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, AlertTriangle, Target, Shield, Scale, Info, BarChart2 } from 'lucide-react';
+import { TrendingUp, AlertTriangle, Target, Shield, Scale, Info } from 'lucide-react';
 import { useDiscipline } from '../../contexts/DisciplineContext';
 
 interface SpiritBirdHarnessProps {
