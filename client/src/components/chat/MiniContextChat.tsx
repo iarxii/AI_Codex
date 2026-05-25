@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, Loader2 } from 'lucide-react';
+import { useAI } from '../../contexts/AIContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -9,6 +10,7 @@ interface MiniContextChatProps {
 }
 
 export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol, onInteractionChange }) => {
+  const { provider, model, getApiKey } = useAI();
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [localMessages, setLocalMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
@@ -54,6 +56,9 @@ export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol, onInte
           system_context: systemContext,
           message: userMessage,
           symbol: symbol,
+          provider: provider,
+          model: model,
+          api_key: getApiKey(provider)
         })
       });
 
