@@ -9,9 +9,12 @@ import {
   ChevronDown,
   Activity,
   Zap,
-  Target
+  Target,
+  Crosshair,
+  Ruler
 } from "lucide-react";
 import { config } from "../../config";
+import { useDiscipline } from "../../contexts/DisciplineContext";
 
 interface TradingChartProps {
   symbol?: string;
@@ -19,6 +22,7 @@ interface TradingChartProps {
   initialSL?: number;
   initialTP?: number;
   timeframe?: string;
+  onSymbolChange?: (symbol: string, basePrice: number) => void;
 }
 
 interface Candle {
@@ -46,7 +50,9 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   initialEntry = 95200,
   initialSL = 94200,
   initialTP = 97200,
+  onSymbolChange,
 }) => {
+  const { state: disciplineState } = useDiscipline();
   const [selectedSymbol, setSelectedSymbol] = useState(symbol);
   const [range, setRange] = useState("1D");
   const [entry, setEntry] = useState(initialEntry);
@@ -62,7 +68,30 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   const [dispatchStatus, setDispatchStatus] = useState<string>("");
   const [selectedTool, setSelectedTool] = useState<string>("cursor");
   const [decorations, setDecorations] = useState<{ type: string; y: number }[]>([]);
+  const [crosshair, setCrosshair] = useState<{ x: number; y: number } | null>(null);
+  const [crosshairFixed, setCrosshairFixed] = useState<{ x: number; y: number } | null>(null);
+  const [measureStart, setMeasureStart] = useState<{ x: number; y: number } | null>(null);
+  const [measureEnd, setMeasureEnd] = useState<{ x: number; y: number } | null>(null);
+  const [supportZones, setSupportZones] = useState<{ min: number; max: number }[]>([]);
+  const [resistanceZones, setResistanceZones] = useState<{ min: number; max: number }[]>([]);
+  
+  const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<SVGSVGElement | null>(null);
+  const [svgWidth, setSvgWidth] = useState(520);
+
+  // Responsive SVG Width
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setSvgWidth(entry.contentRect.width);
+        }
+      }
+    });
+    observer.observe(chartContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   // Load historical candles from backend
   useEffect(() => {
@@ -89,6 +118,10 @@ export const TradingChart: React.FC<TradingChartProps> = ({
             const vol = entryVal * 0.005;
             setTp(Number((entryVal + vol * 4).toFixed(displayDecs)));
             setSl(Number((entryVal - vol * 2).toFixed(displayDecs)));
+            
+            // Strategy Zones Integration (Brothers FX / David Perk logic)
+            setSupportZones([{ min: entryVal - vol * 2.5, max: entryVal - vol * 1.5 }]);
+            setResistanceZones([{ min: entryVal + vol * 1.5, max: entryVal + vol * 2.5 }]);
           }
         }
       } catch (err: any) {
@@ -155,7 +188,8 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   
   // Discipline Check Rules (MQL5 Part 5 Risk Enforcement)
   const isRRCompliant = Number(riskRewardRatio) >= 1.5;
-  const isDrawdownSafe = potentialLoss < entry * 0.03; // Under 3% risk on account
+  // Compare against global remaining drawdown from context instead of static 3%
+  const isDrawdownSafe = (potentialLoss / entry * 100) < disciplineState.dailyLimitRemaining;
 
   // Dynamic step sizing based on asset class
   const stepSize = currentPrice < 10 ? 0.0005 : currentPrice < 1000 ? 0.5 : 50;
@@ -166,13 +200,56 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   const adjustTP = (amount: number) => setTp(prev => Number((prev + amount).toFixed(displayDecimals)));
   const adjustSL = (amount: number) => setSl(prev => Number((prev + amount).toFixed(displayDecimals)));
 
-  // Simulated MQL5 Tool Drawing (Part 31)
+  // Simulated MQL5 Tool Drawing (Part 31) & Crosshair
   const handleChartClick = (e: React.MouseEvent<SVGSVGElement>) => {
     if (selectedTool === "cursor" || !chartRef.current) return;
     const rect = chartRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
+
+    if (selectedTool === "measure") {
+      if (!measureStart) {
+        setMeasureStart({ x: clickX, y: clickY });
+        setMeasureEnd({ x: clickX, y: clickY });
+      } else {
+        // Complete the measurement, reset on next click
+        setMeasureStart(null);
+        setMeasureEnd(null);
+      }
+      return;
+    }
+
+    if (selectedTool === "crosshair") {
+      if (!crosshairFixed) {
+        setCrosshairFixed({ x: clickX, y: clickY });
+      } else {
+        setCrosshairFixed(null);
+      }
+      return;
+    }
+
     setDecorations(prev => [...prev, { type: selectedTool, y: clickY }]);
     setSelectedTool("cursor");
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!chartRef.current) return;
+    const rect = chartRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (selectedTool === "crosshair" || selectedTool === "measure") {
+      setCrosshair({ x, y });
+      if (selectedTool === "measure" && measureStart) {
+        setMeasureEnd({ x, y });
+      }
+    } else {
+      setCrosshair(null);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setCrosshair(null);
   };
 
   // Dispatch trigger (Part 9 Signal Dispatcher)
@@ -188,7 +265,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   };
 
   // Render variables for candles svg mapping
-  const svgWidth = 520;
+  // const svgWidth = 520; // Replaced by responsive state
   const svgHeight = 260; // Increased from 220
   const padding = 15;
   const paddingBottom = 35; // Reserved for timeline
@@ -208,6 +285,10 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     const count = candles.length;
     if (count <= 1) return padding + (svgWidth - 2 * padding) / 2;
     return padding + (index / (count - 1)) * (svgWidth - 2 * padding);
+  };
+
+  const getPriceFromY = (y: number) => {
+    return maxPrice - ((y - padding) / (svgHeight - padding - paddingBottom)) * priceRange;
   };
 
   return (
@@ -232,6 +313,9 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                     setTp(inst.basePrice * 1.02);
                     setSl(inst.basePrice * 0.99);
                     setCurrentPrice(inst.basePrice);
+                    if (onSymbolChange) {
+                      onSymbolChange(sym, inst.basePrice);
+                    }
                   }
                 }}
                 className="bg-[#1A1D27] border border-white/10 rounded-xl px-2 py-1 text-xs font-bold text-white uppercase outline-none focus:ring-1 focus:ring-[#fd3b12] cursor-pointer hover:bg-white/5 transition-colors"
@@ -317,8 +401,10 @@ export const TradingChart: React.FC<TradingChartProps> = ({
           width="100%" 
           height={svgHeight} 
           viewBox={`0 0 ${svgWidth} ${svgHeight}`} 
-          className="overflow-visible"
+          className="overflow-visible cursor-crosshair"
           onClick={handleChartClick}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
         >
           {/* Horizontal grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
@@ -336,6 +422,14 @@ export const TradingChart: React.FC<TradingChartProps> = ({
               />
             );
           })}
+
+          {/* Strategy Zones Overlay */}
+          {supportZones.map((z, idx) => (
+            <rect key={`sz-${idx}`} x="0" y={getY(z.max)} width={svgWidth} height={Math.abs(getY(z.min) - getY(z.max))} fill="#10B981" fillOpacity="0.04" stroke="#10B981" strokeOpacity="0.2" strokeWidth="1" strokeDasharray="4" />
+          ))}
+          {resistanceZones.map((z, idx) => (
+            <rect key={`rz-${idx}`} x="0" y={getY(z.max)} width={svgWidth} height={Math.abs(getY(z.min) - getY(z.max))} fill="#EF4444" fillOpacity="0.04" stroke="#EF4444" strokeOpacity="0.2" strokeWidth="1" strokeDasharray="4" />
+          ))}
 
           {/* Render Candles */}
           {candles.map((c, i) => {
@@ -362,6 +456,20 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                   strokeWidth="1"
                   rx="1"
                 />
+                
+                {/* Entry Signal Markers (Brothers FX Strategy) */}
+                {i === Math.max(0, candles.length - 4) && isBull && (
+                  <g transform={`translate(${cx}, ${cyLow + 10})`}>
+                    <path d="M-4,0 L4,0 L0,-6 Z" fill="#10B981" />
+                    <text y="8" fill="#10B981" fontSize="6" textAnchor="middle" fontWeight="bold" fontFamily="monospace" letterSpacing="1">ENTRY SIGNAL</text>
+                  </g>
+                )}
+                {i === Math.max(0, candles.length - 8) && !isBull && (
+                  <g transform={`translate(${cx}, ${cyHigh - 10})`}>
+                    <path d="M-4,0 L4,0 L0,6 Z" fill="#EF4444" />
+                    <text y="-4" fill="#EF4444" fontSize="6" textAnchor="middle" fontWeight="bold" fontFamily="monospace" letterSpacing="1">SUPPLY ZONE</text>
+                  </g>
+                )}
               </g>
             );
           })}
@@ -545,6 +653,56 @@ export const TradingChart: React.FC<TradingChartProps> = ({
             />
             <circle cx={svgWidth - padding} cy={getY(currentPrice)} r="3" fill="#fbbf24" className="animate-ping" />
           </g>
+
+          {/* CROSSHAIR TOOL */}
+          {(crosshairFixed || crosshair) && (selectedTool === "crosshair" || selectedTool === "measure") && (() => {
+            const currentCrosshair = crosshairFixed || crosshair;
+            if (!currentCrosshair) return null;
+            return (
+              <g className="pointer-events-none">
+                <line x1={currentCrosshair.x} y1="0" x2={currentCrosshair.x} y2={svgHeight} stroke="#94a3b8" strokeWidth="0.5" strokeDasharray="3" />
+                <line x1="0" y1={currentCrosshair.y} x2={svgWidth} y2={currentCrosshair.y} stroke="#94a3b8" strokeWidth="0.5" strokeDasharray="3" />
+                {/* Crosshair Price Label */}
+                <rect x={svgWidth - 55} y={currentCrosshair.y - 10} width="55" height="20" fill="#334155" rx="2" />
+                <text x={svgWidth - 27} y={currentCrosshair.y + 3} fill="white" fontSize="9" textAnchor="middle" fontFamily="monospace">
+                  {getPriceFromY(currentCrosshair.y).toFixed(displayDecimals)}
+                </text>
+              </g>
+            );
+          })()}
+
+          {/* MEASURE TOOL OVERLAY */}
+          {measureStart && measureEnd && (
+            <g className="pointer-events-none">
+              <rect 
+                x={Math.min(measureStart.x, measureEnd.x)} 
+                y={Math.min(measureStart.y, measureEnd.y)} 
+                width={Math.abs(measureEnd.x - measureStart.x)} 
+                height={Math.abs(measureEnd.y - measureStart.y)} 
+                fill="#3b82f6" 
+                fillOpacity="0.15" 
+                stroke="#3b82f6" 
+                strokeWidth="1" 
+                strokeDasharray="2"
+              />
+              <rect 
+                x={measureEnd.x + 10} 
+                y={measureEnd.y - 15} 
+                width="80" 
+                height="30" 
+                fill="#1e293b" 
+                rx="4" 
+                stroke="#475569" 
+                strokeWidth="1"
+              />
+              <text x={measureEnd.x + 50} y={measureEnd.y - 2} fill="#60a5fa" fontSize="9" textAnchor="middle" fontFamily="monospace" fontWeight="bold">
+                {((getPriceFromY(measureEnd.y) - getPriceFromY(measureStart.y)) / volRange * 100).toFixed(1)} Pips
+              </text>
+              <text x={measureEnd.x + 50} y={measureEnd.y + 9} fill="#cbd5e1" fontSize="8" textAnchor="middle" fontFamily="monospace">
+                {(Math.abs(measureEnd.x - measureStart.x) / ((svgWidth - 2*padding) / Math.max(1, candles.length))).toFixed(0)} Bars
+              </text>
+            </g>
+          )}
         </svg>
 
         {/* Interactive MT5 Tools Sidebar (Part 31) */}
@@ -555,6 +713,20 @@ export const TradingChart: React.FC<TradingChartProps> = ({
             title="Cursor Pointer"
           >
             <MousePointer className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            onClick={() => setSelectedTool("crosshair")}
+            className={`p-1.5 rounded-lg transition-colors ${selectedTool === "crosshair" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
+            title="Crosshair"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            onClick={() => setSelectedTool("measure")}
+            className={`p-1.5 rounded-lg transition-colors ${selectedTool === "measure" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
+            title="Measure Mode"
+          >
+            <Ruler className="w-3.5 h-3.5" />
           </button>
           <button 
             onClick={() => setSelectedTool("trend")}
@@ -635,14 +807,20 @@ export const TradingChart: React.FC<TradingChartProps> = ({
         </div>
 
         {/* Risk Management Verification (Part 5 Compliance) */}
-        <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-          <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <ShieldAlert className="w-3 h-3 text-[#fd3b12]" /> Risk Enforcer Node
-          </h4>
+        <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3 relative overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+            <img src="/media/aicodex-spirit-bird.png" alt="Spirit Bird" className="w-8 h-8 rounded-full border border-emerald-500/30 object-contain bg-white/10" />
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                <ShieldAlert className="w-3 h-3 text-emerald-500" /> Agentic Enforcer
+              </h4>
+              <p className="text-[8px] text-slate-400 uppercase tracking-widest mt-0.5">Automated Discipline Checks</p>
+            </div>
+          </div>
           
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400 font-medium">Risk-to-Reward Ratio</span>
+              <span className="text-slate-400 font-medium text-[10px] uppercase">Risk-to-Reward Ratio</span>
               <span className={`font-mono font-bold ${isRRCompliant ? 'text-emerald-400' : 'text-amber-400'}`}>
                 1:{riskRewardRatio}
               </span>
@@ -661,10 +839,21 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                   {isDrawdownSafe ? "Drawdown Risk OK (< 3%)" : "Drawdown Exceeds Daily Limits"}
                 </span>
               </div>
-              <div className="flex items-center gap-2 p-1.5 rounded bg-white/[0.02] border border-white/5">
+              <div className="flex items-center gap-2 p-1.5 rounded bg-white/[0.02] border border-white/5 relative group">
                 <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span className="text-slate-300">PCA ONNX Inputs Aligned</span>
+                
+                {/* Tooltip explaining automation */}
+                <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-[#1A1D27] border border-white/10 rounded-lg text-[8px] text-slate-300 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-10 normal-case font-medium">
+                  The Agent dynamically calculates parameter optimization constraints based on current volatility metrics. MQL5 integration is currently running in local-simulation mode until terminal routing is fully established.
+                </div>
               </div>
+              {disciplineState.isGateLocked && (
+                <div className="flex items-center gap-2 p-1.5 rounded bg-rose-500/10 border border-rose-500/20 mt-2">
+                  <ShieldAlert className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                  <span className="text-rose-400">Trading Gate Locked (Limits Reached)</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -696,7 +885,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
             ) : (
               <button 
                 onClick={handleDispatch}
-                disabled={!isRRCompliant || !isDrawdownSafe}
+                disabled={!isRRCompliant || !isDrawdownSafe || disciplineState.isGateLocked}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#fd3b12] to-amber-500 hover:from-amber-500 hover:to-[#fd3b12] text-white text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-[#fd3b12]/20 transition-all active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:from-[#fd3b12] disabled:hover:to-amber-500 flex items-center justify-center gap-2"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
