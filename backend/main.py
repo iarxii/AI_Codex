@@ -146,7 +146,7 @@ async def verify_premium_handshake(request, call_next):
 # Set up CORS
 origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 effective_origins = [o for o in origins if o != "*"]
-local_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://localhost:9000"]
+local_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://localhost:9000", "http://localhost:9173", "http://127.0.0.1:9173"]
 for lo in local_origins:
     if lo not in effective_origins:
         effective_origins.append(lo)
@@ -158,7 +158,7 @@ if lab_origin not in effective_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=effective_origins if effective_origins else [lab_origin],
-    allow_origin_regex="https://.*\.a\.run\.app",
+    allow_origin_regex="https://.*\.a\.run\.app|http://localhost:\d+|http://127.0.0.1:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
