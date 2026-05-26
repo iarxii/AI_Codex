@@ -116,10 +116,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
   }, [agentMode]);
   return (
     <footer
-      className="px-6 pb-5 pt-3 bg-transparent border-t border-black/[0.04] z-20"
-      style={{ overflow: "visible" }}
+      className="px-3 sm:px-6 pb-5 pt-3 bg-transparent border-t border-black/[0.04] z-20 safe-area-bottom"
+      style={{ overflow: "visible", paddingBottom: "max(1.25rem, env(safe-area-inset-bottom, 0px))" }}
     >
-      <div className="max-w-4xl mx-auto mb-3">
+      <div className="max-w-4xl mx-auto mb-3 hidden sm:block">
         <ProviderSelector
           showTelemetry={showTelemetry}
           setShowTelemetry={setShowTelemetry}
@@ -138,7 +138,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               title="Attach files"
             >
               <svg
-                className="w-3.5 h-3.5"
+                className="w-4 h-4 sm:w-3.5 sm:h-3.5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -150,7 +150,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
                 />
               </svg>
-              Attach
+              <span className="hidden sm:inline">Attach</span>
             </button>
 
             {/* Agent Specialization Dropdown */}
@@ -166,7 +166,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 title="Select agent specialization"
               >
                 {activeSpecialization.icon}
-                {activeSpecialization.name}
+                <span className="hidden sm:inline">{activeSpecialization.name}</span>
                 <svg
                   className="w-2.5 h-2.5 opacity-60"
                   fill="none"
@@ -255,7 +255,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                   />
                 </svg>
-                Tools
+                <span className="hidden sm:inline">Tools</span>
                 <svg
                   className="w-2.5 h-2.5 opacity-40"
                   fill="none"
@@ -329,7 +329,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
                   />
                 </svg>
-                Engine
+                <span className="hidden sm:inline">Engine</span>
               </button>
               <ModelConfigPanel isOpen={isConfigOpen} />
             </div>
@@ -356,7 +356,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </svg>
-              Export
+              <span className="hidden sm:inline">Export</span>
             </button>
           </div>
 
@@ -377,7 +377,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   : "Select a workspace to begin..."
               }
               disabled={!currentConvId}
-              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-2 py-2 text-sm text-[#1A1D2E] placeholder:text-[#7A7D8E] resize-none min-h-[44px] max-h-[160px]"
+              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-2 py-2 text-sm text-[#1A1D2E] placeholder:text-[#7A7D8E] resize-none min-h-[44px] max-h-[120px] sm:max-h-[160px]"
               rows={1}
             />
             {/* Send Button — Prominent Round Orange */}

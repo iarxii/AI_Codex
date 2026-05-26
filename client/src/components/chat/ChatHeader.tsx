@@ -39,13 +39,13 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const { activeSpace } = useAI();
 
   return (
-    <header className="h-14 flex items-center justify-between px-5 bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-20 shadow-sm w-full">
+    <header className="h-14 flex items-center justify-between px-3 sm:px-5 bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-20 shadow-sm w-full safe-area-top">
       {/* items justified to the left */}
       <div className="flex items-center justify-start gap-3">
         {/* Sidebar Toggle */}
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="p-1.5 text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95"
+          className="p-2.5 sm:p-1.5 text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95"
           title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
         >
           <svg
@@ -157,7 +157,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             localStorage.removeItem("token");
             navigate("/login");
           }}
-          className="p-2 hover:bg-black/[0.06] rounded-lg text-[#7A7D8E] hover:text-[#1A1D2E] transition-colors"
+          className="p-2.5 hover:bg-black/[0.06] rounded-lg text-[#7A7D8E] hover:text-[#1A1D2E] transition-colors"
           title="Logout"
         >
           <svg
