@@ -40,6 +40,7 @@ const MarketTicker: React.FC<{ onLaunchChart: (symbol: string, price: number) =>
 
 const TradingSpaceHeader: React.FC = () => {
   const [activeChart, setActiveChart] = useState<{ symbol: string; entry: number } | null>(null);
+  const [activeModalTab, setActiveModalTab] = useState<'chart' | 'analyst'>('chart');
 
   return (
     <>
@@ -71,7 +72,7 @@ const TradingSpaceHeader: React.FC = () => {
             <div className="flex gap-3">
               <button 
                 onClick={() => setActiveChart({ symbol: 'BTCUSD', entry: 95200 })}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fd3b12]/10 hover:bg-[#fd3b12]/20 border border-[#fd3b12]/20 rounded-lg text-xs font-bold text-[#fd3b12] transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fd3b12]/10 hover:bg-[#fd3b12]/20 border border-[#fd3b12]/20 rounded-lg text-xs font-bold text-[#fd3b12] transition-all cursor-pointer touch-44"
               >
                 <ActivityIcon className="w-3.5 h-3.5" />
                 Launch Chart
@@ -89,35 +90,74 @@ const TradingSpaceHeader: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div className="w-full h-full max-h-[95vh] max-w-[95vw] 2xl:max-w-[1600px] flex flex-col bg-[#0B0D14] rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden">
             
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#1A1D27]/50">
-              <h2 className="text-lg font-black text-white uppercase tracking-widest flex items-center gap-2">
-                <BarChart2 className="w-5 h-5 text-[#fd3b12]" /> Global Chart Module
-              </h2>
+            {/* Modal Header */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 sm:px-6 sm:py-4 border-b border-white/5 bg-[#1A1D27]/50 gap-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-widest flex items-center gap-2">
+                  <BarChart2 className="w-5 h-5 text-[#fd3b12]" /> Global Chart Module
+                </h2>
+                {/* Close Button on Mobile (aligned right in header row) */}
+                <button 
+                  onClick={() => setActiveChart(null)}
+                  className="sm:hidden p-2.5 bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 rounded-full transition-colors z-20 cursor-pointer touch-44"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Tab Selector on Mobile/Tablet */}
+              <div className="flex lg:hidden bg-black/40 p-1 rounded-xl border border-white/5 self-center sm:self-auto w-full sm:w-auto">
+                <button
+                  onClick={() => setActiveModalTab('chart')}
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-black uppercase transition-all tracking-wider ${
+                    activeModalTab === 'chart'
+                      ? 'bg-[#fd3b12] text-white shadow-md shadow-[#fd3b12]/20'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Chart
+                </button>
+                <button
+                  onClick={() => setActiveModalTab('analyst')}
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-black uppercase transition-all tracking-wider ${
+                    activeModalTab === 'analyst'
+                      ? 'bg-[#fd3b12] text-white shadow-md shadow-[#fd3b12]/20'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Analyst Panel
+                </button>
+              </div>
+
+              {/* Close Button on Desktop */}
               <button 
                 onClick={() => setActiveChart(null)}
-                className="p-2 bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 rounded-full transition-colors z-20"
+                className="hidden sm:block p-2 bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 rounded-full transition-colors z-20 cursor-pointer touch-44"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-              {/* Main Chart Area (70%) */}
-              <div className="flex-1 lg:w-[70%] p-4 overflow-y-auto">
-                <TradingChart 
-                  key={activeChart.symbol}
-                  symbol={activeChart.symbol} 
-                  initialEntry={activeChart.entry} 
-                  initialSL={activeChart.entry * 0.99} 
-                  initialTP={activeChart.entry * 1.02} 
-                  onSymbolChange={(newSymbol: string, basePrice: number) => {
-                    setActiveChart({ symbol: newSymbol, entry: basePrice });
-                  }}
-                />
+            {/* Modal Body */}
+            <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+              {/* Main Chart Area (70% on desktop, visible when tab is active on mobile) */}
+              <div className={`flex-1 lg:w-[70%] p-3 sm:p-4 overflow-y-auto flex-col ${activeModalTab === 'chart' ? 'flex' : 'hidden lg:flex'}`}>
+                <div className="flex-1 min-h-[350px] lg:min-h-0">
+                  <TradingChart 
+                    key={activeChart.symbol}
+                    symbol={activeChart.symbol} 
+                    initialEntry={activeChart.entry} 
+                    initialSL={activeChart.entry * 0.99} 
+                    initialTP={activeChart.entry * 1.02} 
+                    onSymbolChange={(newSymbol: string, basePrice: number) => {
+                      setActiveChart({ symbol: newSymbol, entry: basePrice });
+                    }}
+                  />
+                </div>
               </div>
 
-              {/* Analyst Sidebar (30%) */}
-              <div className="w-full lg:w-[350px] xl:w-[400px] border-t lg:border-t-0 lg:border-l border-white/5 bg-[#090B0F]">
+              {/* Analyst Sidebar (30% on desktop, visible when tab is active on mobile) */}
+              <div className={`w-full lg:w-[350px] xl:w-[400px] border-t lg:border-t-0 lg:border-l border-white/5 bg-[#090B0F] overflow-y-auto ${activeModalTab === 'analyst' ? 'flex' : 'hidden lg:flex'} flex-col h-full`}>
                 <AnalystSidebar symbol={activeChart.symbol} />
               </div>
             </div>

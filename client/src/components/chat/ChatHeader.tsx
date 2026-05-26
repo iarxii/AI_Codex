@@ -19,6 +19,8 @@ interface ChatHeaderProps {
   currentLatency: number | null;
   loading: boolean;
   artifactCount?: number;
+  isHarnessOpen?: boolean;
+  setIsHarnessOpen?: (open: boolean) => void;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -34,6 +36,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   currentLatency,
   loading,
   artifactCount = 0,
+  isHarnessOpen,
+  setIsHarnessOpen,
 }) => {
   const navigate = useNavigate();
   const { activeSpace } = useAI();
@@ -105,6 +109,22 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
       {/* items justified to the right */}
       <div className="flex items-center justify-end gap-3">
+        {/* Spirit Bird Interaction Harness Toggle — only for trading space on < lg screens */}
+        {activeSpace?.slug === 'trading-space' && setIsHarnessOpen && (
+          <button
+            onClick={() => setIsHarnessOpen(!isHarnessOpen)}
+            className={`lg:hidden p-2.5 rounded-2xl border transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-sm ${
+              isHarnessOpen
+                ? "bg-[#fd3b12]/15 text-[#fd3b12] border-[#fd3b12]/30 shadow-[#fd3b12]/10"
+                : "bg-white/40 border-black/[0.05] text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-white/60"
+            }`}
+            title="Toggle Spirit Bird Interaction Harness"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            <span className="text-[10px] font-black uppercase tracking-wider hidden sm:inline">Harness</span>
+          </button>
+        )}
+
         {/* System Function Shifter Dropdown */}
         <NeuralFunctionSwitch 
           isCanvasOpen={isCanvasOpen}
