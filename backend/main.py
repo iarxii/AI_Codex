@@ -167,6 +167,18 @@ app.add_middleware(
 # Global Exception Handler to ensure CORS headers on 500s
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+    if isinstance(exc, StarletteHTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers={
+                "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+                "Access-Control-Allow-Credentials": "true",
+                **(getattr(exc, "headers", None) or {})
+            }
+        )
+        
     import traceback
     print(f"[ERROR] Unhandled exception: {exc}")
     traceback.print_exc()

