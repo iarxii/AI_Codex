@@ -33,4 +33,3 @@ volumes:
 networks:
   fintrader-network:
     driver: bridge
-    internal: true  # Isolate from external network; exposing only via mapped ports
