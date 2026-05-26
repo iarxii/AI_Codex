@@ -1,6 +1,18 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import p5 from "p5";
 import { useAI } from "../contexts/AIContext";
+
+const CAROUSEL_IMAGES = [
+  '/media/wallpaper/webp_sm/thabang_vector_wallpaper_1.webp',
+  '/media/wallpaper/webp_sm/thabang_vector_wallpaper_2.webp',
+  '/media/wallpaper/webp_sm/thabang_vector_wallpaper_3.webp',
+  '/media/wallpaper/webp_sm/thabang_vector_wallpaper_4.webp',
+  '/media/wallpaper/webp_sm/thabang_vector_wallpaper_5.webp',
+  '/media/wallpaper/webp_sm/thabang_vector_wallpaper_6.webp',
+  '/media/wallpaper/webp_sm/thabang_vector_wallpaper_7.webp',
+  '/media/wallpaper/webp_sm/thabang_vector_wallpaper_8.webp',
+  '/media/wallpaper/webp_sm/thabang_vector_wallpaper_9.webp',
+];
 
 interface P5BackgroundProps {
   isDynamic?: boolean;
@@ -16,14 +28,13 @@ const P5Background: React.FC<P5BackgroundProps> = ({
     showScanlines,
     showGlitches,
     showGrain,
-    showVideo,
     showWaves,
     showNeuralStrings,
     stringColor,
   } = visualSettings;
 
   // Space-specific backgrounds mapping
-  const spaceConfigs: Record<string, { still: string; video?: string }> = {
+  const spaceConfigs: Record<string, { still: string }> = {
     'trading-space': {
       still: '/media/FinTraderWallpaper.png',
     },
@@ -36,19 +47,32 @@ const P5Background: React.FC<P5BackgroundProps> = ({
   };
 
   const currentSpaceConfig = activeSpace ? spaceConfigs[activeSpace.slug] : null;
-  const stillBgPath = currentSpaceConfig?.still || '/media/thabang_vector_wallpaper_2.png';
-  const videoBgPath = currentSpaceConfig?.video || '/media/landscape_background.mp4';
   const mobileBgPath = currentSpaceConfig?.still || '/media/aicodex_vector_wallpaper.png';
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Preload images
+  useEffect(() => {
+    if (currentSpaceConfig) return; // No need to preload if we are in a space with a static bg
+    CAROUSEL_IMAGES.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, [currentSpaceConfig]);
+
+  // Carousel timer
+  useEffect(() => {
+    if (currentSpaceConfig) return; // Disable carousel if a specific static image is active
+    
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % CAROUSEL_IMAGES.length);
+    }, 12000); // 12 second transition
+
+    return () => clearInterval(interval);
+  }, [currentSpaceConfig]);
 
   // PENDING: isDynamic prop will eventually be wired to user preferences / low-power mode toggle.
   const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = 1.3; // Atmospheric slow-mo
-    }
-  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -437,10 +461,7 @@ const P5Background: React.FC<P5BackgroundProps> = ({
   return (
     <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden bg-[#E2E8F0]">
       <style>{`
-        /* Hide video on mobile, show on desktop */
-        .desktop-video { display: none; }
         @media (min-width: 1024px) {
-          .desktop-video { display: block; }
           .mobile-bg { display: none; }
         }
         @keyframes wave-shift {
@@ -515,36 +536,34 @@ const P5Background: React.FC<P5BackgroundProps> = ({
         }}
       />
 
-      {/* Desktop Animated Video Background */}
-      {showVideo && (
-        <video
-          ref={videoRef}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="desktop-video absolute inset-0 w-full h-full object-cover"
-          style={{
-            opacity: 0.2,
-            filter: "blur(0.5px)",
-            objectPosition: "center bottom",
-          }}
-        >
-          <source src={videoBgPath} type="video/mp4" />
-        </video>
-      )}
-
-      {/* Still Vector Background */}
-      {visualSettings.showStillBackground && (
+      {/* Background Rendering */}
+      {visualSettings.showStillBackground && currentSpaceConfig ? (
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat animate-in fade-in duration-700"
           style={{
-            backgroundImage: `url('${stillBgPath}')`,
+            backgroundImage: `url('${currentSpaceConfig.still}')`,
             opacity: activeSpace?.slug === 'trading-space' ? 0.4 : 0.25,
             filter: "blur(0.5px)",
             objectPosition: "center",
           }}
         />
+      ) : visualSettings.showStillBackground && (
+        <div className="absolute inset-0">
+          {CAROUSEL_IMAGES.map((src, idx) => (
+            <div
+              key={src}
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+              style={{
+                backgroundImage: `url('${src}')`,
+                opacity: idx === currentImageIndex ? 0.25 : 0,
+                filter: "blur(0.5px)",
+                transition: "opacity 3s ease-in-out",
+                objectPosition: "center",
+                pointerEvents: "none",
+              }}
+            />
+          ))}
+        </div>
       )}
       {/* Mandatory Watermark Mask - Radial Gradient from Bottom-Right */}
       <div
