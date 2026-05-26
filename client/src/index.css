@@ -339,3 +339,54 @@ body {
 .animate-marquee:hover {
   animation-play-state: paused;
 }
+
+/* ============================================
+   PWA & Mobile Responsive Utilities
+   ============================================ */
+
+/* Safe Area Insets — for notched devices (iPhone X+, Android punch-hole) */
+.safe-area-top { padding-top: env(safe-area-inset-top, 0px); }
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-area-x {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Touch Optimization — prevent accidental double-tap zoom */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Minimum Touch Target — 44x44px as per Apple/Google HIG */
+.touch-44 {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* PWA Standalone Mode */
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior: none;
+  }
+}
+
+/* Reduced Motion — respect user accessibility preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Mobile Text Readability — prevent iOS auto-zoom on input focus */
+@media (max-width: 480px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}

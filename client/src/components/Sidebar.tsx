@@ -181,12 +181,12 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <aside
         className={`
-        fixed lg:static top-0 left-0 h-full w-72 flex flex-col bg-[var(--bg-surface)]/40 backdrop-blur-2xl border-r border-black/[0.06] z-50 
+        fixed lg:static top-0 left-0 h-full w-full sm:w-80 lg:w-72 flex flex-col bg-[var(--bg-surface)]/40 backdrop-blur-2xl border-r border-black/[0.06] z-50 safe-area-top
         transition-all duration-500 ease-in-out
         ${isOpen ? "translate-x-0 opacity-100" : "-translate-x-full lg:hidden lg:opacity-0"}
       `}
       >
-        <div className="px-6 py-8 flex flex-col items-center justify-center text-center group">
+        <div className="px-6 py-4 sm:py-6 lg:py-8 flex flex-col items-center justify-center text-center group">
           <div className="relative mb-1">
             {/* <img 
               src="/media/logo.png" 
@@ -255,23 +255,23 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="flex p-2 gap-1 bg-black/[0.02] border-b border-black/[0.06]">
+        <div className="flex p-2 gap-1.5 bg-black/[0.02] border-b border-black/[0.06]">
             <button
                 onClick={() => {
                     setActiveTab('workspaces');
                     setActiveSpace(null);
                     setViewSpacesCatalog(false);
                 }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === 'workspaces' ? 'bg-white shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 sm:py-2 lg:py-1.5 rounded-lg text-sm sm:text-xs font-semibold transition-all ${activeTab === 'workspaces' ? 'bg-white shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
             >
-                <RectangleStackIcon className="w-4 h-4" />
+                <RectangleStackIcon className="w-5 h-5 sm:w-4 sm:h-4" />
                 Standard
             </button>
             <button
                 onClick={() => setActiveTab('spaces')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === 'spaces' ? 'bg-[var(--accent)]/10 text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 sm:py-2 lg:py-1.5 rounded-lg text-sm sm:text-xs font-semibold transition-all ${activeTab === 'spaces' ? 'bg-[var(--accent)]/10 text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
             >
-                <CubeTransparentIcon className="w-4 h-4" />
+                <CubeTransparentIcon className="w-5 h-5 sm:w-4 sm:h-4" />
                 Spaces
             </button>
         </div>
@@ -305,7 +305,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               }
               if (window.innerWidth < 1024) onClose();
             }}
-            className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-md group bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white shadow-[var(--accent)]/20"
+            className="w-full flex items-center justify-center gap-2.5 py-3.5 sm:py-2.5 px-4 rounded-xl text-base sm:text-sm font-bold transition-all active:scale-95 shadow-md group bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white shadow-[var(--accent)]/20"
           >
             <svg className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
@@ -314,7 +314,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-1.5 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-3 space-y-2 sm:space-y-1.5 scrollbar-hide">
           {loading && (
             <div className="text-center py-4 text-[var(--text-secondary)] text-xs uppercase tracking-widest font-semibold animate-pulse">
               Syncing History...
@@ -359,7 +359,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onSelectConversation(conv.id);
                 if (window.innerWidth < 1024) onClose();
               }}
-              className={`w-full text-left p-3 rounded-xl transition-all group relative overflow-hidden ${
+              className={`w-full text-left p-4 sm:p-3 rounded-xl transition-all group relative overflow-hidden ${
                 currentConversationId === conv.id
                   ? "bg-[var(--accent)]/12 border border-[var(--accent)]/25 shadow-sm"
                   : "hover:bg-black/[0.04] border border-transparent"
@@ -455,7 +455,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        <div className="p-4 border-t border-black/[0.06] bg-[var(--bg-primary)]/50">
+        <div className="p-4 border-t border-black/[0.06] bg-[var(--bg-primary)]/50 safe-area-bottom">
           <div className="flex items-center gap-3 px-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-hover)] flex items-center justify-center text-[10px] font-bold text-white shadow-sm border border-white/20">
               {displayName.substring(0, 2).toUpperCase()}
@@ -470,9 +470,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors"
+              className="p-2.5 sm:p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors"
             >
-              <Cog6ToothIcon className="w-5 h-5" />
+              <Cog6ToothIcon className="w-6 h-6 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>

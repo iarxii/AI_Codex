@@ -1,0 +1,61 @@
+{
+  "name": "AICodex — Agentic AI Workspace",
+  "short_name": "AICodex",
+  "description": "Agentic AI coding assistant with multi-provider LLM support, real-time telemetry, and multi-modular workbench.",
+  "start_url": "/chat",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#D8DCE4",
+  "theme_color": "#fd3b12",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["productivity", "developer", "utilities"],
+  "icons": [
+    {
+      "src": "/media/aicodex-spirit-bird.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/media/aicodex-spirit-bird.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/media/aicodex-spirit-bird-white.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "monochrome"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Workspace",
+      "short_name": "New",
+      "description": "Create a new AI workspace session",
+      "url": "/chat",
+      "icons": [
+        {
+          "src": "/media/aicodex-spirit-bird.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/media/aicodex_vector_wallpaper.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "AICodex Desktop Workspace"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "handle_links": "preferred"
+}
