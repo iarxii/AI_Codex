@@ -85,7 +85,7 @@ const MessageList: React.FC<MessageListProps> = ({
         (() => {
           if (activeSpace?.slug === 'trading-space') {
             return (
-              <div className="h-full flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-700">
+              <div className="h-full flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-700" style={{ marginTop: "100px" }}>
                 <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Market Signal Node */}
                   <div className="col-span-1 md:col-span-2 p-8 rounded-[32px] bg-[#1A1D27] border border-white/5 shadow-2xl relative overflow-hidden group">
