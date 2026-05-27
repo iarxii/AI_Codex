@@ -43,7 +43,11 @@ const MarketTicker: React.FC<{ onLaunchChart: (symbol: string, price: number) =>
   );
 };
 
-const TradingSpaceHeader: React.FC = () => {
+interface TradingSpaceHeaderProps {
+  connected?: boolean;
+}
+
+const TradingSpaceHeader: React.FC<TradingSpaceHeaderProps> = ({ connected = false }) => {
   const [activeChart, setActiveChart] = useState<{ symbol: string; entry: number } | null>(null);
   const [activeModalTab, setActiveModalTab] = useState<'chart' | 'analyst'>('chart');
 
@@ -57,7 +61,7 @@ const TradingSpaceHeader: React.FC = () => {
             </div>
             <div>
               <h1 className="text-sm font-black text-white tracking-widest uppercase flex items-center gap-2">
-                FinQuant Terminal <span className="px-1.5 py-0.5 rounded text-[8px] bg-red-500/20 text-red-400 font-bold">LIVE</span>
+                FinQuant Terminal <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>{connected ? 'LIVE' : 'ERROR'}</span>
               </h1>
               <p className="text-[10px] text-gray-400 font-medium">Quantitative Analysis & Strategy Engine</p>
             </div>
