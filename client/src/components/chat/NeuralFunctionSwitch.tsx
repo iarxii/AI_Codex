@@ -63,7 +63,7 @@ const NeuralFunctionSwitch: React.FC<NeuralFunctionSwitchProps> = ({
         leaveFrom="transform opacity-100 scale-100 translate-y-0"
         leaveTo="transform opacity-0 scale-95 translate-y-[-10px]"
       >
-        <Menu.Items className="absolute right-0 mt-2 w-64 origin-top-right divide-y divide-black/[0.05] rounded-3xl bg-white/80 backdrop-blur-2xl border border-white/40 shadow-2xl focus:outline-none z-50 overflow-hidden">
+        <Menu.Items anchor="bottom end" className="w-64 divide-y divide-black/[0.05] rounded-3xl bg-white/80 backdrop-blur-2xl border border-white/40 shadow-2xl focus:outline-none z-50 overflow-hidden">
           <div className="px-2 py-2">
             <Menu.Item>
               {({ active }) => (

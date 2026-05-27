@@ -43,7 +43,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const { activeSpace } = useAI();
 
   return (
-    <header className="h-14 flex items-stretch justify-between bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-40 shadow-sm w-full safe-area-top overflow-visible flex-nowrap">
+    <header className="h-14 flex items-stretch justify-between bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-40 shadow-sm w-full safe-area-top overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {/* items justified to the left */}
       <div className="flex items-center justify-start gap-3 shrink-0 h-full">
         <div className="sticky left-0 z-10 flex items-center gap-3 bg-gradient-to-r from-[#D8DCE4] via-[#D8DCE4]/95 to-transparent pl-4 pr-2 h-full shrink-0">
