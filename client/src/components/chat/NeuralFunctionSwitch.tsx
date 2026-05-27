@@ -13,30 +13,44 @@ interface NeuralFunctionSwitchProps {
   isCanvasOpen: boolean;
   setIsCanvasOpen: (open: boolean) => void;
   artifactCount: number;
+  isDarkBg?: boolean;
 }
 
 const NeuralFunctionSwitch: React.FC<NeuralFunctionSwitchProps> = ({
   isCanvasOpen,
   setIsCanvasOpen,
-  artifactCount
+  artifactCount,
+  isDarkBg = false,
 }) => {
   const navigate = useNavigate();
 
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
-        <Menu.Button className="group flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-white/40 hover:bg-white/60 backdrop-blur-md border border-black/[0.05] hover:border-black/[0.1] transition-all duration-300 shadow-sm active:scale-95">
+        <Menu.Button className={`group flex items-center gap-2.5 px-4 py-2 rounded-2xl backdrop-blur-md transition-all duration-300 shadow-sm active:scale-95 ${
+          isDarkBg 
+            ? "bg-white/20 hover:bg-white/30 border border-white/25 text-white" 
+            : "bg-white/40 hover:bg-white/60 border border-black/[0.05] hover:border-black/[0.1]"
+        }`}>
           <div className="relative">
-             <CircleStackIcon className="w-4 h-4 text-[#4A4D5E] group-hover:text-[#fd3b12] transition-colors" />
+             <CircleStackIcon className={`w-4 h-4 transition-colors ${
+               isDarkBg ? "text-white" : "text-[#4A4D5E] group-hover:text-[#fd3b12]"
+             }`} />
              {artifactCount > 0 && (
-               <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#fd3b12] rounded-full animate-pulse border border-white" />
+               <span className={`absolute -top-1 -right-1 w-2 h-2 rounded-full animate-pulse border ${
+                 isDarkBg ? "bg-white border-[#fd3b12]" : "bg-[#fd3b12] border-white"
+               }`} />
              )}
           </div>
-          <span className="text-[11px] font-black uppercase tracking-[0.15em] text-[#1A1D2E]">
+          <span className={`text-[11px] font-black uppercase tracking-[0.15em] ${
+            isDarkBg ? "text-white" : "text-[#1A1D2E]"
+          }`}>
             <span className="hidden sm:inline">System Functions</span>
             <span className="inline sm:hidden">Sys.Func</span>
           </span>
-          <ChevronDownIcon className="w-3.5 h-3.5 text-[#7A7D8E] group-hover:text-[#1A1D2E] transition-colors" />
+          <ChevronDownIcon className={`w-3.5 h-3.5 transition-colors ${
+            isDarkBg ? "text-white/85 group-hover:text-white" : "text-[#7A7D8E] group-hover:text-[#1A1D2E]"
+          }`} />
         </Menu.Button>
       </div>
 

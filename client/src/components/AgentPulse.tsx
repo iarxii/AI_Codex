@@ -6,12 +6,14 @@ interface AgentPulseProps {
   mode?: "thinking" | "idle";
   className?: string;
   showText?: boolean;
+  isDarkBg?: boolean;
 }
 
 const AgentPulse: React.FC<AgentPulseProps> = ({
   mode = "thinking",
   className = "",
   showText = true,
+  isDarkBg = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +43,11 @@ const AgentPulse: React.FC<AgentPulseProps> = ({
         // Draw 3 wave strands
         for (let i = 0; i < 3; i++) {
           const alpha = isThinking ? 255 - i * 60 : 180 - i * 40;
-          const color = isThinking ? [255, 102, 0] : [100, 116, 139]; // Orange for thinking, Slate for idle
+          const color = isDarkBg
+            ? [255, 255, 255]
+            : isThinking
+            ? [255, 102, 0]
+            : [100, 116, 139]; // White for dark bg, Orange for thinking, Slate for idle
 
           p.stroke(color[0], color[1], color[2], alpha);
           p.strokeWeight(isThinking ? 1.5 - i * 0.3 : 1.2 - i * 0.3);
@@ -65,22 +71,26 @@ const AgentPulse: React.FC<AgentPulseProps> = ({
 
     const p5Instance = new p5(sketch);
     return () => p5Instance.remove();
-  }, [mode]);
+  }, [mode, isDarkBg]);
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div className="flex-shrink-0">
         {mode === "thinking" ? (
-          <Brain className="w-4 h-4 text-[#fd3b12]" />
+          <Brain className={`w-4 h-4 ${isDarkBg ? "text-white animate-pulse" : "text-[#fd3b12]"}`} />
         ) : (
-          <Bot className="w-4 h-4 text-slate-500 opacity-80" />
+          <Bot className={`w-4 h-4 ${isDarkBg ? "text-white/80" : "text-slate-500 opacity-80"}`} />
         )}
       </div>
       <div ref={containerRef} className="opacity-80" />
       {showText && (
         <span
           className={`text-[10px] font-bold uppercase tracking-widest ${
-            mode === "thinking" ? "text-[#fd3b12]/70" : "text-slate-500/60"
+            isDarkBg
+              ? "text-white/80"
+              : mode === "thinking"
+              ? "text-[#fd3b12]/70"
+              : "text-slate-500/60"
           }`}
         >
           {mode === "thinking" ? "Synthesizing" : "Awaiting Input"}

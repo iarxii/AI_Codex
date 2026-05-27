@@ -43,10 +43,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const { activeSpace } = useAI();
 
   return (
-    <header className="h-14 flex items-center justify-between bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-20 shadow-sm w-full safe-area-top overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <header className="h-14 flex items-stretch justify-between bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-20 shadow-sm w-full safe-area-top overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {/* items justified to the left */}
-      <div className="flex items-center justify-start gap-3 shrink-0">
-        <div className="sticky left-0 z-10 flex items-center gap-3 bg-gradient-to-r from-[#D8DCE4] via-[#D8DCE4]/90 to-transparent pl-3 pr-6 py-1 -ml-3 mr-1">
+      <div className="flex items-center justify-start gap-3 shrink-0 h-full">
+        <div className="sticky left-0 z-10 flex items-center gap-3 bg-gradient-to-r from-[#D8DCE4] via-[#D8DCE4]/95 to-transparent pl-4 pr-8 h-full shrink-0">
           {/* Sidebar Toggle */}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -116,7 +116,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       </div>
 
       {/* items justified to the right */}
-      <div className="flex items-center justify-end gap-3 shrink-0">
+      <div className="flex items-center justify-end gap-3 shrink-0 h-full">
         {/* Spirit Bird Interaction Harness Toggle — only for trading space on < lg screens */}
         {activeSpace?.slug === "trading-space" && setIsHarnessOpen && (
           <button
@@ -151,23 +151,28 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </button>
         )}
 
-        <div className="sticky right-0 z-10 flex items-center gap-3 bg-gradient-to-r from-transparent via-[#fd3b12]/90 to-[#fd3b12] pl-6 pr-3 py-1 -mr-3 ml-1 shrink-0">
+        <div className="sticky right-0 z-10 flex items-center gap-3 bg-gradient-to-r from-transparent via-[#fd3b12]/90 to-[#fd3b12] pl-10 pr-4 h-full shrink-0">
           {/* System Function Shifter Dropdown */}
           <NeuralFunctionSwitch
             isCanvasOpen={isCanvasOpen}
             setIsCanvasOpen={setIsCanvasOpen}
             artifactCount={artifactCount}
+            isDarkBg={true}
           />
           {/* Agent Pulse Status */}
-          <div className="hidden md:flex items-center px-4 border-l border-black/[0.06] ml-2">
-            <AgentPulse mode={loading ? "thinking" : "idle"} showText={false} />
+          <div className="hidden md:flex items-center px-4 border-l border-white/20 ml-2 h-6">
+            <AgentPulse mode={loading ? "thinking" : "idle"} showText={false} isDarkBg={true} />
 
             {/* Latency */}
             {currentLatency && (
               <div
-                className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold transition-all ${loading ? "bg-red-100 border-red-300" : "bg-black/[0.04] border-black/[0.06]"}`}
+                className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+                  loading 
+                    ? "bg-white/20 border-white/30 text-white" 
+                    : "bg-white/10 border-white/20 text-white/90"
+                }`}
               >
-                <span className="text-[10px] font-semibold text-[#4A4D5E] uppercase tracking-tight">
+                <span className="text-[10px] font-semibold uppercase tracking-tight">
                   {currentLatency.toFixed(2)}s
                 </span>
               </div>
@@ -179,21 +184,19 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             onClick={() => setIsSettingsOpen(true)}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
               connected
-                ? "bg-[#fd3b12]/10 border-[#fd3b12]/25 hover:bg-[#fd3b12]/20 hover:border-[#fd3b12]/40"
-                : "bg-red-100 border-red-300"
+                ? "bg-white/20 border-white/25 hover:bg-white/30 text-white"
+                : "bg-red-500/30 border-red-500/40 text-red-100"
             }`}
             title={`Provider: ${activeProviderInfo.label} — Click to change`}
           >
             <ProviderIcon provider={activeProviderInfo} size={16} />
             <span
-              className={`hidden md:flex text-[10px] font-bold uppercase tracking-tight ${
-                connected ? "text-[#fd3b12]" : "text-red-600"
-              }`}
+              className="hidden md:flex text-[10px] font-bold uppercase tracking-tight text-white"
             >
               {activeProviderInfo.label} API
             </span>
             <div
-              className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-500 animate-pulse" : "bg-red-500"}`}
+              className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-400 animate-pulse" : "bg-red-500"}`}
             ></div>
           </button>
 
@@ -205,7 +208,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               localStorage.removeItem("ai_sidebar_tab");
               navigate("/login");
             }}
-            className="p-2.5 hover:bg-black/[0.06] rounded-lg text-[#7A7D8E] hover:text-[#1A1D2E] transition-colors"
+            className="p-2.5 hover:bg-white/10 rounded-lg text-white/85 hover:text-white transition-colors"
             title="Logout"
           >
             <svg
