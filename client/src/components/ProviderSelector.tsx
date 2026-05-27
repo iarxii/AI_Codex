@@ -189,12 +189,13 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         </button>
       </div>
 
-      <div className="flex-1">
+      <div className="flex-none w-16 sm:flex-1">
         {/* AI Provider selector */}
         <Listbox value={provider} onChange={setProvider}>
           <div className="relative mt-1">
             <Listbox.Label className="block text-[10px] font-bold uppercase tracking-widest text-[#4A4D5E] mb-1.5 ml-1">
-              AI Provider
+              <span className="hidden sm:block">AI Provider</span>
+              <span className="block sm:hidden">Node</span>
             </Listbox.Label>
             <Listbox.Button className="relative w-full cursor-default rounded-xl bg-[#E2E6EC] border border-black/[0.08] py-2.5 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/20 sm:text-xs transition-all hover:bg-[#D8DCE4]">
               <span className="flex items-center">
@@ -202,10 +203,10 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                   <ProviderIcon
                     provider={selectedProvider}
                     size={24}
-                    className="mr-3"
+                    className="mr-0 sm:mr-3"
                   />
                 )}
-                <span className="block truncate font-semibold text-[#1A1D2E]">
+                <span className="hidden sm:block truncate font-semibold text-[#1A1D2E]">
                   {selectedProvider?.label}
                 </span>
               </span>
@@ -222,7 +223,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               leaveFrom="opacity-100"
               leaveTo="opacity-0"
             >
-              <Listbox.Options className="absolute z-50 bottom-full mb-2 max-h-60 w-full overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide">
+              <Listbox.Options className="absolute z-50 bottom-full mb-2 max-h-60 w-48 sm:w-full left-0 overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide">
                 {PROVIDERS
                   .filter((p) => {
                     const isAdmin = ["admin", "super_admin"].includes(userProfile?.role || "");
@@ -272,12 +273,13 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         </Listbox>
       </div>
 
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         {/* model selection list */}
         <Listbox value={model} onChange={setModel}>
           <div className="relative mt-1">
             <Listbox.Label className="block text-[10px] font-bold uppercase tracking-widest text-[#4A4D5E] mb-1.5 ml-1">
-              Model Configuration
+              <span className="hidden sm:block">Model Configuration</span>
+              <span className="block sm:hidden">Model</span>
             </Listbox.Label>
             <Listbox.Button className="relative w-full cursor-default rounded-xl bg-[#E2E6EC] border border-black/[0.08] py-2.5 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/20 sm:text-xs transition-all hover:bg-[#D8DCE4]">
               <span className="block truncate font-semibold text-[#1A1D2E]">
