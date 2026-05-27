@@ -667,7 +667,7 @@ const Chat: React.FC = () => {
 
         {/* Trading Space Header — contextual sub-header */}
         {activeSpace?.slug === 'trading-space' && !viewSpacesCatalog && (
-          <TradingSpaceHeader />
+          <TradingSpaceHeader connected={connected} />
         )}
         
         {/* Floating Hardware Telemetry — Moved to Top to prevent input obstruction */}
