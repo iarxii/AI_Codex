@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import SettingsModal from "./SettingsModal";
 import {
   Cog6ToothIcon,
@@ -47,6 +47,31 @@ const Sidebar: React.FC<SidebarProps> = ({
     if (saved === 'spaces' || saved === 'workspaces') return saved;
     return 'workspaces';
   });
+
+  // Swipe gesture handlers to close sidebar on mobile
+  const touchStartX = useRef<number | null>(null);
+  const touchCurrentX = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchCurrentX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    touchCurrentX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX.current === null || touchCurrentX.current === null) return;
+    const diffX = touchStartX.current - touchCurrentX.current;
+    // If swiped left by more than 60px on mobile, close the sidebar
+    if (diffX > 60) {
+      onClose();
+    }
+    touchStartX.current = null;
+    touchCurrentX.current = null;
+  };
   
   // Display name logic
   const displayName = userProfile?.first_name 
@@ -194,13 +219,27 @@ const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         className={`
         fixed lg:static top-0 left-0 h-full w-full sm:w-80 lg:w-72 flex flex-col bg-[var(--bg-surface)]/40 backdrop-blur-2xl border-r border-black/[0.06] z-50 safe-area-top
         transition-all duration-500 ease-in-out
         ${isOpen ? "translate-x-0 opacity-100" : "-translate-x-full lg:hidden lg:opacity-0"}
       `}
       >
-        <div className="px-6 py-4 sm:py-6 lg:py-8 flex flex-col items-center justify-center text-center group">
+        <div className="px-6 py-4 sm:py-6 lg:py-8 flex flex-col items-center justify-center text-center group relative">
+          {/* Close button for mobile */}
+          <button 
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 rounded-xl bg-black/5 hover:bg-black/10 text-gray-450 hover:text-gray-800 transition-colors lg:hidden"
+            title="Close Sidebar"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
           <div className="relative mb-1">
             {/* <img 
               src="/media/logo.png" 
@@ -370,6 +409,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={conv.id}
               onClick={() => {
+                if (currentConversationId === conv.id) {
+                  if (window.innerWidth < 1024) onClose();
+                  return;
+                }
                 onSelectConversation(conv.id);
                 if (window.innerWidth < 1024) onClose();
               }}
