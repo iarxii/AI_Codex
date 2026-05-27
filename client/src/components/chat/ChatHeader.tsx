@@ -46,39 +46,41 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
     <header className="h-14 flex items-center justify-between px-3 sm:px-5 bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-20 shadow-sm w-full safe-area-top overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {/* items justified to the left */}
       <div className="flex items-center justify-start gap-3 shrink-0">
-        {/* Sidebar Toggle */}
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="p-2.5 sm:p-1.5 text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95"
-          title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
+        <div className="sticky left-0 z-10 flex items-center gap-3 bg-gradient-to-r from-[#D8DCE4] via-[#D8DCE4]/90 to-transparent pl-3 pr-6 py-1 -ml-3 mr-1">
+          {/* Sidebar Toggle */}
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2.5 sm:p-1.5 text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95 shrink-0"
+            title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
           >
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M9 3v18" />
-          </svg>
-        </button>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M9 3v18" />
+            </svg>
+          </button>
 
-        {/* Logo shown when sidebar is closed or on mobile */}
-        <div
-          className={`flex items-center gap-2 animate-in fade-in slide-in-from-left-4 duration-300 ${isSidebarOpen ? "lg:hidden" : ""}`}
-        >
-          <img
-            src="/media/aicodex-spirit-bird.png"
-            alt="AICodex Logo"
-            className="w-7 h-7 shrink-0 object-contain rounded-lg border border-[var(--accent)]"
-          />
-          <span className="text-sm font-bold tracking-tight text-[var(--text-primary)] hidden sm:block">
-            AI<span className="text-[var(--accent)]">Codex</span>
-          </span>
+          {/* Logo shown when sidebar is closed or on mobile */}
+          <div
+            className={`flex items-center gap-2 animate-in fade-in slide-in-from-left-4 duration-300 shrink-0 ${isSidebarOpen ? "lg:hidden" : ""}`}
+          >
+            <img
+              src="/media/aicodex-spirit-bird.png"
+              alt="AICodex Logo"
+              className="w-7 h-7 shrink-0 object-contain rounded-lg border border-[var(--accent)]"
+            />
+            <span className="text-sm font-bold tracking-tight text-[var(--text-primary)] hidden sm:block">
+              AI<span className="text-[var(--accent)]">Codex</span>
+            </span>
+          </div>
+
+          <div className="w-px h-4 bg-black/[0.08] mx-1 shrink-0"></div>
         </div>
-
-        <div className="w-px h-4 bg-black/[0.08] mx-1"></div>
 
         {/* workspace profile */}
         <button

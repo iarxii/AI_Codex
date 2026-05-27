@@ -250,7 +250,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <img
                 src="/media/aicodex-spirit-bird.png"
                 alt="Adaptivconcept FL Logo"
-                className="w-20 h-20 cursor-pointer object-contain rounded-3xl border-2 border-[var(--accent)]"
+                className="p-2 w-20 h-20 cursor-pointer object-contain rounded-3xl border-2 border-[var(--accent)]"
                 title="AdaptivConcept FL"
               />
             </div>
@@ -271,7 +271,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </span>
                   </div>
                 )}
-                <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-[var(--text-muted)] flex items-center gap-1.5">
+                <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-dark [var(--text-muted)] flex items-center gap-1.5">
                   {provider === "local" && (
                     <>
                       <CpuChipIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
@@ -309,7 +309,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {/* Tabs */}
-          <div className="flex p-2 gap-1.5 bg-black/[0.02] border-b border-black/[0.06]">
+          <div className="flex p-2 gap-1.5 bg-[var(--bg-primary)]/50 border-b border-black/[0.06]">
               <button
                   onClick={() => {
                       setActiveTab('workspaces');
