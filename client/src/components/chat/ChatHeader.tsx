@@ -134,70 +134,72 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           artifactCount={artifactCount}
         />
 
-        {/* Agent Pulse Status */}
-        <div className="hidden md:flex items-center px-4 border-l border-black/[0.06] ml-2">
-          <AgentPulse mode={loading ? "thinking" : "idle"} showText={false} />
+        <div className="sticky right-0 z-10 flex items-center gap-3 bg-gradient-to-r from-transparent via-[#D8DCE4]/90 to-[#D8DCE4] pl-6 pr-3 py-1 -mr-3 ml-1 shrink-0">
+          {/* Agent Pulse Status */}
+          <div className="hidden md:flex items-center px-4 border-l border-black/[0.06] ml-2">
+            <AgentPulse mode={loading ? "thinking" : "idle"} showText={false} />
 
-          {/* Latency */}
-          {currentLatency && (
-            <div
-              className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold transition-all ${loading ? "bg-red-100 border-red-300" : "bg-black/[0.04] border-black/[0.06]"}`}
-            >
-              <span className="text-[10px] font-semibold text-[#4A4D5E] uppercase tracking-tight">
-                {currentLatency.toFixed(2)}s
-              </span>
-            </div>
-          )}
-        </div>
+            {/* Latency */}
+            {currentLatency && (
+              <div
+                className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold transition-all ${loading ? "bg-red-100 border-red-300" : "bg-black/[0.04] border-black/[0.06]"}`}
+              >
+                <span className="text-[10px] font-semibold text-[#4A4D5E] uppercase tracking-tight">
+                  {currentLatency.toFixed(2)}s
+                </span>
+              </div>
+            )}
+          </div>
 
-        {/* Provider Badge — clickable, opens SettingsModal */}
-        <button
-          onClick={() => setIsSettingsOpen(true)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
-            connected
-              ? "bg-[#fd3b12]/10 border-[#fd3b12]/25 hover:bg-[#fd3b12]/20 hover:border-[#fd3b12]/40"
-              : "bg-red-100 border-red-300"
-          }`}
-          title={`Provider: ${activeProviderInfo.label} — Click to change`}
-        >
-          <ProviderIcon provider={activeProviderInfo} size={16} />
-          <span
-            className={`hidden md:flex text-[10px] font-bold uppercase tracking-tight ${
-              connected ? "text-[#fd3b12]" : "text-red-600"
+          {/* Provider Badge — clickable, opens SettingsModal */}
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
+              connected
+                ? "bg-[#fd3b12]/10 border-[#fd3b12]/25 hover:bg-[#fd3b12]/20 hover:border-[#fd3b12]/40"
+                : "bg-red-100 border-red-300"
             }`}
+            title={`Provider: ${activeProviderInfo.label} — Click to change`}
           >
-            {activeProviderInfo.label} API
-          </span>
-          <div
-            className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-500 animate-pulse" : "bg-red-500"}`}
-          ></div>
-        </button>
+            <ProviderIcon provider={activeProviderInfo} size={16} />
+            <span
+              className={`hidden md:flex text-[10px] font-bold uppercase tracking-tight ${
+                connected ? "text-[#fd3b12]" : "text-red-600"
+              }`}
+            >
+              {activeProviderInfo.label} API
+            </span>
+            <div
+              className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-500 animate-pulse" : "bg-red-500"}`}
+            ></div>
+          </button>
 
-        {/* Logout */}
-        <button
-          onClick={() => {
-            localStorage.removeItem("token");
-            localStorage.removeItem("ai_active_space");
-            localStorage.removeItem("ai_sidebar_tab");
-            navigate("/login");
-          }}
-          className="p-2.5 hover:bg-black/[0.06] rounded-lg text-[#7A7D8E] hover:text-[#1A1D2E] transition-colors"
-          title="Logout"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+          {/* Logout */}
+          <button
+            onClick={() => {
+              localStorage.removeItem("token");
+              localStorage.removeItem("ai_active_space");
+              localStorage.removeItem("ai_sidebar_tab");
+              navigate("/login");
+            }}
+            className="p-2.5 hover:bg-black/[0.06] rounded-lg text-[#7A7D8E] hover:text-[#1A1D2E] transition-colors"
+            title="Logout"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-            />
-          </svg>
-        </button>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
   );
