@@ -34,15 +34,30 @@ interface Candle {
 }
 
 const INSTRUMENTS = [
+  // Cryptocurrencies
   { symbol: "BTCUSD", name: "Bitcoin / USD", category: "Cryptocurrencies", basePrice: 95000 },
   { symbol: "ETHUSD", name: "Ethereum / USD", category: "Cryptocurrencies", basePrice: 3400 },
+  { symbol: "XRPUSD", name: "Ripple / USD", category: "Cryptocurrencies", basePrice: 0.62 },
+  // Forex
   { symbol: "EURUSD", name: "Euro / US Dollar", category: "Forex", basePrice: 1.0850 },
   { symbol: "GBPUSD", name: "Pound / US Dollar", category: "Forex", basePrice: 1.2650 },
-  { symbol: "TSLA", name: "Tesla Inc.", category: "Equities", basePrice: 245.0 },
-  { symbol: "AAPL", name: "Apple Inc.", category: "Equities", basePrice: 185.0 },
+  { symbol: "ZARUSD", name: "SA Rand / US Dollar", category: "Forex", basePrice: 18.50 },
+  // US M7 Stocks
+  { symbol: "TSLA", name: "Tesla Inc.", category: "US M7 Stocks", basePrice: 245.0 },
+  { symbol: "AAPL", name: "Apple Inc.", category: "US M7 Stocks", basePrice: 185.0 },
+  { symbol: "MSFT", name: "Microsoft Corp.", category: "US M7 Stocks", basePrice: 420.0 },
+  { symbol: "GOOGL", name: "Alphabet Inc.", category: "US M7 Stocks", basePrice: 175.0 },
+  { symbol: "META", name: "Meta Platforms Inc.", category: "US M7 Stocks", basePrice: 470.0 },
+  { symbol: "NVDA", name: "NVIDIA Corp.", category: "US M7 Stocks", basePrice: 900.0 },
+  { symbol: "AMZN", name: "Amazon.com Inc.", category: "US M7 Stocks", basePrice: 180.0 },
+  // Commodities
   { symbol: "XAUUSD", name: "Gold / USD", category: "Commodities", basePrice: 2400.0 },
   { symbol: "USOIL", name: "WTI Crude Oil", category: "Commodities", basePrice: 78.0 },
-  { symbol: "SPX500", name: "S&P 500 Index", category: "Indices", basePrice: 5300.0 },
+  { symbol: "BRENT", name: "Brent Crude Oil", category: "Commodities", basePrice: 82.0 },
+  { symbol: "NATGAS", name: "Natural Gas", category: "Commodities", basePrice: 2.50 },
+  // ETFs / Indices
+  { symbol: "SPX500", name: "S&P 500 Index", category: "ETFs / Indices", basePrice: 5300.0 },
+  { symbol: "STX40", name: "Top 40 Index", category: "ETFs / Indices", basePrice: 7500.0 },
 ];
 
 export const TradingChart: React.FC<TradingChartProps> = ({
@@ -136,6 +151,27 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     return () => {
       active = false;
     };
+  }, [selectedSymbol, range]);
+
+  // Synchronize active workspace context to backend
+  useEffect(() => {
+    const syncContext = async () => {
+      try {
+        await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/market/context`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            symbol: selectedSymbol,
+            timeframe: range
+          })
+        });
+      } catch (err) {
+        console.error("Failed to sync chart context to backend:", err);
+      }
+    };
+    syncContext();
   }, [selectedSymbol, range]);
 
   // Live ticking price connection via WebSocket

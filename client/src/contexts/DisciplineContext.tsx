@@ -23,7 +23,13 @@ const defaultState: DisciplineState = {
     isOpen: true,
     name: "London/NY Overlap"
   },
-  allowedSymbolsWhitelist: ["BTCUSD", "ETHUSD", "EURUSD", "GBPUSD", "XAUUSD", "SPX500"],
+  allowedSymbolsWhitelist: [
+    "BTCUSD", "ETHUSD", "XRPUSD",
+    "EURUSD", "GBPUSD", "ZARUSD",
+    "TSLA", "AAPL", "MSFT", "GOOGL", "META", "NVDA", "AMZN",
+    "XAUUSD", "USOIL", "BRENT", "NATGAS",
+    "SPX500", "STX40"
+  ],
   isGateLocked: false,
   activeExposurePercent: 7.5, // 7.5% active exposure initial state
 };
