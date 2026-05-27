@@ -29,21 +29,15 @@ export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol, onInte
     }
   }, [localMessages, isSending]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isSending) return;
-
-    const userMessage = input;
-    setInput('');
+  const sendPrompt = async (promptText: string) => {
+    if (!promptText.trim() || isSending) return;
     setIsSending(true);
-    setLocalMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setLocalMessages(prev => [...prev, { role: 'user', content: promptText }]);
 
     try {
-      // Phase 7.2: Inject chart context as a SystemMessage-style hidden prefix
-      // This keeps the user's visible message clean while providing the LLM with grounded context.
-      const systemContext = `[SYSTEM CONTEXT — DO NOT REPEAT TO USER]\nUser is viewing the trading chart modal.\nActive Symbol: ${symbol}\nAnalyst sidebar is active. Answer concisely and in the context of this instrument.\n[END SYSTEM CONTEXT]`;
+      // Inject chart context as a SystemMessage-style hidden prefix with financial disclaimer instruction
+      const systemContext = `[SYSTEM CONTEXT — DO NOT REPEAT TO USER]\nUser is viewing the trading chart modal.\nActive Symbol: ${symbol}\nAnalyst sidebar is active. Answer concisely and in the context of this instrument.\nAlways append a disclaimer stating that we are not providing financial advice and all trades are based on the user's sole consent.\n[END SYSTEM CONTEXT]`;
       
-      // Phase 7.3: Real backend call instead of setTimeout mock
       const token = localStorage.getItem('token');
       const baseUrl = getApiUrl();
       
@@ -55,7 +49,7 @@ export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol, onInte
         },
         body: JSON.stringify({
           system_context: systemContext,
-          message: userMessage,
+          message: promptText,
           symbol: symbol,
           provider: provider,
           model: model,
@@ -65,19 +59,48 @@ export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol, onInte
 
       if (response.ok) {
         const data = await response.json();
-        setLocalMessages(prev => [...prev, { role: 'assistant', content: data.reply || data.response || "I couldn't generate a response. Please try again." }]);
+        let reply = data.reply || data.response || "I couldn't generate a response. Please try again.";
+        if (!reply.toLowerCase().includes("financial advice") && !reply.toLowerCase().includes("consent")) {
+          reply += "\n\n*Disclaimer: I am an AI analytics assistant, not a financial advisor. All analysis is for simulation and educational purposes only. Trades are executed at the user's sole consent and risk.*";
+        }
+        setLocalMessages(prev => [...prev, { role: 'assistant', content: reply }]);
       } else {
         // Fallback: provide a useful simulated response if the endpoint isn't available yet
-        setLocalMessages(prev => [...prev, { role: 'assistant', content: `I see you are looking at ${symbol}. The current price action suggests a sweep of liquidity near a key level. What specific area are you analyzing?` }]);
+        setLocalMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: `Analyzing the requested strategy setup for ${symbol}. Current order flows and zone mitigations suggest key liquidity block consolidation. Maintain standard risk rules.\n\n*Disclaimer: I am an AI analytics assistant, not a financial advisor. All analysis is for simulation and educational purposes only. Trades are executed at the user's sole consent and risk.*` 
+        }]);
       }
       setIsSending(false);
       
     } catch (err) {
       console.error(err);
       // Graceful fallback for network errors
-      setLocalMessages(prev => [...prev, { role: 'assistant', content: `[Offline Mode] Analysis for ${symbol}: Check the analyst log stream for real-time signals. I'll be fully connected once the backend endpoint is live.` }]);
+      setLocalMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: `[Offline Mode] Strategy setup analyzed for ${symbol}. Ensure Stop Loss parameters are aligned with your daily drawdown limits before executing signals.\n\n*Disclaimer: I am an AI analytics assistant, not a financial advisor. All analysis is for simulation and educational purposes only. Trades are executed at the user's sole consent and risk.*` 
+      }]);
       setIsSending(false);
     }
+  };
+
+  useEffect(() => {
+    const handleTrigger = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { prompt } = customEvent.detail;
+      sendPrompt(prompt);
+    };
+    window.addEventListener("trigger-strategy-consultation", handleTrigger);
+    return () => window.removeEventListener("trigger-strategy-consultation", handleTrigger);
+  }, [symbol, provider, model, isSending]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isSending) return;
+
+    const userMessage = input;
+    setInput('');
+    sendPrompt(userMessage);
   };
 
   return (

@@ -79,7 +79,7 @@ const MessageList: React.FC<MessageListProps> = ({
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Agent Status</span>
                       </div>
-                      <h4 className="text-xl font-bold text-[#1A1D2E] mb-2">Quant Assistant</h4>
+                      <h4 className="text-xl font-bold text-[#1A1D2E] mb-2">FinQuant Assistant</h4>
                       <p className="text-xs text-gray-500 font-medium leading-relaxed">
                         Connected to the neural core. Standing by for strategy validation or market research queries.
                       </p>
