@@ -933,6 +933,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
             </button>
           )}
         </div>
+        </div>
       </div>
 
       {/* Control Panel & Discipline Engine Status */}
