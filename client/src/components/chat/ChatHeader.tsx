@@ -175,6 +175,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         <button
           onClick={() => {
             localStorage.removeItem("token");
+            localStorage.removeItem("ai_active_space");
+            localStorage.removeItem("ai_sidebar_tab");
             navigate("/login");
           }}
           className="p-2.5 hover:bg-black/[0.06] rounded-lg text-[#7A7D8E] hover:text-[#1A1D2E] transition-colors"

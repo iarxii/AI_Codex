@@ -140,6 +140,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     setActiveSpace(space);
     if (space) {
         localStorage.setItem('ai_active_space', JSON.stringify(space));
+        localStorage.setItem('ai_sidebar_tab', 'spaces');
         setViewSpacesCatalog(false);
     } else {
         localStorage.removeItem('ai_active_space');
@@ -177,6 +178,33 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
             if (synced.models) setModelConfigs(synced.models);
           } catch (e) {}
         }
+
+        // Validate stored active space against server authorization
+        const savedSpaceStr = localStorage.getItem('ai_active_space');
+        if (savedSpaceStr) {
+          try {
+            const savedSpace = JSON.parse(savedSpaceStr);
+            const spaceRes = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/spaces/${savedSpace.slug}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (spaceRes.ok) {
+              const validatedSpace = await spaceRes.json();
+              setActiveSpace(validatedSpace);
+              localStorage.setItem('ai_active_space', JSON.stringify(validatedSpace));
+            } else {
+              console.warn(`[AIContext] Space ${savedSpace.slug} validation failed (${spaceRes.status}). Clearing active space.`);
+              setActiveSpace(null);
+              localStorage.removeItem('ai_active_space');
+              localStorage.setItem('ai_sidebar_tab', 'workspaces');
+            }
+          } catch (e) {
+            console.error('Failed to validate active space', e);
+          }
+        }
+      } else if (res.status === 401) {
+        setActiveSpace(null);
+        localStorage.removeItem('ai_active_space');
+        localStorage.removeItem('ai_sidebar_tab');
       }
     } catch (e) {
       console.error('Failed to sync profile', e);
