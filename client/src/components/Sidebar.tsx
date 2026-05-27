@@ -228,105 +228,107 @@ const Sidebar: React.FC<SidebarProps> = ({
         ${isOpen ? "translate-x-0 opacity-100" : "-translate-x-full lg:hidden lg:opacity-0"}
       `}
       >
-        <div className="px-6 py-4 sm:py-6 lg:py-8 flex flex-col items-center justify-center text-center group relative">
-          {/* Close button for mobile */}
-          <button 
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-xl bg-black/5 hover:bg-black/10 text-gray-450 hover:text-gray-800 transition-colors lg:hidden"
-            title="Close Sidebar"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-          <div className="relative mb-1">
-            {/* <img 
-              src="/media/logo.png" 
-              alt="AICodex Logo" 
-              className="w-18 h-18 object-contain transition-all duration-500 group-hover:scale-105"
-            /> */}
-            <img
-              src="/media/aicodex-spirit-bird.png"
-              alt="Adaptivconcept FL Logo"
-              className="w-20 h-20 cursor-pointer object-contain rounded-3xl border-2 border-[var(--accent)]"
-              title="AdaptivConcept FL"
-            />
-          </div>
+        <div className="bg-gradient-to-b from-white to-transparent">
+          <div className="px-6 py-4 sm:py-6 lg:py-8 flex flex-col items-center justify-center text-center group relative">
+            {/* Close button for mobile */}
+            <button 
+              onClick={onClose}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-black/5 hover:bg-black/10 text-gray-455 hover:text-gray-800 transition-colors lg:hidden"
+              title="Close Sidebar"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+            <div className="relative mb-1">
+              {/* <img 
+                src="/media/logo.png" 
+                alt="AICodex Logo" 
+                className="w-18 h-18 object-contain transition-all duration-500 group-hover:scale-105"
+              /> */}
+              <img
+                src="/media/aicodex-spirit-bird.png"
+                alt="Adaptivconcept FL Logo"
+                className="w-20 h-20 cursor-pointer object-contain rounded-3xl border-2 border-[var(--accent)]"
+                title="AdaptivConcept FL"
+              />
+            </div>
 
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
-              AI<span className="text-[var(--accent)]">Codex</span>
-            </h1>
-            <div className="flex flex-col items-center gap-1.5 justify-center mt-1">
-              {isPremiumSpace && (
-                <div 
-                  className={`flex items-center gap-1.5 mb-1 px-2 py-0.5 rounded-full border transition-all duration-500 ${isPremiumBackendOnline ? 'bg-green-500/10 border-green-500/30' : 'bg-orange-500/10 border-orange-500/30'}`}
-                  title={isPremiumBackendOnline ? "T4 GPU Backend is active" : "Premium instances are synchronizing..."}
-                >
-                  <div className={`w-1.5 h-1.5 rounded-full ${isPremiumBackendOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-orange-500 shadow-[0_0_8px_rgba(253,59,18,0.6)]'}`} />
-                  <span className={`text-[8px] font-bold uppercase tracking-[0.1em] ${isPremiumBackendOnline ? 'text-green-500' : 'text-orange-500'}`}>
-                    {isPremiumBackendOnline ? 'Neural Pulse Active' : 'Pulse Syncing'}
-                  </span>
-                </div>
-              )}
-              <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-[var(--text-muted)] flex items-center gap-1.5">
-                {provider === "local" && (
-                  <>
-                    <CpuChipIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
-                    Neural Core
-                  </>
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+                AI<span className="text-[var(--accent)]">Codex</span>
+              </h1>
+              <div className="flex flex-col items-center gap-1.5 justify-center mt-1">
+                {isPremiumSpace && (
+                  <div 
+                    className={`flex items-center gap-1.5 mb-1 px-2 py-0.5 rounded-full border transition-all duration-500 ${isPremiumBackendOnline ? 'bg-green-500/10 border-green-500/30' : 'bg-orange-500/10 border-orange-500/30'}`}
+                    title={isPremiumBackendOnline ? "T4 GPU Backend is active" : "Premium instances are synchronizing..."}
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full ${isPremiumBackendOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-orange-500 shadow-[0_0_8px_rgba(253,59,18,0.6)]'}`} />
+                    <span className={`text-[8px] font-bold uppercase tracking-[0.1em] ${isPremiumBackendOnline ? 'text-green-500' : 'text-orange-500'}`}>
+                      {isPremiumBackendOnline ? 'Neural Pulse Active' : 'Pulse Syncing'}
+                    </span>
+                  </div>
                 )}
-                {provider === "ollama_cloud" && (
-                  <>
-                    <CloudIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
-                    Neural Cloud
-                  </>
-                )}
-                {provider === "groq" && (
-                  <>
-                    <BoltIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
-                    Neural Velocity
-                  </>
-                )}
-                {provider === "openrouter" && (
-                  <>
-                    <GlobeAltIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
-                    Neural Interface
-                  </>
-                )}
-                {provider === "gemini" && (
-                  <>
-                    <SparklesIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
-                    Neural Expert
-                  </>
-                )}
-                {/* 👆 will be revised in future to offer "flavours" of agentic workflows for various purposes */}
-              </span>
+                <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-[var(--text-muted)] flex items-center gap-1.5">
+                  {provider === "local" && (
+                    <>
+                      <CpuChipIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
+                      Neural Core
+                    </>
+                  )}
+                  {provider === "ollama_cloud" && (
+                    <>
+                      <CloudIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
+                      Neural Cloud
+                    </>
+                  )}
+                  {provider === "groq" && (
+                    <>
+                      <BoltIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
+                      Neural Velocity
+                    </>
+                  )}
+                  {provider === "openrouter" && (
+                    <>
+                      <GlobeAltIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
+                      Neural Interface
+                    </>
+                  )}
+                  {provider === "gemini" && (
+                    <>
+                      <SparklesIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
+                      Neural Expert
+                    </>
+                  )}
+                  {/* 👆 will be revised in future to offer "flavours" of agentic workflows for various purposes */}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Tabs */}
-        <div className="flex p-2 gap-1.5 bg-black/[0.02] border-b border-black/[0.06]">
-            <button
-                onClick={() => {
-                    setActiveTab('workspaces');
-                    setActiveSpace(null);
-                    setViewSpacesCatalog(false);
-                }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 sm:py-2 lg:py-1.5 rounded-lg text-sm sm:text-xs font-semibold transition-all ${activeTab === 'workspaces' ? 'bg-white shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
-            >
-                <RectangleStackIcon className="w-5 h-5 sm:w-4 sm:h-4" />
-                Standard
-            </button>
-            <button
-                onClick={() => setActiveTab('spaces')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 sm:py-2 lg:py-1.5 rounded-lg text-sm sm:text-xs font-semibold transition-all ${activeTab === 'spaces' ? 'bg-[var(--accent)]/10 text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
-            >
-                <CubeTransparentIcon className="w-5 h-5 sm:w-4 sm:h-4" />
-                Spaces
-            </button>
+          {/* Tabs */}
+          <div className="flex p-2 gap-1.5 bg-black/[0.02] border-b border-black/[0.06]">
+              <button
+                  onClick={() => {
+                      setActiveTab('workspaces');
+                      setActiveSpace(null);
+                      setViewSpacesCatalog(false);
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 sm:py-2 lg:py-1.5 rounded-lg text-sm sm:text-xs font-semibold transition-all ${activeTab === 'workspaces' ? 'bg-white shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
+              >
+                  <RectangleStackIcon className="w-5 h-5 sm:w-4 sm:h-4" />
+                  Standard
+              </button>
+              <button
+                  onClick={() => setActiveTab('spaces')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 sm:py-2 lg:py-1.5 rounded-lg text-sm sm:text-xs font-semibold transition-all ${activeTab === 'spaces' ? 'bg-[var(--accent)]/10 text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
+              >
+                  <CubeTransparentIcon className="w-5 h-5 sm:w-4 sm:h-4" />
+                  Spaces
+              </button>
+          </div>
         </div>
 
         <div className="p-4 border-b border-black/[0.06] space-y-2.5">
