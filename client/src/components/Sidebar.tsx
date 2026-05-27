@@ -515,7 +515,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         <div className="p-4 border-t border-black/[0.06] bg-[var(--bg-primary)]/50 safe-area-bottom">
-          <div className="flex items-center gap-3 px-2">
+          <div className="flex items-center gap-3 px-2 pb-4">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-hover)] flex items-center justify-center text-[10px] font-bold text-white shadow-sm border border-white/20">
               {displayName.substring(0, 2).toUpperCase()}
             </div>
