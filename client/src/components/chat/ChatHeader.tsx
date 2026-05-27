@@ -72,7 +72,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             <img
               src="/media/aicodex-spirit-bird.png"
               alt="AICodex Logo"
-              className="w-7 h-7 shrink-0 object-contain rounded-lg border border-[var(--accent)]"
+              className="p-1 w-7 h-7 shrink-0 object-contain rounded-lg border border-[var(--accent)]"
             />
             <span className="text-sm font-bold tracking-tight text-[var(--text-primary)] hidden sm:block">
               AI<span className="text-[var(--accent)]">Codex</span>

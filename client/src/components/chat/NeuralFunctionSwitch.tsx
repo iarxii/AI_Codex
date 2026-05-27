@@ -32,6 +32,7 @@ const NeuralFunctionSwitch: React.FC<NeuralFunctionSwitchProps> = ({
             ? "bg-white/20 hover:bg-white/30 border border-white/25 text-white" 
             : "bg-white/40 hover:bg-white/60 border border-black/[0.05] hover:border-black/[0.1]"
         }`}>
+          {/* icon */}
           <div className="relative">
              <CircleStackIcon className={`w-4 h-4 transition-colors ${
                isDarkBg ? "text-white" : "text-[#4A4D5E] group-hover:text-[#fd3b12]"
@@ -42,12 +43,14 @@ const NeuralFunctionSwitch: React.FC<NeuralFunctionSwitchProps> = ({
                }`} />
              )}
           </div>
+          {/* label */}
           <span className={`text-[11px] font-black uppercase tracking-[0.15em] ${
             isDarkBg ? "text-white" : "text-[#1A1D2E]"
           }`}>
             <span className="hidden sm:inline">System Functions</span>
             <span className="inline sm:hidden">Sys.Func</span>
           </span>
+          {/* chevron */}
           <ChevronDownIcon className={`w-3.5 h-3.5 transition-colors ${
             isDarkBg ? "text-white/85 group-hover:text-white" : "text-[#7A7D8E] group-hover:text-[#1A1D2E]"
           }`} />
