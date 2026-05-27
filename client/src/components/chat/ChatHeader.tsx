@@ -43,9 +43,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const { activeSpace } = useAI();
 
   return (
-    <header className="h-14 flex items-center justify-between px-3 sm:px-5 bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-20 shadow-sm w-full safe-area-top">
+    <header className="h-14 flex items-center justify-between px-3 sm:px-5 bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-20 shadow-sm w-full safe-area-top overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {/* items justified to the left */}
-      <div className="flex items-center justify-start gap-3">
+      <div className="flex items-center justify-start gap-3 shrink-0">
         {/* Sidebar Toggle */}
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -108,7 +108,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       </div>
 
       {/* items justified to the right */}
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex items-center justify-end gap-3 shrink-0">
         {/* Spirit Bird Interaction Harness Toggle — only for trading space on < lg screens */}
         {activeSpace?.slug === 'trading-space' && setIsHarnessOpen && (
           <button
