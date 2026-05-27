@@ -397,7 +397,8 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 error_msg = f"Request timed out after {request_timeout}s. The model server may be overloaded or prefilling context. Please try again."
             else:
                 logger.error(f"PIPELINE ERROR: LLM invocation failed — {invoke_err}")
-                error_msg = str(invoke_err)
+                if not error_msg or error_msg == str(invoke_err):
+                    error_msg = str(invoke_err)
                 # Parse common API errors
                 if "429" in error_msg:
                     error_msg = "Rate limited by provider. Please wait and retry, or switch models."
