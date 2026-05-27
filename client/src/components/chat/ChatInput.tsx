@@ -112,12 +112,22 @@ const ChatInput: React.FC<ChatInputProps> = ({
     return window.innerWidth >= 640; // Default open on desktop, closed on mobile
   });
 
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
   // Sync specialization with agent mode
   React.useEffect(() => {
     if (!agentMode && activeSpecialization.id !== "conversational") {
       setActiveSpecialization(SPECIALIZATIONS[0]);
     }
   }, [agentMode]);
+
+  // Auto-resize message input height to content
+  React.useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  }, [input]);
   return (
     <footer
       className="px-3 sm:px-6 pb-5 pt-3 bg-transparent border-t border-black/[0.04] z-20 safe-area-bottom"
@@ -292,7 +302,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               </button>
 
               {isToolsOpen && (
-                <div className="absolute bottom-full left-0 mb-2 w-64 bg-white border border-black/[0.08] rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <div className="absolute bottom-full right-0 sm:left-0 mb-2 w-64 bg-white border border-black/[0.08] rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
                   <div className="px-3 py-1.5 border-b border-black/[0.04] mb-1">
                     <span className="text-[9px] font-black uppercase tracking-widest text-[#7A7D8E]">
                       Capability Matrix
@@ -383,6 +393,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           {/* Textarea + Send Row */}
           <div className="flex items-end gap-3 px-3 pb-3 pt-1">
             <textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
