@@ -42,7 +42,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { provider, userProfile, activeSpace, setActiveSpace, setAvailableSpaces, setViewSpacesCatalog, isPremiumSpace, isPremiumBackendOnline } = useAI();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [spaceConversations, setSpaceConversations] = useState<Conversation[]>([]);
-  const [activeTab, setActiveTab] = useState<'workspaces' | 'spaces'>('workspaces');
+  const [activeTab, setActiveTab] = useState<'workspaces' | 'spaces'>(() => {
+    const saved = localStorage.getItem('ai_sidebar_tab');
+    if (saved === 'spaces' || saved === 'workspaces') return saved;
+    return 'workspaces';
+  });
   
   // Display name logic
   const displayName = userProfile?.first_name 
@@ -88,6 +92,16 @@ const Sidebar: React.FC<SidebarProps> = ({
     fetchConversations();
     fetchSpaces();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('ai_sidebar_tab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeSpace) {
+      setActiveTab('spaces');
+    }
+  }, [activeSpace]);
 
   useEffect(() => {
     if (activeTab === 'spaces') {
