@@ -9,7 +9,11 @@ def get_model_capabilities(provider: str, model: str) -> List[str]:
     
     # Tool Support (Function Calling)
     if provider in ["groq", "gemini", "openrouter"]:
-        capabilities.append("Tools")
+        model_lower = (model or "").lower()
+        if provider == "groq" and "compound" in model_lower:
+            pass
+        else:
+            capabilities.append("Tools")
     elif provider == "local" or provider == "ollama_cloud":
         # Broaden tool support for modern Ollama models
         # These families are known to support native tool calling in Ollama
