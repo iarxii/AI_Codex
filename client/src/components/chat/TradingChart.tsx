@@ -11,7 +11,8 @@ import {
   Zap,
   Target,
   Crosshair,
-  Ruler
+  Ruler,
+  BookOpen
 } from "lucide-react";
 import { config } from "../../config";
 import { useDiscipline } from "../../contexts/DisciplineContext";
@@ -60,6 +61,33 @@ const INSTRUMENTS = [
   { symbol: "STX40", name: "Top 40 Index", category: "ETFs / Indices", basePrice: 7500.0 },
 ];
 
+const STRATEGIES = [
+  {
+    id: "brothers_fx",
+    name: "Brothers FX Zones",
+    desc: "Supply/Demand zone mitigation on H1 overlap.",
+    prompt: "Execute an analysis on the active chart for the Brothers FX Zones strategy. Focus on validating key supply/demand levels and entry signals."
+  },
+  {
+    id: "david_perk",
+    name: "David Perk Blocks",
+    desc: "Institutional order block identification.",
+    prompt: "Perform a David Perk Order Blocks assessment. Identify where institutional liquidity pools and order blocks are resting."
+  },
+  {
+    id: "turtle_breakout",
+    name: "Volatility Breakout",
+    desc: "Turtle trading channel breakouts.",
+    prompt: "Verify the chart for Volatility Breakout momentum. Are we breaking out of the 20-day price boundaries?"
+  },
+  {
+    id: "mean_reversion",
+    name: "Mean Reversion",
+    desc: "Overextended indicators reversal zones.",
+    prompt: "Evaluate the active chart for Mean Reversion patterns. Do indicators suggest overbought/oversold conditions?"
+  }
+];
+
 export const TradingChart: React.FC<TradingChartProps> = ({
   symbol = "BTCUSD",
   initialEntry = 95200,
@@ -82,6 +110,8 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   const [dispatched, setDispatched] = useState(false);
   const [dispatchStatus, setDispatchStatus] = useState<string>("");
   const [selectedTool, setSelectedTool] = useState<string>("cursor");
+  const [showStrategyPanel, setShowStrategyPanel] = useState(false);
+  const [chartType, setChartType] = useState<"candle" | "line" | "bar">("candle");
   const [decorations, setDecorations] = useState<{ type: string; y: number }[]>([]);
   const [crosshair, setCrosshair] = useState<{ x: number; y: number } | null>(null);
   const [crosshairFixed, setCrosshairFixed] = useState<{ x: number; y: number } | null>(null);
@@ -379,6 +409,23 @@ export const TradingChart: React.FC<TradingChartProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+          {/* Chart Type Selector */}
+          <div className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/5">
+            {(["candle", "line", "bar"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setChartType(t)}
+                className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${
+                  chartType === t
+                    ? "bg-[#fd3b12] text-white"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
           {/* Timeframe Range Selector Presets */}
           <div className="flex items-center gap-1 bg-black/20 p-1 rounded-xl border border-white/5">
             {["1D", "1W", "1M", "3M", "All"].map((r) => (
@@ -399,11 +446,35 @@ export const TradingChart: React.FC<TradingChartProps> = ({
           <div className="flex items-center gap-4">
             <div className="text-right">
               <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Live Price</span>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap justify-end">
                 <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
                 <span className="text-lg font-black font-mono tracking-tight tabular-nums">
                   {currentPrice.toLocaleString(undefined, { minimumFractionDigits: displayDecimals, maximumFractionDigits: displayDecimals })}
                 </span>
+                {(() => {
+                  if (candles.length === 0) return null;
+                  const firstPrice = candles[0].open;
+                  const diff = currentPrice - firstPrice;
+                  const pct = (firstPrice > 0) ? (diff / firstPrice) * 100 : 0;
+                  const sign = diff >= 0 ? "+" : "";
+                  const color = diff >= 0 ? "text-emerald-400" : "text-rose-400";
+                  
+                  const getDurationLabel = (r: string) => {
+                    switch (r) {
+                      case "1D": return "a day";
+                      case "1W": return "a week";
+                      case "1M": return "a month";
+                      case "3M": return "6 months";
+                      case "All": return "1 year";
+                      default: return "a day";
+                    }
+                  };
+                  return (
+                    <span className={`text-[10px] font-bold font-mono ml-2 shrink-0 ${color}`}>
+                      {sign}{diff.toFixed(displayDecimals)} ({sign}{pct.toFixed(2)}%) over {getDurationLabel(range)}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
             <button 
@@ -421,27 +492,56 @@ export const TradingChart: React.FC<TradingChartProps> = ({
       </div>
 
       {/* Main SVG Candlestick Chart */}
-      <div className="relative border border-white/5 bg-[#090B0F]/50 rounded-2xl p-2 mb-6 group/chart overflow-hidden">
-        {isLoading && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="w-8 h-8 border-2 border-[#fd3b12]/30 border-t-[#fd3b12] rounded-full animate-spin"></div>
+      <div className="relative border border-white/5 bg-[#090B0F]/50 rounded-2xl p-2 mb-6 group/chart overflow-hidden flex flex-row h-[280px]">
+        
+        {/* Strategy Column (Toggled) */}
+        {showStrategyPanel && (
+          <div className="w-[180px] shrink-0 border-r border-white/5 bg-black/20 p-3 flex flex-col gap-2.5 overflow-y-auto h-full scrollbar-thin select-none">
+            <h5 className="text-[9px] font-black uppercase text-[#fd3b12] tracking-wider mb-1 flex items-center gap-1">
+              🧠 Strategies
+            </h5>
+            {STRATEGIES.map((strat) => (
+              <button
+                key={strat.id}
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("trigger-strategy-consultation", {
+                    detail: { name: strat.name, prompt: strat.prompt }
+                  }));
+                }}
+                className="w-full text-left p-2 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-[#fd3b12]/10 hover:border-[#fd3b12]/30 transition-all flex flex-col gap-0.5 group/card"
+              >
+                <span className="text-[10px] font-bold text-white group-hover/card:text-[#fd3b12] transition-colors">
+                  {strat.name}
+                </span>
+                <span className="text-[8px] text-slate-400 font-medium leading-normal line-clamp-2">
+                  {strat.desc}
+                </span>
+              </button>
+            ))}
           </div>
         )}
-        {error && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <span className="text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-4 py-2 rounded-xl">{error}</span>
-          </div>
-        )}
-        <svg 
-          ref={chartRef}
-          width="100%" 
-          height={svgHeight} 
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`} 
-          className="overflow-visible cursor-crosshair"
-          onClick={handleChartClick}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-        >
+
+        <div ref={chartContainerRef} className="flex-1 relative min-w-0 h-full">
+          {isLoading && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+              <div className="w-8 h-8 border-2 border-[#fd3b12]/30 border-t-[#fd3b12] rounded-full animate-spin"></div>
+            </div>
+          )}
+          {error && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <span className="text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-4 py-2 rounded-xl">{error}</span>
+            </div>
+          )}
+          <svg 
+            ref={chartRef}
+            width="100%" 
+            height={svgHeight} 
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`} 
+            className="overflow-visible cursor-crosshair"
+            onClick={handleChartClick}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
           {/* Horizontal grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
             const yVal = padding + ratio * (svgHeight - padding - paddingBottom);
@@ -467,8 +567,45 @@ export const TradingChart: React.FC<TradingChartProps> = ({
             <rect key={`rz-${idx}`} x="0" y={getY(z.max)} width={svgWidth} height={Math.abs(getY(z.min) - getY(z.max))} fill="#EF4444" fillOpacity="0.04" stroke="#EF4444" strokeOpacity="0.2" strokeWidth="1" strokeDasharray="4" />
           ))}
 
+          {/* Render Line Chart */}
+          {chartType === "line" && candles.length > 0 && (() => {
+            const linePoints = candles.map((c, i) => `${getX(i)},${getY(c.close)}`).join(" L ");
+            const bottomY = getY(minPrice);
+            const fillAreaPath = `M ${getX(0)},${bottomY} L ${linePoints} L ${getX(candles.length - 1)},${bottomY} Z`;
+            return (
+              <g>
+                <defs>
+                  <linearGradient id="chart-area-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#fd3b12" stopOpacity="0.25"/>
+                    <stop offset="100%" stopColor="#fd3b12" stopOpacity="0.0"/>
+                  </linearGradient>
+                </defs>
+                <path d={fillAreaPath} fill="url(#chart-area-grad)" />
+                <path d={`M ${linePoints}`} fill="none" stroke="#fd3b12" strokeWidth="2.5" />
+              </g>
+            );
+          })()}
+
+          {/* Render Bar Chart (OHLC) */}
+          {chartType === "bar" && candles.map((c, i) => {
+            const cx = getX(i);
+            const cyOpen = getY(c.open);
+            const cyClose = getY(c.close);
+            const cyHigh = getY(c.high);
+            const cyLow = getY(c.low);
+            const isBull = c.close >= c.open;
+            const strokeColor = isBull ? "#10B981" : "#EF4444";
+            return (
+              <g key={`bar-${i}`} className="transition-all duration-200">
+                <line x1={cx} y1={cyHigh} x2={cx} y2={cyLow} stroke={strokeColor} strokeWidth="1.5" />
+                <line x1={cx - 3.5} y1={cyOpen} x2={cx} y2={cyOpen} stroke={strokeColor} strokeWidth="1.5" />
+                <line x1={cx} y1={cyClose} x2={cx + 3.5} y2={cyClose} stroke={strokeColor} strokeWidth="1.5" />
+              </g>
+            );
+          })}
+
           {/* Render Candles */}
-          {candles.map((c, i) => {
+          {chartType === "candle" && candles.map((c, i) => {
             const cx = getX(i);
             const cyOpen = getY(c.open);
             const cyClose = getY(c.close);
@@ -742,7 +879,15 @@ export const TradingChart: React.FC<TradingChartProps> = ({
         </svg>
 
         {/* Interactive MT5 Tools Sidebar (Part 31) */}
-        <div className="absolute left-3 top-3 flex flex-col gap-1.5 bg-black/40 backdrop-blur-md p-1.5 rounded-xl border border-white/5">
+        <div className="absolute left-3 top-3 flex flex-col gap-1.5 bg-black/40 backdrop-blur-md p-1.5 rounded-xl border border-white/5 z-20">
+          <button 
+            onClick={() => setShowStrategyPanel(!showStrategyPanel)}
+            className={`p-2.5 rounded-xl transition-all border ${showStrategyPanel ? 'bg-[#fd3b12] border-[#fd3b12]/50 text-white shadow-lg shadow-[#fd3b12]/20' : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-350'}`}
+            title="Toggle Strategy Panel"
+          >
+            <BookOpen className="w-4 h-4" />
+          </button>
+          <div className="h-px w-6 bg-white/10 my-0.5"></div>
           <button 
             onClick={() => setSelectedTool("cursor")}
             className={`p-1.5 rounded-lg transition-colors ${selectedTool === "cursor" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}

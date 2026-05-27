@@ -57,7 +57,7 @@ const TradingSpaceHeader: React.FC = () => {
             </div>
             <div>
               <h1 className="text-sm font-black text-white tracking-widest uppercase flex items-center gap-2">
-                Alpha Terminal <span className="px-1.5 py-0.5 rounded text-[8px] bg-red-500/20 text-red-400 font-bold">LIVE</span>
+                FinQuant Terminal <span className="px-1.5 py-0.5 rounded text-[8px] bg-red-500/20 text-red-400 font-bold">LIVE</span>
               </h1>
               <p className="text-[10px] text-gray-400 font-medium">Quantitative Analysis & Strategy Engine</p>
             </div>
@@ -80,7 +80,7 @@ const TradingSpaceHeader: React.FC = () => {
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fd3b12]/10 hover:bg-[#fd3b12]/20 border border-[#fd3b12]/20 rounded-lg text-xs font-bold text-[#fd3b12] transition-all cursor-pointer touch-44"
               >
                 <ActivityIcon className="w-3.5 h-3.5" />
-                Launch Chart
+                Global Market Chart
               </button>
             </div>
           </div>

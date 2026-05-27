@@ -49,6 +49,7 @@ const Chat: React.FC = () => {
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
   const [isChartExpanded, setIsChartExpanded] = useState(false);
   const [isHarnessOpen, setIsHarnessOpen] = useState(false);
+  const [isHarnessCollapsed, setIsHarnessCollapsed] = useState(false);
   const [showTelemetry, setShowTelemetry] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -751,12 +752,52 @@ const Chat: React.FC = () => {
                   )}
 
                   {/* Right Column: Contextual Tools Harness — Desktop (Phase 5.2) */}
-                  <div className="hidden lg:flex lg:w-[350px] xl:w-[400px] border-l border-white/5 bg-[#090A0E] flex-col z-10 overflow-y-auto">
-                    <div className="p-4 border-b border-white/5 sticky top-0 bg-[#090A0E]/80 backdrop-blur-md">
-                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#fd3b12]">Spirit Bird Interaction ({activeSpace?.name || 'FinTrader Analytics'})</h3>
-                      <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">Agent UI Projection Space</p>
-                    </div>
-                    <SpiritBirdHarness spaceName={activeSpace?.name || 'FinTrader Analytics'} />
+                  <div className={`hidden lg:flex flex-col border-l border-white/5 bg-[#090A0E] z-10 transition-all duration-300 ${isHarnessCollapsed ? 'w-[60px]' : 'w-[350px] xl:w-[400px]'}`}>
+                    {isHarnessCollapsed ? (
+                      <div className="flex flex-col items-center py-4 space-y-6 h-full select-none">
+                        <button 
+                          onClick={() => setIsHarnessCollapsed(false)} 
+                          className="p-2 rounded-xl bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                          title="Expand Spirit Bird HUD"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                        <div className="h-px w-8 bg-white/5"></div>
+                        <div className="flex flex-col items-center space-y-4 flex-1">
+                          <div className="w-8 h-8 rounded-lg bg-[#fd3b12]/10 flex items-center justify-center border border-[#fd3b12]/20 text-[#fd3b12] cursor-pointer" onClick={() => setIsHarnessCollapsed(false)} title="Target Tracker">
+                            <span className="text-[10px] font-black font-mono">🎯</span>
+                          </div>
+                          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-500 cursor-pointer animate-pulse" onClick={() => setIsHarnessCollapsed(false)} title="Risk Monitor">
+                            <span className="text-[10px] font-black font-mono">🛡️</span>
+                          </div>
+                          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-400 cursor-pointer" onClick={() => setIsHarnessCollapsed(false)} title="Market State">
+                            <span className="text-[10px] font-black font-mono">📈</span>
+                          </div>
+                        </div>
+                        <div className="text-[9px] text-slate-600 font-mono tracking-[0.25em] font-black uppercase [writing-mode:vertical-lr] rotate-180 py-4 select-none">
+                          SPIRIT BIRD
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
+                        <div className="p-4 border-b border-white/5 sticky top-0 bg-[#090A0E]/80 backdrop-blur-md flex items-center justify-between z-10">
+                          <div>
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#fd3b12]">Spirit Bird Interaction ({activeSpace?.name || 'FinTrader Analytics'})</h3>
+                            <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">Agent UI Projection Space</p>
+                          </div>
+                          <button 
+                            onClick={() => setIsHarnessCollapsed(true)} 
+                            className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                            title="Collapse Panel"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                          </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                          <SpiritBirdHarness spaceName={activeSpace?.name || 'FinTrader Analytics'} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
