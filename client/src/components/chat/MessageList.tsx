@@ -1,5 +1,5 @@
 import React from "react";
-import { TrendingUpIcon, ActivityIcon } from "lucide-react";
+import { TrendingUpIcon, TrendingDownIcon, ActivityIcon } from "lucide-react";
 import MessageItem from "./MessageItem";
 import type { Message, ThoughtLogEntry } from "../../types/chat";
 import type { ProviderId, CodexSpace } from "../../contexts/AIContext";
@@ -39,6 +39,46 @@ const MessageList: React.FC<MessageListProps> = ({
     .reverse()
     .findIndex((m) => m.sender === "user");
 
+  const [signal, setSignal] = React.useState({
+    symbol: "BTCUSD",
+    sentiment: "BULLISH",
+    strength: 89,
+    confidence: "High",
+    dataStreams: 14,
+    description: "The FinQuant Engine has aggregated real-time sentiment from 14 global data streams. High-probability trade setups identified in the BTC/USD pair."
+  });
+
+  React.useEffect(() => {
+    if (activeSpace?.slug !== 'trading-space') return;
+
+    const symbols = ["BTCUSD", "ETHUSD", "EURUSD", "GBPUSD", "SPX500", "TSLA", "USOIL", "XAUUSD", "ZARUSD", "STX40"];
+    const sentiments = ["BULLISH", "BEARISH"];
+    const confidences = ["High", "Medium", "Extreme"];
+
+    const interval = setInterval(() => {
+      const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+      const sentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
+      const confidence = confidences[Math.floor(Math.random() * confidences.length)];
+      const strength = Math.floor(Math.random() * 25) + 73; // 73% to 97%
+      const dataStreams = Math.floor(Math.random() * 12) + 8; // 8 to 19
+
+      const description = sentiment === "BULLISH"
+        ? `The FinQuant Engine has aggregated real-time sentiment from ${dataStreams} global data streams. High-probability bullish setups identified in the ${symbol} pair.`
+        : `The FinQuant Engine has aggregated real-time sentiment from ${dataStreams} global data streams. High-probability bearish setups identified in the ${symbol} pair.`;
+
+      setSignal({
+        symbol,
+        sentiment,
+        strength,
+        confidence,
+        dataStreams,
+        description
+      });
+    }, 4500);
+
+    return () => clearInterval(interval);
+  }, [activeSpace]);
+
   return (
     <main className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide relative z-10">
       {(!currentConvId || messages.length === 0) &&
@@ -50,24 +90,28 @@ const MessageList: React.FC<MessageListProps> = ({
                   {/* Market Signal Node */}
                   <div className="col-span-1 md:col-span-2 p-8 rounded-[32px] bg-[#1A1D27] border border-white/5 shadow-2xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-                      <TrendingUpIcon className="w-32 h-32 text-emerald-500" />
+                      {signal.sentiment === 'BULLISH' ? (
+                        <TrendingUpIcon className="w-32 h-32 text-emerald-500" />
+                      ) : (
+                        <TrendingDownIcon className="w-32 h-32 text-rose-500" />
+                      )}
                     </div>
                     <div className="relative z-10">
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2.5 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                          <ActivityIcon className="w-5 h-5 text-emerald-400" />
+                        <div className={`p-2.5 rounded-xl border ${signal.sentiment === 'BULLISH' ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
+                          <ActivityIcon className={`w-5 h-5 ${signal.sentiment === 'BULLISH' ? 'text-emerald-400' : 'text-rose-400'}`} />
                         </div>
                         <h3 className="text-sm font-black text-white uppercase tracking-widest">Market Signals Analysis Node</h3>
                       </div>
                       <h2 className="text-4xl font-black text-white mb-4 tracking-tighter leading-none">
-                        BULLISH <span className="text-emerald-500">SENTIMENT</span> DETECTED
+                        {signal.sentiment} <span className={signal.sentiment === 'BULLISH' ? 'text-emerald-500' : 'text-rose-500'}>SENTIMENT</span> DETECTED
                       </h2>
                       <p className="text-gray-400 text-sm font-medium mb-8 max-w-md leading-relaxed">
-                        The Alpha Terminal has aggregated real-time sentiment from 14 global data streams. High-probability trade setups identified in the BTC/USD pair.
+                        {signal.description}
                       </p>
                       <div className="flex gap-4">
-                        <div className="px-4 py-2 bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest rounded-lg">Strength: 89%</div>
-                        <div className="px-4 py-2 bg-white/5 text-gray-400 text-[10px] font-black uppercase tracking-widest rounded-lg border border-white/5">Confidence: High</div>
+                        <div className={`px-4 py-2 text-black text-[10px] font-black uppercase tracking-widest rounded-lg ${signal.sentiment === 'BULLISH' ? 'bg-emerald-500' : 'bg-rose-500'}`}>Strength: {signal.strength}%</div>
+                        <div className="px-4 py-2 bg-white/5 text-gray-400 text-[10px] font-black uppercase tracking-widest rounded-lg border border-white/5">Confidence: {signal.confidence}</div>
                       </div>
                     </div>
                   </div>
