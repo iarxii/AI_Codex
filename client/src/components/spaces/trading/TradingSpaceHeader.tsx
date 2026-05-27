@@ -6,10 +6,15 @@ import { AnalystSidebar } from './AnalystSidebar';
 const ASSETS = [
   { symbol: "EURUSD", price: "1.0852", change: "+0.12%" },
   { symbol: "GBPUSD", price: "1.2641", change: "-0.05%" },
+  { symbol: "ZARUSD", price: "18.5200", change: "+0.45%" },
   { symbol: "BTCUSD", price: "95240", change: "+2.4%" },
   { symbol: "ETHUSD", price: "3420", change: "+1.1%" },
+  { symbol: "XRPUSD", price: "0.6210", change: "+5.6%" },
   { symbol: "SPX500", price: "5304", change: "+0.8%" },
+  { symbol: "STX40", price: "75320", change: "+0.3%" },
   { symbol: "TSLA", price: "245.10", change: "-1.2%" },
+  { symbol: "NVDA", price: "912.40", change: "+3.8%" },
+  { symbol: "BRENT", price: "82.40", change: "+0.7%" },
 ];
 
 const MarketTicker: React.FC<{ onLaunchChart: (symbol: string, price: number) => void }> = ({ onLaunchChart }) => {

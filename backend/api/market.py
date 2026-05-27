@@ -1,33 +1,85 @@
 import asyncio
 import datetime
 import random
+import threading
 import yfinance as yf
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, Query
+from pydantic import BaseModel
 
 router = APIRouter()
 
-# Map standard symbols to yfinance symbols
+# Global thread-safe workspace context
+active_context_lock = threading.Lock()
+active_context = {
+    "symbol": "BTCUSD",
+    "timeframe": "1D"
+}
+
+class ContextUpdate(BaseModel):
+    symbol: str
+    timeframe: str
+
+@router.post("/context")
+async def update_active_context(data: ContextUpdate):
+    with active_context_lock:
+        active_context["symbol"] = data.symbol
+        active_context["timeframe"] = data.timeframe
+    return {"status": "success", "context": active_context}
+
+@router.get("/context")
+async def get_active_context():
+    with active_context_lock:
+        return active_context
+
+# Map standard symbols to yfinance symbols (19 total assets)
 SYMBOL_MAP = {
+    # Cryptocurrencies
     "BTCUSD": "BTC-USD",
     "ETHUSD": "ETH-USD",
+    "XRPUSD": "XRP-USD",
+    # Forex
     "EURUSD": "EURUSD=X",
     "GBPUSD": "GBPUSD=X",
-    "SPX500": "^GSPC",
+    "ZARUSD": "USDZAR=X",
+    # US M7 Stocks
     "TSLA": "TSLA",
+    "AAPL": "AAPL",
+    "MSFT": "MSFT",
+    "GOOGL": "GOOGL",
+    "META": "META",
+    "NVDA": "NVDA",
+    "AMZN": "AMZN",
+    # Commodities
     "XAUUSD": "GC=F",
     "USOIL": "CL=F",
+    "BRENT": "BZ=F",
+    "NATGAS": "NG=F",
+    # ETFs / Indices
+    "SPX500": "^GSPC",
+    "STX40": "^J200.JO",
 }
 
 # Standard fallback prices if yfinance fails or is rate-limited
 FALLBACK_BASE_PRICES = {
     "BTCUSD": 95000.0,
     "ETHUSD": 3400.0,
+    "XRPUSD": 0.62,
     "EURUSD": 1.0850,
     "GBPUSD": 1.2650,
-    "SPX500": 5300.0,
+    "ZARUSD": 18.50,
     "TSLA": 245.0,
+    "AAPL": 185.0,
+    "MSFT": 420.0,
+    "GOOGL": 175.0,
+    "META": 470.0,
+    "NVDA": 900.0,
+    "AMZN": 180.0,
     "XAUUSD": 2400.0,
     "USOIL": 78.0,
+    "BRENT": 82.0,
+    "NATGAS": 2.50,
+    "SPX500": 5300.0,
+    "STX40": 7500.0,
 }
 
 def get_fallback_candles(symbol: str, range_preset: str) -> list:
