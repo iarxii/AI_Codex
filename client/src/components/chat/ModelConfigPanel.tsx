@@ -11,7 +11,7 @@ const ModelConfigPanel: React.FC<ModelConfigPanelProps> = ({ isOpen }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="absolute bottom-full left-0 mb-2 w-72 bg-white/90 backdrop-blur-xl border border-black/[0.08] rounded-2xl p-4 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300 z-50">
+    <div className="absolute bottom-full right-0 mb-2 w-72 bg-white/90 backdrop-blur-xl border border-black/[0.08] rounded-2xl p-4 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300 z-50">
       <div className="flex flex-col gap-4">
         <h3 className="text-[10px] font-black uppercase tracking-widest text-[#fd3b12]">
           Engine Parameters
