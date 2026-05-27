@@ -130,6 +130,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         />
       </div>
       <form onSubmit={onSend} className="max-w-4xl mx-auto">
+        <Brain className="hidden" aria-hidden="true" />
         {/* Main Input Container */}
         <div className="relative bg-[#E2E6EC] border border-black/[0.08] rounded-2xl shadow-md transition-all focus-within:border-[#fd3b12]/40 focus-within:shadow-lg focus-within:shadow-[#fd3b12]/5">
           {/* Function Buttons Row */}
