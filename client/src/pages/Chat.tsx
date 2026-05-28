@@ -16,7 +16,7 @@ import ChatInput from '../components/chat/ChatInput';
 import MetricsStrip from '../components/chat/MetricsStrip';
 import ModelTelemetryHUD from '../components/chat/ModelTelemetryHUD';
 import { SpiritBirdHarness } from '../components/chat/SpiritBirdHarness';
-import SpacesCatalog from '../components/SpacesCatalog';
+import SpacesCatalog from 'codex_spaces/client/src/components/SpacesCatalog';
 import TradingSpaceHeader from '../components/spaces/trading/TradingSpaceHeader';
 import '../spaces.css';
 

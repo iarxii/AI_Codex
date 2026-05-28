@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
     print("[LIFESPAN] Database initialized.")
     
     # Seed Codex Spaces to ensure catalog is populated
-    from backend.seed_spaces import seed
+    from codex_spaces.backend.seed_spaces import seed
     await seed()
     print("[LIFESPAN] Codex Spaces seeded.")
     
@@ -224,7 +224,8 @@ async def health_check():
     return {"status": "healthy", "timestamp": str(datetime.now())}
 
 # Include routers
-from backend.api import auth, chat, metrics, rag, skills, conversations, models, workspace, profile, admin, spaces, market, arcade
+from backend.api import auth, chat, metrics, rag, skills, conversations, models, workspace, profile, admin, market, arcade
+from codex_spaces.backend.api import spaces
 app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
 app.include_router(profile.router, prefix=settings.API_V1_STR + "/profile", tags=["profile"])
 app.include_router(admin.router, prefix=settings.API_V1_STR + "/admin", tags=["admin"])

@@ -1,3 +1,6 @@
 [submodule "graphify"]
 	path = graphify
 	url = https://github.com/iarxii/graphify.git
+[submodule "codex_spaces"]
+	path = codex_spaces
+	url = https://github.com/iarxii/CodexSpaces.git

@@ -14,7 +14,7 @@ from datetime import datetime
 from backend.db.session import get_db, AsyncSessionLocal
 from backend.db.models import Conversation, Message, CodexSpace, CodexSpaceAccess
 from backend.agent.graph import create_agent_graph
-from backend.agent.space_config import get_space_config
+from codex_spaces.backend.agent.space_config import get_space_config
 from sqlalchemy import select, update
 
 router = APIRouter()
