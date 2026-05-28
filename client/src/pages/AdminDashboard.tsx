@@ -12,7 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAI } from '../contexts/AIContext';
 import { config } from '../config';
-import AdminSpaces from '../components/admin/AdminSpaces';
+import AdminSpaces from 'codex_spaces/client/src/components/admin/AdminSpaces';
 
 interface AdminUser {
   id: number;

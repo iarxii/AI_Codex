@@ -89,30 +89,9 @@ class DocumentChunk(Base):
         Index("idx_document_chunks_embedding", embedding, postgresql_using="ivfflat", postgresql_with={"lists": 100}, postgresql_ops={"embedding": "vector_cosine_ops"}),
     )
 
-class CodexSpace(Base):
-    __tablename__ = "codex_spaces"
-    
-    id: Mapped[int] = mapped_column(primary_key=True)
-    slug: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    name: Mapped[str] = mapped_column(String(100))
-    description: Mapped[str] = mapped_column(Text)
-    icon: Mapped[Optional[str]] = mapped_column(String(255))
-    color: Mapped[Optional[str]] = mapped_column(String(20))
-    is_active: Mapped[bool] = mapped_column(default=True)
-    is_public: Mapped[bool] = mapped_column(default=False)
-    required_role: Mapped[str] = mapped_column(String(20), default="user")
-    capacity: Mapped[int] = mapped_column(default=5)
-    config_json: Mapped[Optional[str]] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-class CodexSpaceAccess(Base):
-    __tablename__ = "codex_space_access"
-    
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    space_id: Mapped[int] = mapped_column(ForeignKey("codex_spaces.id"), index=True)
-    granted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    granted_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+# CodexSpaces models are isolated in the private codex_spaces submodule.
+# Re-exported here to maintain backward compatibility with all existing imports.
+from codex_spaces.backend.db.space_models import CodexSpace, CodexSpaceAccess  # noqa: F401
 
 class ArcadeScore(Base):
     __tablename__ = "arcade_scores"
