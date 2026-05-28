@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       'codex_spaces': path.resolve(__dirname, '../codex_spaces'),
+      'codex_app': path.resolve(__dirname, './src'),
     },
   },
   server: {

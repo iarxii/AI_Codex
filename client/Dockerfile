@@ -9,6 +9,10 @@ RUN npm install
 
 # Copy source code
 COPY . .
+COPY ./codex_spaces_temp /codex_spaces
+
+# Create symlink for type and dependency resolution in the submodule
+RUN ln -s /app/node_modules /codex_spaces/client/node_modules
 
 # Build the app
 # Note: VITE_API_URL should be set as a build argument or environment variable

@@ -23,6 +23,7 @@ COPY . /app/backend
 # Or we can copy it manually if we are building via a script.
 # For now, let's assume we copy it into the backend folder temporarily or handle it in the build command.
 COPY ./OllamaOpt_local /app/OllamaOpt
+COPY ./codex_spaces_local /app/codex_spaces
 
 # Set PYTHONPATH
 # We need /app to find 'backend' package and /app/OllamaOpt to find 'cli'
