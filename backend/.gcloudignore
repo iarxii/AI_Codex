@@ -18,3 +18,8 @@ OllamaOpt_local/docs
 OllamaOpt_local/llama-cpp-turboquant/build
 OllamaOpt_local/llama-cpp-turboquant/models
 OllamaOpt_local/llama-cpp-turboquant/vendor
+
+# Specifically allow codex_spaces_local
+!codex_spaces_local/
+codex_spaces_local/.git
+codex_spaces_local/client/node_modules

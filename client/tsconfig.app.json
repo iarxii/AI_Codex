@@ -16,9 +16,11 @@
     "jsx": "react-jsx",
 
     /* Path aliases */
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
-      "codex_spaces/*": ["../codex_spaces/*"]
+      "codex_spaces/*": ["../codex_spaces/*"],
+      "codex_app/*": ["src/*"]
     },
 
     /* Linting */

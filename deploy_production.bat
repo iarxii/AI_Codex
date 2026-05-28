@@ -47,9 +47,12 @@ if "!COLAB_SECRET!" NEQ "" echo [DUAL BACKEND] Detected Colab Handshake Secret.
 
 if "%DEPLOY_BE%"=="true" (
     echo [1/4] Submitting Backend Build to Google Cloud...
+    if exist backend\codex_spaces_local rd /S /Q backend\codex_spaces_local
+    xcopy /E /I /Y codex_spaces backend\codex_spaces_local
     pushd backend
     call %GCLOUD% builds submit --tag %BACKEND_IMAGE% --project %PROJECT_ID%
     popd
+    if exist backend\codex_spaces_local rd /S /Q backend\codex_spaces_local
     if %ERRORLEVEL% NEQ 0 (
         echo Backend build failed. Exiting.
         exit /b %ERRORLEVEL%
@@ -106,11 +109,21 @@ if "%DEPLOY_FE%"=="true" (
     echo Premium URL detected: !PREMIUM_URL!
 
     echo [3/4] Submitting Frontend Build to Google Cloud...
+    if exist client\codex_spaces_temp rd /S /Q client\codex_spaces_temp
+    mkdir client\codex_spaces_temp
+    mkdir client\codex_spaces_temp\client
+    mkdir client\codex_spaces_temp\client\src
+    mkdir client\codex_spaces_temp\backend
+    xcopy /E /I /Y codex_spaces\client\src client\codex_spaces_temp\client\src
+    xcopy /E /I /Y codex_spaces\backend client\codex_spaces_temp\backend
+    copy codex_spaces\README.md client\codex_spaces_temp\ >nul
+    copy codex_spaces\.gitignore client\codex_spaces_temp\ >nul
     pushd client
     call %GCLOUD% builds submit --config cloudbuild.yaml ^
         --project %PROJECT_ID% ^
         --substitutions=_VITE_API_URL=!BACKEND_URL!,_VITE_PREMIUM_URL=!PREMIUM_URL!,_VITE_COLAB_URL=!COLAB_URL!,_VITE_COLAB_SECRET=!COLAB_SECRET!
     popd
+    if exist client\codex_spaces_temp rd /S /Q client\codex_spaces_temp
     if %ERRORLEVEL% NEQ 0 (
         echo Frontend build failed. Exiting.
         exit /b %ERRORLEVEL%
