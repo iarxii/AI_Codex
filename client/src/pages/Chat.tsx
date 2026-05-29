@@ -1,5 +1,5 @@
 // Chat.tsx — AICodex Agentic Chat Interface (Modularized v3)
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import AgentCanvas from '../components/AgentCanvas';
@@ -462,9 +462,32 @@ const Chat: React.FC = () => {
   }, [reconnectCount, isPremiumSpace]);
 
   // 3. Auto-scroll
+  const lastScrolledMsgId = useRef<string | null>(null);
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg) {
+      if (lastMsg.sender === 'user') {
+        scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+      } else if (lastMsg.sender === 'bot') {
+        if (lastScrolledMsgId.current !== lastMsg.id) {
+          setTimeout(() => {
+            const element = document.getElementById(`msg-${lastMsg.id}`);
+            const container = scrollRef.current?.parentElement;
+            if (element && container) {
+              const elementTop = element.offsetTop;
+              const headerOffset = activeSpace?.slug === 'trading-space' ? 120 : 76;
+              const targetScrollTop = Math.max(0, elementTop - headerOffset);
+              container.scrollTo({
+                top: targetScrollTop,
+                behavior: 'smooth'
+              });
+              lastScrolledMsgId.current = lastMsg.id;
+            }
+          }, 50);
+        }
+      }
+    }
+  }, [messages, activeSpace]);
 
   const loadConversation = async (id: number) => {
     setLoading(true);
@@ -628,6 +651,75 @@ const Chat: React.FC = () => {
     });
   };
 
+  const handleRetry = useCallback((errorMsgId: string, newProvider?: string, newModel?: string) => {
+    const errorIndex = messages.findIndex(m => m.id === errorMsgId);
+    if (errorIndex === -1) return;
+
+    let triggerText = '';
+    for (let j = errorIndex - 1; j >= 0; j--) {
+      if (messages[j].sender === 'user') {
+        triggerText = messages[j].content;
+        break;
+      }
+    }
+
+    if (!triggerText) {
+      alert("Could not find the query to retry.");
+      return;
+    }
+
+    let providerToUse = activeProvider;
+    let modelToUse = activeModel;
+    if (newProvider && newModel) {
+      setProvider(newProvider as any);
+      setModel(newModel, newProvider as any);
+      providerToUse = newProvider as any;
+      modelToUse = newModel;
+    }
+
+    setMessages(prev => prev.filter(m => m.id !== errorMsgId));
+
+    if (!currentConvId) {
+      alert("Please select or create a workspace first.");
+      return;
+    }
+
+    isProcessing.current = true;
+    setLoading(true);
+    setCurrentToolCalls([]);
+    currentToolCallsRef.current = [];
+    setThoughtStartTime(Date.now());
+    setThoughtLog([]);
+    setTelemetry(null);
+
+    const apiKey = getApiKey(providerToUse) || '';
+
+    try {
+      if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+        throw new Error('Neural link disconnected. Please refresh or check connection.');
+      }
+
+      const payload = {
+        message: triggerText,
+        conversation_id: currentConvId,
+        provider: providerToUse,
+        model: modelToUse,
+        api_key: apiKey,
+        api_keys: getAllApiKeys(),
+        agent_mode: agentMode,
+        local_backend_mode: getLocalBackendMode(),
+        config: modelConfig,
+        base_url: localStorage.getItem('ollama_cloud_url') || ''
+      };
+      ws.current.send(JSON.stringify(payload));
+    } catch (err: any) {
+      console.error('Retry error:', err);
+      setMessages(prev => [...prev, { id: 'err-' + Date.now(), sender: 'bot', content: `❌ Send Failed: ${err.message}` }]);
+      setLoading(false);
+      isProcessing.current = false;
+    }
+  }, [messages, activeProvider, activeModel, currentConvId, agentMode, modelConfig, getApiKey, getAllApiKeys, setProvider, setModel]);
+
   // Dynamic styling based on active space
   const themeClass = activeSpace && !viewSpacesCatalog ? `space-theme-${activeSpace.slug}` : '';
 
@@ -711,6 +803,7 @@ const Chat: React.FC = () => {
                   activeSpace={activeSpace}
                   onCancel={handleCancel}
                   onViewInCanvas={handleViewInCanvas}
+                  onRetry={handleRetry}
                 />
 
                 <ChatInput 

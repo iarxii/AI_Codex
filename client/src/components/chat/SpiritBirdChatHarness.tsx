@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Loader2, Sparkles, Calendar, BookOpen, Smile } from 'lucide-react';
+import { Send, Bot, Loader2, Calendar, BookOpen, Smile } from 'lucide-react';
 import { useAI } from '../../contexts/AIContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';

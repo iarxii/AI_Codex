@@ -35,6 +35,13 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
     }
   }, [activeSpace, provider, setProvider]);
 
+  // Fallback if current provider is groq but space is code-lab or gpt-oss
+  useEffect(() => {
+    if (activeSpace && ["code-lab", "gpt-oss"].includes(activeSpace.slug) && provider === "groq") {
+      setProvider("local");
+    }
+  }, [activeSpace, provider, setProvider]);
+
   const fetchModels = async () => {
     setLoading(true);
     let apiKey = "";
@@ -228,6 +235,11 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                   .filter((p) => {
                     const isAdmin = ["admin", "super_admin"].includes(userProfile?.role || "");
                     
+                    // Restrict to Local, Ollama Cloud, OpenRouter, Gemini (exclude Groq) for code-lab and gpt-oss spaces
+                    if (activeSpace && ["code-lab", "gpt-oss"].includes(activeSpace.slug)) {
+                      if (p.id === "groq") return false;
+                    }
+
                     // Always allow Ollama Cloud (it's BYOK)
                     if (p.id === 'ollama_cloud') return true;
 

@@ -6,8 +6,7 @@ from backend.db.session import get_db
 
 router = APIRouter()
 
-@router.get("")
-async def list_models(
+async def _list_models_raw(
     provider: str, 
     api_key: str = Query(None), 
     x_api_key: str = Header(None),
@@ -151,3 +150,55 @@ async def list_models(
                 raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
 
         return []
+
+
+@router.get("")
+async def list_models(
+    provider: str, 
+    api_key: str = Query(None), 
+    x_api_key: str = Header(None),
+    x_base_url: str = Header(None),
+    x_local_backend_mode: str = Header(None),
+    x_space_slug: str = Header(None),
+    x_is_premium: str = Header(None),
+    db: Any = Depends(get_db)
+):
+    models = await _list_models_raw(
+        provider=provider,
+        api_key=api_key,
+        x_api_key=x_api_key,
+        x_base_url=x_base_url,
+        x_local_backend_mode=x_local_backend_mode,
+        x_space_slug=x_space_slug,
+        x_is_premium=x_is_premium,
+        db=db
+    )
+    
+    if not x_space_slug:
+        return models
+        
+    if x_space_slug == "code-lab":
+        # Only Gemma / Google models
+        return [
+            m for m in models 
+            if "gemma" in m["id"].lower() 
+            or "gemma" in m["name"].lower() 
+            or "google" in m["id"].lower()
+        ]
+        
+    if x_space_slug == "gpt-oss":
+        if provider == "gemini":
+            return [
+                m for m in models 
+                if "gemini" in m["id"].lower() 
+                or "gemini" in m["name"].lower()
+            ]
+        # Only OpenAI / GPT models
+        return [
+            m for m in models 
+            if "gpt" in m["id"].lower() 
+            or "gpt" in m["name"].lower() 
+            or "openai" in m["id"].lower()
+        ]
+        
+    return models
