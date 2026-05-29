@@ -41,14 +41,15 @@ async def seed():
         result = await session.execute(select(CodexSpace).filter_by(slug="code-lab"))
         gemma = result.scalar_one_or_none()
         if gemma:
+            gemma.name = "Gemma Code Lab (Gemma 4)"
             gemma.icon = "/media/brand-icons/gemma.svg"
             gemma.color = "#446EFF"
             gemma.config_json = json.dumps({"is_gpu_enabled": True})
-            print("Updated Gemma Code Lab icon and GPU status")
+            print("Updated Gemma Code Lab icon, name and GPU status")
         else:
             new_gemma = CodexSpace(
                 slug="code-lab",
-                name="Gemma Code Lab",
+                name="Gemma Code Lab (Gemma 4)",
                 description="High-performance coding assistant powered by Google's Gemma 4.",
                 icon="/media/brand-icons/gemma.svg",
                 color="#446EFF",
@@ -58,7 +59,7 @@ async def seed():
                 config_json=json.dumps({"is_gpu_enabled": True})
             )
             session.add(new_gemma)
-            print("Created Gemma Code Lab")
+            print("Created Gemma Code Lab (Gemma 4)")
 
         # 3. Add Placeholders (Coming Soon)
         placeholders = [
@@ -85,12 +86,12 @@ async def seed():
             {
                 "slug": "spirit-book",
                 "name": "SpiritBook",
-                "description": "Advanced conversational model for writing, copywriting and linguistic analysis. Future support for Audio Gen. (Coming Soon)",
+                "description": "Casual conversational partner and personal productivity helper, featuring the Spirit Bird mascot.",
                 "icon": "/media/aicodex-spirit-bird-white.png",
                 "color": "#6366f1",
                 "is_active": True,
                 "is_public": True,
-                "config_json": json.dumps({"is_gpu_enabled": True, "status": "coming-soon"})
+                "config_json": json.dumps({"is_gpu_enabled": True, "status": "active"})
             }
         ]
 

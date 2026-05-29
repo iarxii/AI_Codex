@@ -157,7 +157,7 @@ const MessageList: React.FC<MessageListProps> = ({
           // Specialized Space Overrides
           const spaceOverrides: Record<string, { label: string; icon: string | null; desc: string }> = {
             'code-lab': {
-              label: "Gemma Code Lab",
+              label: "Gemma Code Lab (Gemma 4)",
               icon: "/media/brand-icons/gemma.svg",
               desc: "High-performance agentic coding environment powered by Google's Gemma 4.",
             },
