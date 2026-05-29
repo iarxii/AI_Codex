@@ -10,12 +10,12 @@ Depending on your requirements, the workspace can be run **locally** (native Win
 
 ```mermaid
 graph TD
-    subgraph Local Mode (Native Windows)
+    subgraph "Local Mode (Native Windows)"
         A[React Frontend] <-->|REST / WebSockets| B[FastAPI Backend]
         B <-->|Direct IPC via MetaTrader5 library| C[MT5 Windows Terminal]
     end
 
-    subgraph Online/Containerized Mode (Linux + Wine)
+    subgraph "Online/Containerized Mode (Linux + Wine)"
         D[React Frontend] <-->|REST / WebSockets| E[FastAPI Backend]
         E <-->|gRPC Broker on Port 50051| F[fintrader-mt5-engine Container]
         F <-->|Wine IPC| G[MT5 Terminal inside Wine]
