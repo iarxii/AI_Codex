@@ -18,6 +18,7 @@ interface MessageListProps {
   activeSpace: CodexSpace | null;
   onCancel: () => void;
   onViewInCanvas: (artifactId: string) => void;
+  onRetry?: (errorMsgId: string, newProvider?: string, newModel?: string) => void;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -34,6 +35,7 @@ const MessageList: React.FC<MessageListProps> = ({
   activeSpace,
   onCancel,
   onViewInCanvas,
+  onRetry,
 }) => {
   const lastUserIndex = [...messages]
     .reverse()
@@ -435,6 +437,7 @@ const MessageList: React.FC<MessageListProps> = ({
             currentContext={currentContext}
             onCancel={onCancel}
             onViewInCanvas={onViewInCanvas}
+            onRetry={onRetry}
           />
         ))}
       </div>

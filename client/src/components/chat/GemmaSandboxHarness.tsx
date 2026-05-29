@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Code, Cpu, Play, CheckCircle2, AlertCircle, Info, Sparkles } from 'lucide-react';
+import { Code, Cpu, Play, Info, Sparkles } from 'lucide-react';
 
 export const GemmaSandboxHarness: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sandbox' | 'mtp'>('sandbox');

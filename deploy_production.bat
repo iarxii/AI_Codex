@@ -48,7 +48,10 @@ if "!COLAB_SECRET!" NEQ "" echo [DUAL BACKEND] Detected Colab Handshake Secret.
 if "%DEPLOY_BE%"=="true" (
     echo [1/4] Submitting Backend Build to Google Cloud...
     if exist backend\codex_spaces_local rd /S /Q backend\codex_spaces_local
-    xcopy /E /I /Y codex_spaces backend\codex_spaces_local
+    echo \node_modules\ > exclude.txt
+    echo \.git\ >> exclude.txt
+    xcopy /E /I /Y /EXCLUDE:exclude.txt codex_spaces backend\codex_spaces_local
+    del exclude.txt
     pushd backend
     call %GCLOUD% builds submit --tag %BACKEND_IMAGE% --project %PROJECT_ID%
     popd
