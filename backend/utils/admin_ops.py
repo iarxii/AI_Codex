@@ -29,8 +29,10 @@ def generate_global_knowledge_map():
     logger.info(f"Merging {len(graph_files)} workspace graphs into global map...")
 
     # Build command
-    python_exe = "python"
+    import sys
+    python_exe = sys.executable or "python"
     graphify_module = "graphify"
+
     
     # Add the submodule to PYTHONPATH
     env = os.environ.copy()
