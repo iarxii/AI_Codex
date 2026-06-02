@@ -9,6 +9,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import { AIProvider, useAI } from './contexts/AIContext';
 import P5Background from './components/P5Background';
 import { DisciplineProvider } from './contexts/DisciplineContext';
+import { BridgeProvider } from './contexts/BridgeContext';
+import ColabBridgeOverlay from './components/ColabBridgeOverlay';
 
 import './App.css';
 
@@ -17,6 +19,7 @@ const AppContent: React.FC = () => {
   return (
     <>
       <P5Background key={`${JSON.stringify(visualSettings)}-${activeSpace?.slug || 'global'}`} />
+      <ColabBridgeOverlay />
       <Router>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -36,9 +39,11 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AIProvider>
-      <DisciplineProvider>
-        <AppContent />
-      </DisciplineProvider>
+      <BridgeProvider>
+        <DisciplineProvider>
+          <AppContent />
+        </DisciplineProvider>
+      </BridgeProvider>
     </AIProvider>
   );
 };

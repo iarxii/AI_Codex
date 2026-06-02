@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { config, getApiUrl } from '../config';
 
-export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud';
+export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud' | 'colab_bridge';
 
 export interface UserProfile {
   title?: string;
@@ -112,6 +112,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     openrouter: localStorage.getItem('ai_model_openrouter') || '',
     gemini: localStorage.getItem('ai_model_gemini') || '',
     ollama_cloud: localStorage.getItem('ai_model_ollama_cloud') || '',
+    colab_bridge: localStorage.getItem('ai_model_colab_bridge') || '',
   });
 
   const [visualSettings, setVisualSettings] = useState<VisualSettings>(() => {

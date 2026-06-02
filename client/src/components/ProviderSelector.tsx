@@ -2,6 +2,7 @@ import React, { Fragment, useEffect, useState } from "react";
 import { Listbox, Transition } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { useAI } from "../contexts/AIContext";
+import { useBridge } from "../contexts/BridgeContext";
 import { config, getApiUrl } from "../config";
 import { PROVIDERS, PROVIDER_MAP, getLocalBackendMode, setLocalBackendMode } from "./providerMeta";
 import type { LocalBackendMode } from "./providerMeta";
@@ -17,6 +18,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   setShowTelemetry,
 }) => {
   const { provider, setProvider, model, setModel, activeSpace, isPremiumSpace, userProfile } = useAI();
+  const { availableModels: bridgeModels } = useBridge();
   const [availableModels, setAvailableModels] = useState<
     { id: string; name: string }[]
   >([]);
@@ -26,7 +28,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 
   useEffect(() => {
     fetchModels();
-  }, [provider, backendMode]);
+  }, [provider, backendMode, bridgeModels]);
 
   // Fallback to Groq if user is in Standard Workspace and tries to use local models
   useEffect(() => {
@@ -43,6 +45,24 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   }, [activeSpace, provider, setProvider]);
 
   const fetchModels = async () => {
+    if (provider === "colab_bridge") {
+      setLoading(true);
+      const formattedModels = bridgeModels.map((m) => ({ id: m, name: m }));
+      setAvailableModels(formattedModels);
+      if (
+        formattedModels.length > 0 &&
+        (!model || !formattedModels.find((m) => m.id === model))
+      ) {
+        const persisted = localStorage.getItem(`ai_model_${provider}`);
+        if (persisted && formattedModels.find((m) => m.id === persisted)) {
+          setModel(persisted);
+        } else {
+          setModel(formattedModels[0].id);
+        }
+      }
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     let apiKey = "";
     if (provider === "groq")
@@ -235,6 +255,11 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                   .filter((p) => {
                     const isAdmin = ["admin", "super_admin"].includes(userProfile?.role || "");
                     
+                    // Only show colab_bridge if we are in a premium space
+                    if (p.id === 'colab_bridge' && !isPremiumSpace) {
+                      return false;
+                    }
+
                     // Restrict to Local, Ollama Cloud, OpenRouter, Gemini (exclude Groq) for code-lab and gpt-oss spaces
                     if (activeSpace && ["code-lab", "gpt-oss"].includes(activeSpace.slug)) {
                       if (p.id === "groq") return false;
