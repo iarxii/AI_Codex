@@ -225,12 +225,13 @@ async def health_check():
 
 # Include routers
 from backend.api import auth, chat, metrics, rag, skills, conversations, models, workspace, profile, admin, market, arcade
-from codex_spaces.backend.api import spaces
+from codex_spaces.backend.api import spaces, bridge
 app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
 app.include_router(profile.router, prefix=settings.API_V1_STR + "/profile", tags=["profile"])
 app.include_router(admin.router, prefix=settings.API_V1_STR + "/admin", tags=["admin"])
 app.include_router(conversations.router, prefix=settings.API_V1_STR + "/conversations", tags=["conversations"])
 app.include_router(spaces.router, prefix=settings.API_V1_STR + "/spaces", tags=["spaces"])
+app.include_router(bridge.router, prefix=settings.API_V1_STR + "/spaces/bridge", tags=["bridge"])
 app.include_router(chat.router, prefix=settings.API_V1_STR + "/chat", tags=["chat"])
 app.include_router(workspace.router, prefix=settings.API_V1_STR + "/workspace", tags=["workspace"])
 app.include_router(metrics.router, prefix=settings.API_V1_STR + "/metrics", tags=["metrics"])

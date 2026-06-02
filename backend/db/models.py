@@ -91,7 +91,7 @@ class DocumentChunk(Base):
 
 # CodexSpaces models are isolated in the private codex_spaces submodule.
 # Re-exported here to maintain backward compatibility with all existing imports.
-from codex_spaces.backend.db.space_models import CodexSpace, CodexSpaceAccess  # noqa: F401
+from codex_spaces.backend.db.space_models import CodexSpace, CodexSpaceAccess, BridgeSession  # noqa: F401
 
 class ArcadeScore(Base):
     __tablename__ = "arcade_scores"
