@@ -188,7 +188,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "model_config": model_config,
                         "conversation_id": str(conversation_id),
                         "agent_mode": agent_mode,
-                        "local_backend_mode": local_backend_mode
+                        "local_backend_mode": local_backend_mode,
+                        "user_id": user.id,
+                        "space_slug": space_type
                     },
                     "recursion_limit": 25
                 }
@@ -238,7 +240,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "model_config": model_config,
                         "conversation_id": str(conversation_id),
                         "agent_mode": agent_mode,
-                        "local_backend_mode": local_backend_mode
+                        "local_backend_mode": local_backend_mode,
+                        "user_id": user.id,
+                        "space_slug": space_type
                     },
                     "recursion_limit": 25
                 }

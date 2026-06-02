@@ -52,7 +52,14 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
     max_toks = model_config.get("max_tokens", 1024)
 
     try:
-        if provider == "groq":
+        if provider == "colab_bridge":
+            from codex_spaces.backend.agent.bridge_llm import ChatBridge
+            user_id = config.get("configurable", {}).get("user_id")
+            space_slug = config.get("configurable", {}).get("space_slug")
+            if not user_id or not space_slug:
+                raise ValueError("Colab bridge requires 'user_id' and 'space_slug' in configuration.")
+            llm = ChatBridge(user_id=int(user_id), space_slug=str(space_slug), model_name=model or "default")
+        elif provider == "groq":
             from langchain_groq import ChatGroq
             llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=temp, max_tokens=max_toks, streaming=True)
         elif provider == "ollama_cloud":
