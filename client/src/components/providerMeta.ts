@@ -4,7 +4,7 @@
  */
 
 
-export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud';
+export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud' | 'colab_bridge';
 export type LocalBackendMode = 'ollama' | 'llamacpp';
 
 export interface ProviderInfo {
@@ -38,6 +38,16 @@ export const PROVIDERS: ProviderInfo[] = [
     iconType: 'svg-file',
     brand: 'Ollama',
     class: 'expert',
+  },
+  {
+    id: 'colab_bridge',
+    label: 'Colab Bridge',
+    description: 'Reverse tunnel execution',
+    color: '#fb923c',
+    icon: '/media/brand-icons/openai_black.svg',
+    iconType: 'svg-file',
+    brand: 'Ollama',
+    class: 'pro',
   },
   {
     id: 'groq',
