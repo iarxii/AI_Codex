@@ -4,3 +4,6 @@
 [submodule "codex_spaces"]
 	path = codex_spaces
 	url = https://github.com/iarxii/CodexSpaces.git
+[submodule "vscode-extension"]
+	path = vscode-extension
+	url = https://github.com/iarxii/spirit-bird-vscodex.git
