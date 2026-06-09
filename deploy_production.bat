@@ -10,8 +10,8 @@ SET FRONTEND_IMAGE=us-central1-docker.pkg.dev/%PROJECT_ID%/aicodex-repo/frontend
 
 :: Default to deploying both
 SET DEPLOY_BE=true
-SET DEPLOY_FE=true
-SET DEPLOY_PREMIUM=false
+SET DEPLOY_FE=false
+SET DEPLOY_PREMIUM=true
 SET COLAB_URL=
 SET COLAB_SECRET=
 
@@ -68,7 +68,7 @@ if "%DEPLOY_BE%"=="true" (
         --region %REGION% ^
         --project %PROJECT_ID% ^
         --allow-unauthenticated ^
-        --memory 1Gi ^
+        --memory 2Gi ^
         --timeout 600 ^
         --set-env-vars "SECRET_KEY=AICODEX_SUPER_SECRET_KEY_CHANGEME,DB_TYPE=sqlite,CORS_ORIGINS=*,GCS_BUCKET_NAME=aicodex-data-1096425756328,SEED_ADMIN=False"
     if %ERRORLEVEL% NEQ 0 (
