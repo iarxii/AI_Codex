@@ -17,5 +17,13 @@
   },
 
   // For JavaScript/TypeScript projects
-  "typescript.tsdk": "node_modules/typescript/lib"
+  "typescript.tsdk": "node_modules/typescript/lib",
+
+  // Python import resolution paths
+  "python.analysis.extraPaths": [
+    "./"
+  ],
+  "python.autoComplete.extraPaths": [
+    "./"
+  ]
 }

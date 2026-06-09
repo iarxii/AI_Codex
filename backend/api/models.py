@@ -1,8 +1,11 @@
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Header, Depends
 from typing import List, Dict, Any
+import json
 from backend.config import settings
 from backend.db.session import get_db
+from backend.db.models import User
+from backend.api.auth import get_current_user
 
 router = APIRouter()
 
@@ -14,6 +17,7 @@ async def _list_models_raw(
     x_local_backend_mode: str = Header(None),
     x_space_slug: str = Header(None),
     x_is_premium: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Any = Depends(get_db)
 ):
     """
@@ -28,6 +32,25 @@ async def _list_models_raw(
     is_premium = x_is_premium == "true"
     
     actual_key = x_api_key or api_key
+    if not actual_key:
+        api_keys = {}
+        if current_user and current_user.settings_json:
+            try:
+                api_keys = json.loads(current_user.settings_json).get("api_keys", {})
+            except Exception:
+                pass
+        actual_key = api_keys.get(provider)
+        
+    if not actual_key:
+        import os
+        if provider == "gemini" or provider == "google":
+            actual_key = os.environ.get("GEMINI_API_KEY")
+        elif provider == "groq":
+            actual_key = os.environ.get("GROQ_API_KEY")
+        elif provider == "openrouter":
+            actual_key = os.environ.get("OPENROUTER_API_KEY")
+        elif provider == "ollama_cloud":
+            actual_key = os.environ.get("OLLAMA_API_KEY")
     async with httpx.AsyncClient(timeout=10.0) as client:
         if provider == "local":
             local_mode = x_local_backend_mode or settings.LOCAL_BACKEND_MODE
@@ -161,6 +184,7 @@ async def list_models(
     x_local_backend_mode: str = Header(None),
     x_space_slug: str = Header(None),
     x_is_premium: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Any = Depends(get_db)
 ):
     models = await _list_models_raw(
@@ -171,6 +195,7 @@ async def list_models(
         x_local_backend_mode=x_local_backend_mode,
         x_space_slug=x_space_slug,
         x_is_premium=x_is_premium,
+        current_user=current_user,
         db=db
     )
     
