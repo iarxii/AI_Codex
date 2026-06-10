@@ -6,37 +6,54 @@ function App() {
   const [result, setResult] = useState('');
 
   const handleClick = (val) => {
-    if (val === '=') {
-      try {
-        setResult(eval(input).toString());
-      } catch (e) {
-        setResult('Error');
-      }
-    } else if (val === 'C') {
-      setInput('');
-      setResult('');
-    } else {
-      setInput(prev => prev + val);
+    setInput((prev) => prev + val);
+  };
+
+  const clearInput = () => {
+    setInput('');
+    setResult('');
+  };
+
+  const calculate = () => {
+    try {
+      const evaluated = new Function('return ' + input)();
+      setResult(evaluated.toString());
+    } catch (error) {
+      setResult('Error');
     }
   };
 
   return (
     <div className="calculator-container">
-      <div className="calculator">
+      <div className="calculator-card">
         <div className="display">
-          <div className="input">{input || '0'}</div>
-          <div className="result">{result}</div>
+          <div className="input-text">{input || '0'}</div>
+          <div className="result-text">{result}</div>
         </div>
         <div className="buttons">
-          {['C', '/', '*', '-', '+', '7', '8', '9', '4', '5', '6', '1', '2', '3', '0', '.', '='].map(btn => (
-            <button 
-              key={btn} 
-              className={`btn ${btn === '=' ? 'equal' : ''} ${['/', '*', '-', '+'].includes(btn) ? 'op' : ''}`}
-              onClick={() => handleClick(btn)}
-            >
-              {btn}
-            </button>
-          ))}
+          <button onClick={clearInput} className="btn-special">C</button>
+          <button onClick={() => handleClick('(')} className="btn-op">(</button>
+          <button onClick={() => handleClick(')')} className="btn-op">)</button>
+          <button onClick={() => handleClick('/')} className="btn-op">÷</button>
+
+          <button onClick={() => handleClick('7')}>7</button>
+          <button onClick={() => handleClick('8')}>8</button>
+          <button onClick={() => handleClick('9')}>9</button>
+          <button onClick={() => handleClick('*')} className="btn-op">×</button>
+
+          <button onClick={() => handleClick('4')}>4</button>
+          <button onClick={() => handleClick('5')}>5</button>
+          <button onClick={() => handleClick('6')}>6</button>
+          <button onClick={() => handleClick('-')} className="btn-op">-</button>
+
+          <button onClick={() => handleClick('1')}>1</button>
+          <button onClick={() => handleClick('2')}>2</button>
+          <button onClick={() => handleClick('3')}>3</button>
+          <button onClick={() => handleClick('+')} className="btn-op">+</button>
+
+          <button onClick={() => handleClick('0')} className="btn-zero">0</button>
+          <button onClick={() => handleClick('.')}>.</button>
+          <button onClick={calculate} className="btn-equal">=</button>
         </div>
       </div>
     </div>
