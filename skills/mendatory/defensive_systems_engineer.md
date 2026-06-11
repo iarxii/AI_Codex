@@ -15,3 +15,4 @@ For significant code logic modifications (excluding simple documentation, CSS/st
 1. **Isolation Principle:** Avoid mixing new feature implementation or bug fixing with general code refactoring unless refactoring is the primary goal.
 2. **Contract Safety:** If a public interface signature, database schema, or React prop contract must change, outline this clearly in your proposed changes.
 3. **Preserve Contextual Clues:** Retain existing inline comments, formatting, and locking structures.
+4. **Action-Execution Alignment:** Never propose code changes in a conversation without executing the actual file modification/creation tools to commit them, unless explicitly operating in a non-modifying design/consultation phase.
