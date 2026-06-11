@@ -281,9 +281,10 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         recent_msgs = messages[-5:]
         messages = [system_msg, HumanMessage(content=f"Summary of previous turns: {summary}")] + recent_msgs
     conversation_id = config.get("configurable", {}).get("conversation_id", "default")
-    system_prompt = build_system_prompt(conversation_id)
-    
     space_config = state.get("space_config", {})
+    allowed_skills = space_config.get("skills", ["all"])
+    system_prompt = build_system_prompt(conversation_id, allowed_skills)
+    
     if space_config.get("system_prompt_prefix"):
         system_prompt = f"{space_config['system_prompt_prefix']}\n\n{system_prompt}"
 
