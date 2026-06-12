@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
 from .state import AgentState
-from .nodes import reason_node, execute_tool_node, init_node
+from .nodes import reason_node, execute_tool_node, init_node, guard_node
 from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node
 
 def should_continue(state: AgentState):
@@ -36,6 +36,7 @@ def create_agent_graph():
     
     # Add nodes
     workflow.add_node("init", init_node)
+    workflow.add_node("guard", guard_node)
     workflow.add_node("reason", reason_node)
     workflow.add_node("execute_tool", execute_tool_node)
     workflow.add_node("trading_debate", bull_bear_debate_node)
@@ -50,12 +51,15 @@ def create_agent_graph():
         route_after_init,
         {
             "trading_debate": "trading_debate",
-            "reason": "reason"
+            "reason": "guard"
         }
     )
     
-    # After debate, go to reason
-    workflow.add_edge("trading_debate", "reason")
+    # Guard → Reason (guard validates context before LLM invocation)
+    workflow.add_edge("guard", "reason")
+    
+    # After debate, go to guard (then reason)
+    workflow.add_edge("trading_debate", "guard")
     
     # Add conditional edges
     workflow.add_conditional_edges(
@@ -84,7 +88,7 @@ def create_agent_graph():
     )
     
     # Add normal edges
-    workflow.add_edge("execute_tool", "reason")
+    workflow.add_edge("execute_tool", "guard")
     
     # Compile
     return workflow.compile()
