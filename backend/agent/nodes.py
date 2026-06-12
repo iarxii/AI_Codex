@@ -234,6 +234,57 @@ async def init_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]
     
     return {"telemetry": telemetry}
 
+async def guard_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Pre-reasoning guard that validates context health before invoking the LLM.
+    Detects:
+      1. Stuck loops — 3+ identical consecutive tool calls
+      2. Excessive context — token count approaching model limits
+    Short-circuits with a user-friendly error instead of producing garbage.
+    """
+    messages = state["messages"]
+    provider = config.get("configurable", {}).get("provider", "local")
+    model = config.get("configurable", {}).get("model", "default")
+    
+    # 1. Stuck Loop Detection: check last N tool calls for repetition
+    from langchain_core.messages import ToolMessage as _ToolMsg
+    recent_tool_names = []
+    for m in reversed(messages):
+        if hasattr(m, "tool_calls") and m.tool_calls:
+            recent_tool_names.append(m.tool_calls[0].get("name", ""))
+        if len(recent_tool_names) >= 3:
+            break
+    
+    if len(recent_tool_names) >= 3 and len(set(recent_tool_names)) == 1:
+        stuck_tool = recent_tool_names[0]
+        logger.warning(f"GUARD: Stuck loop detected — tool '{stuck_tool}' called 3 times consecutively")
+        return {
+            "messages": [AIMessage(
+                content=f"⚠️ I appear to be stuck in a loop calling `{stuck_tool}` repeatedly. "
+                         "Let me step back and address your request differently. "
+                         "Could you rephrase what you need, or should I try a different approach?"
+            )],
+            "current_tool_calls": [],
+            "is_complete": True
+        }
+    
+    # 2. Context Budget Pre-check (warn, don't block — reason_node handles summarization)
+    from backend.utils.telemetry import estimate_tokens, get_model_context_limit
+    total_tokens = sum(estimate_tokens(str(m.content)) for m in messages)
+    context_limit = get_model_context_limit(provider, model)
+    
+    if total_tokens > context_limit * 0.95:
+        logger.warning(f"GUARD: Context critically full ({total_tokens}/{context_limit} tokens)")
+        # Don't block — reason_node will summarize, but log for observability
+    
+    telemetry = state.get("telemetry", {})
+    if "latencies" not in telemetry:
+        telemetry["latencies"] = {}
+    telemetry["context_tokens"] = total_tokens
+    telemetry["context_limit"] = context_limit
+    
+    return {"telemetry": telemetry}
+
 async def summarize_history(messages: List[BaseMessage], config: RunnableConfig) -> str:
     """
     Summarizes older messages to save context space.
@@ -272,14 +323,22 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             write_workspace_status(conversation_id, status)
             logger.info(f"SENTINEL: Status updated at turn {turn_count} ({len(status)} chars)")
     
-    # Context Budgeting: If history is long, summarize older parts
+    # Context Budgeting: Token-aware summarization
+    from backend.utils.telemetry import estimate_tokens, get_model_context_limit
+    
+    total_tokens = sum(estimate_tokens(str(m.content)) for m in messages)
+    context_limit = get_model_context_limit(provider, model)
+    budget_threshold = int(context_limit * 0.7)  # Leave 30% headroom for system prompt + response
+    
     summary = ""
-    if len(messages) > 15:
+    if total_tokens > budget_threshold and len(messages) > 6:
+        logger.info(f"PIPELINE: Context budget exceeded ({total_tokens}/{budget_threshold} tokens). Summarizing...")
         summary = await summarize_history(messages, config)
         # Keep only the system message, the summary, and the last 5 messages
         system_msg = messages[0]
         recent_msgs = messages[-5:]
         messages = [system_msg, HumanMessage(content=f"Summary of previous turns: {summary}")] + recent_msgs
+        logger.info(f"PIPELINE: Context compressed to {len(messages)} messages")
     conversation_id = config.get("configurable", {}).get("conversation_id", "default")
     space_config = state.get("space_config", {})
     allowed_skills = space_config.get("skills", ["all"])

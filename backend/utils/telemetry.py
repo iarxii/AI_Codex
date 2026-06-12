@@ -63,3 +63,44 @@ def estimate_tokens(text: str) -> int:
         return 0
     # Simple heuristic: 1 token approx 4 characters
     return len(text) // 4
+
+def get_model_context_limit(provider: str, model: str) -> int:
+    """
+    Returns the approximate context window size (in tokens) for the given
+    provider/model combination. Used for budget-aware context management
+    to prevent unbounded context accumulation.
+    """
+    model_lower = (model or "").lower()
+    
+    # Provider-level defaults
+    provider_defaults = {
+        "groq": 8192,
+        "gemini": 32768,
+        "openrouter": 8192,
+        "ollama_cloud": 8192,
+        "local": 4096,
+    }
+    
+    # Model-specific overrides (known context windows)
+    if "gemini-1.5-pro" in model_lower or "gemini-2.0" in model_lower:
+        return 128_000
+    if "gemini-1.5-flash" in model_lower:
+        return 128_000
+    if "gemma4" in model_lower or "gemma-4" in model_lower:
+        return 32_768
+    if "llama-3.1-405b" in model_lower or "llama3.3" in model_lower:
+        return 128_000
+    if "llama3.1" in model_lower or "llama3.2" in model_lower:
+        return 128_000
+    if "llama3" in model_lower:
+        return 8192
+    if "mistral" in model_lower:
+        return 32_768
+    if "qwen2.5" in model_lower:
+        return 32_768
+    if "deepseek" in model_lower:
+        return 64_000
+    if "compound" in model_lower:
+        return 8192
+    
+    return provider_defaults.get(provider, 8192)
