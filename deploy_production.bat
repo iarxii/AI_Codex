@@ -37,6 +37,9 @@ if "%~1"=="--be" (
     shift
 ) else (
     echo Deployment Mode: Full Stack
+    SET DEPLOY_BE=true
+    SET DEPLOY_FE=true
+    SET DEPLOY_PREMIUM=true
 )
 shift
 goto parse_args
