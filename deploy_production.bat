@@ -3,6 +3,9 @@ SETLOCAL EnableDelayedExpansion
 :: Change to the directory of this script to ensure relative paths work correctly
 cd /d "%~dp0"
 SET GCLOUD=gcloud
+if exist "%LocalAppData%\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd" (
+    SET GCLOUD="%LocalAppData%\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd"
+)
 SET PROJECT_ID=aicodex-lab
 SET REGION=us-central1
 SET BACKEND_IMAGE=us-central1-docker.pkg.dev/%PROJECT_ID%/aicodex-repo/backend
