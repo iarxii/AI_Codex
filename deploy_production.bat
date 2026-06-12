@@ -1,4 +1,4 @@
-@echo off
+    @echo off
 SETLOCAL EnableDelayedExpansion
 :: Change to the directory of this script to ensure relative paths work correctly
 cd /d "%~dp0"
