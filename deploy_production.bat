@@ -104,7 +104,7 @@ if "%DEPLOY_PREMIUM%"=="true" (
 
 if "%DEPLOY_FE%"=="true" (
     echo Retrieving Backend URL for Frontend build...
-    for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-be --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set BACKEND_URL=%%i
+    for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-be --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set BACKEND_URL=%%i
     
     if "!BACKEND_URL!"=="" (
         echo ERROR: Could not retrieve Backend URL. Is 'aicodex-be' deployed?
@@ -114,7 +114,7 @@ if "%DEPLOY_FE%"=="true" (
     echo Backend URL detected: !BACKEND_URL!
     
     echo Retrieving Premium URL for Frontend build...
-    for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-premium --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set PREMIUM_URL=%%i
+    for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-premium --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set PREMIUM_URL=%%i
     echo Premium URL detected: !PREMIUM_URL!
 
     echo [3/4] Submitting Frontend Build to Google Cloud...
@@ -154,9 +154,9 @@ if "%DEPLOY_FE%"=="true" (
 )
 
 echo [5/6] Generating/Updating Route Map JSON...
-for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-be --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set BACKEND_URL=%%i
-for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-lab --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set FRONTEND_URL=%%i
-for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-premium --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set PREMIUM_URL=%%i
+for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-be --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set BACKEND_URL=%%i
+for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-lab --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set FRONTEND_URL=%%i
+for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-premium --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set PREMIUM_URL=%%i
 
 SET ROUTE_MAP_PATH=..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-react\src\data\route_map.json
 (
