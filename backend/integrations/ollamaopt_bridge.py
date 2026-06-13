@@ -285,24 +285,26 @@ def get_context_builder(provider: str = "local"):
             
             new_msgs = [SystemMessage(content=assembled.system_prompt)]
             
-            # We filter the original messages to only include those that fit in the budget
-            # OllamaOpt's assembled.history_context is useful for local LLMs, 
-            # but for cloud providers we want the original objects.
-            
-            # Simple heuristic: if history was truncated by OllamaOpt, we should trim our list
             if assembled.was_truncated:
-                # We'll take the last N messages that likely fit
-                # (OllamaOpt uses a char-based cap, we'll follow its lead)
-                trimmed_history = messages[-6:] # Keep last 3 turns if truncated
+                # If history was truncated by OllamaOpt, we trim our list from the end.
+                # To prevent orphaned ToolMessages (which fail API constraints), we scan backward
+                # and ensure we do not start the message list with a ToolMessage.
+                keep_count = 6
+                if keep_count > len(messages):
+                    keep_count = len(messages)
+                
+                trimmed_history = messages[-keep_count:]
+                while trimmed_history and getattr(trimmed_history[0], "type", "") == "tool":
+                    keep_count += 1
+                    if keep_count > len(messages):
+                        break
+                    trimmed_history = messages[-keep_count:]
             else:
-                trimmed_history = messages[:-1] # All except current query
+                trimmed_history = [m for m in messages if m.type != "system"]
             
             for m in trimmed_history:
-                if m.type == "system": continue
                 new_msgs.append(m)
             
-            # Finally append the clean user query
-            new_msgs.append(HumanMessage(content=user_query))
             return new_msgs
 
         _initialized_context_builder.build_context = build_context_wrapper

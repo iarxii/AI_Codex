@@ -41,21 +41,24 @@ class WorkspaceWriterSkill(BaseSkill):
         "required": ["filename", "content"]
     }
 
-    async def execute(self, filename: str, content: str, type: str = "code", conversation_id: Optional[str] = None) -> SkillResult:
+    async def execute(self, filename: str, content: str, type: str = "code", tutor_explanation: Optional[str] = None, conversation_id: Optional[str] = None) -> SkillResult:
         if not conversation_id:
             return SkillResult(success=False, error="No active conversation ID provided in tool context.")
 
         try:
-            # Security: Ensure filename is safe
-            safe_filename = os.path.basename(filename)
-            if not safe_filename:
-                return SkillResult(success=False, error="Invalid filename provided.")
+            # Security: Ensure filename is safe and remains within the workspace
+            norm_filename = os.path.normpath(filename)
+            if norm_filename.startswith("..") or os.path.isabs(norm_filename):
+                return SkillResult(success=False, error="Security violation: Path must be relative and remain within the workspace.")
 
             local_path = save_scratchpad_file(
                 session_id=conversation_id,
-                filename=safe_filename,
+                filename=norm_filename,
                 content=content
             )
+
+            # Use forward slashes for cross-platform UI representation
+            display_filename = norm_filename.replace(os.path.sep, "/")
 
             # Generate the CANVAS marker for the UI
             # Format: [CANVAS:TYPE:TITLE:LANGUAGE:PATH] CONTENT [/CANVAS]
@@ -67,12 +70,12 @@ class WorkspaceWriterSkill(BaseSkill):
             
             # Extract language from extension if not provided
             lang = "text"
-            if "." in safe_filename:
-                ext = safe_filename.split(".")[-1]
+            if "." in display_filename:
+                ext = display_filename.split(".")[-1]
                 lang_map = {"py": "python", "js": "javascript", "ts": "typescript", "tsx": "tsx", "html": "html", "css": "css"}
                 lang = lang_map.get(ext, ext)
 
-            canvas_marker = f"[CANVAS:{type}:{safe_filename}:{lang}] {display_content} [/CANVAS]"
+            canvas_marker = f"[CANVAS:{type}:{display_filename}:{lang}] {display_content} [/CANVAS]"
 
             # Trigger non-blocking graphify update
             graph_skill = registry.get_skill("graphify")
@@ -82,10 +85,10 @@ class WorkspaceWriterSkill(BaseSkill):
 
             return SkillResult(
                 success=True, 
-                output=f"Successfully updated {safe_filename} in the workspace scratchpad.",
+                output=f"Successfully updated {display_filename} in the workspace scratchpad.",
                 data={
                     "path": local_path,
-                    "filename": safe_filename,
+                    "filename": display_filename,
                     "canvas_marker": canvas_marker,
                     "tutor_explanation": tutor_explanation
                 }

@@ -18,6 +18,21 @@ def skill_to_langchain_tool(skill: BaseSkill) -> StructuredTool:
         description=skill.description,
     )
 
+def make_wrapped_workspace_writer(skill: BaseSkill, conversation_id: str):
+    async def wrapped_workspace_writer(filename: str, content: str, type: str = "code", tutor_explanation: str = None):
+        return await skill.execute(filename=filename, content=content, type=type, tutor_explanation=tutor_explanation, conversation_id=conversation_id)
+    return wrapped_workspace_writer
+
+def make_wrapped_shell_exec(skill: BaseSkill, conversation_id: str):
+    async def wrapped_shell_exec(command: str, cwd: str = "."):
+        return await skill.execute(command=command, cwd=cwd, conversation_id=conversation_id)
+    return wrapped_shell_exec
+
+def make_wrapped_workspace_reader(skill: BaseSkill, conversation_id: str):
+    async def wrapped_workspace_reader(action: str, path: str, query: str = None, recursive: bool = False):
+        return await skill.execute(action=action, path=path, query=query, recursive=recursive, conversation_id=conversation_id)
+    return wrapped_workspace_reader
+
 def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = None) -> List[StructuredTool]:
     """
     Discovers all skills and returns them as a list of LangChain tools.
@@ -36,18 +51,30 @@ def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = Non
             # We must preserve the signature for StructuredTool.from_function to work.
             # For the workspace_writer, we know its specific signature.
             if skill.name == "workspace_writer":
-                async def wrapped_workspace_writer(filename: str, content: str, type: str = "code"):
-                    return await skill.execute(filename=filename, content=content, type=type, conversation_id=conversation_id)
-                
                 tool = StructuredTool.from_function(
-                    coroutine=wrapped_workspace_writer,
+                    coroutine=make_wrapped_workspace_writer(skill, conversation_id),
+                    name=skill.name,
+                    description=skill.description,
+                )
+            elif skill.name == "shell_exec":
+                tool = StructuredTool.from_function(
+                    coroutine=make_wrapped_shell_exec(skill, conversation_id),
+                    name=skill.name,
+                    description=skill.description,
+                )
+            elif skill.name == "workspace_reader":
+                tool = StructuredTool.from_function(
+                    coroutine=make_wrapped_workspace_reader(skill, conversation_id),
                     name=skill.name,
                     description=skill.description,
                 )
             else:
                 # Generic fallback for other skills (can be expanded)
+                # To prevent closure capture issues here too, we use a default argument trick
+                async def wrapped_generic(*args, skill=skill, **kwargs):
+                    return await skill.execute(*args, **kwargs)
                 tool = StructuredTool.from_function(
-                    coroutine=skill.execute,
+                    coroutine=wrapped_generic,
                     name=skill.name,
                     description=skill.description,
                 )

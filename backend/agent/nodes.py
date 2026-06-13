@@ -49,7 +49,7 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
 
     model_config = config.get("configurable", {}).get("model_config", {})
     temp = model_config.get("temperature", 0.0)
-    max_toks = model_config.get("max_tokens", 1024)
+    max_toks = model_config.get("max_tokens", 4096)
 
     try:
         if provider == "colab_bridge":
@@ -246,27 +246,36 @@ async def guard_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any
     provider = config.get("configurable", {}).get("provider", "local")
     model = config.get("configurable", {}).get("model", "default")
     
-    # 1. Stuck Loop Detection: check last N tool calls for repetition
-    from langchain_core.messages import ToolMessage as _ToolMsg
-    recent_tool_names = []
+    # 1. Stuck Loop Detection: check last N tool calls for repetition within the current turn
+    recent_tool_calls = []
     for m in reversed(messages):
-        if hasattr(m, "tool_calls") and m.tool_calls:
-            recent_tool_names.append(m.tool_calls[0].get("name", ""))
-        if len(recent_tool_names) >= 3:
+        if isinstance(m, HumanMessage):
             break
+        if hasattr(m, "tool_calls") and m.tool_calls:
+            for tc in m.tool_calls:
+                import json
+                try:
+                    args_str = json.dumps(tc.get("args", {}), sort_keys=True)
+                except Exception:
+                    args_str = str(tc.get("args", {}))
+                recent_tool_calls.append((tc.get("name", ""), args_str))
+            if len(recent_tool_calls) >= 3:
+                break
     
-    if len(recent_tool_names) >= 3 and len(set(recent_tool_names)) == 1:
-        stuck_tool = recent_tool_names[0]
-        logger.warning(f"GUARD: Stuck loop detected — tool '{stuck_tool}' called 3 times consecutively")
-        return {
-            "messages": [AIMessage(
-                content=f"⚠️ I appear to be stuck in a loop calling `{stuck_tool}` repeatedly. "
-                         "Let me step back and address your request differently. "
-                         "Could you rephrase what you need, or should I try a different approach?"
-            )],
-            "current_tool_calls": [],
-            "is_complete": True
-        }
+    if len(recent_tool_calls) >= 3:
+        last_three = recent_tool_calls[:3]
+        if len(set(last_three)) == 1:
+            stuck_tool = last_three[0][0]
+            logger.warning(f"GUARD: Stuck loop detected — tool '{stuck_tool}' called 3 times consecutively with same arguments")
+            return {
+                "messages": [AIMessage(
+                    content=f"⚠️ I appear to be stuck in a loop calling `{stuck_tool}` repeatedly with the same arguments. "
+                             "Let me step back and address your request differently. "
+                             "Could you rephrase what you need, or should I try a different approach?"
+                )],
+                "current_tool_calls": [],
+                "is_complete": True
+            }
     
     # 2. Context Budget Pre-check (warn, don't block — reason_node handles summarization)
     from backend.utils.telemetry import estimate_tokens, get_model_context_limit
