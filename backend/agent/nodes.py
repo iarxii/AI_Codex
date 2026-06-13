@@ -377,7 +377,13 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     
     # Wire the budget! 
     # This transforms the raw message list into a budget-aware prompt
-    messages = context_builder.build_context(messages, system_prompt=system_prompt)
+    if context_builder:
+        messages = context_builder.build_context(messages, system_prompt=system_prompt)
+    else:
+        from langchain_core.messages import SystemMessage
+        # Fallback: Filter out old system prompts and prepend the new one
+        messages = [SystemMessage(content=system_prompt)] + [m for m in messages if m.type != "system"]
+        logger.warning("PIPELINE: ContextBuilder is None. Using fallback raw message formatting.")
     
     logger.info(f"PIPELINE: Context built (len={len(messages)}). Initializing LLM...")
     
