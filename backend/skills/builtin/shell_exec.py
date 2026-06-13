@@ -27,15 +27,25 @@ class ShellExecSkill(BaseSkill):
         "required": ["command"]
     }
 
-    async def execute(self, command: str, cwd: str = ".") -> SkillResult:
+    async def execute(self, command: str, cwd: str = ".", conversation_id: str = None) -> SkillResult:
         try:
             # Resolve absolute CWD
             root = Path(__file__).resolve().parents[3]
-            abs_cwd = (root / cwd).resolve()
             
-            # Security check for CWD
-            if not str(abs_cwd).startswith(str(root)):
+            if conversation_id:
+                # Resolve relative to the conversation scratchpad
+                base_dir = (root / "data" / "workspaces" / conversation_id / "scratch").resolve()
+            else:
+                base_dir = root.resolve()
+
+            abs_cwd = (base_dir / cwd).resolve()
+            
+            # Security check for CWD: must remain within base_dir
+            if not str(abs_cwd).startswith(str(base_dir)):
                  return SkillResult(success=False, error="Access denied: CWD is outside workspace root.")
+
+            # Ensure the directory exists
+            abs_cwd.mkdir(parents=True, exist_ok=True)
 
             # Execute via sandbox
             result = await execute_sandboxed(command, cwd=str(abs_cwd))

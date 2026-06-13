@@ -49,16 +49,25 @@ def save_scratchpad_file(session_id: str, filename: str, content: str):
     """
     Saves content to a local workspace file and syncs to GCS if enabled.
     Path: data/workspaces/{session_id}/scratch/{filename}
+    Supports relative subdirectories safely by preventing directory traversal.
     """
-    # 1. Local Write
-    workspace_dir = os.path.join("data", "workspaces", session_id, "scratch")
-    os.makedirs(workspace_dir, exist_ok=True)
+    # Resolve the absolute workspace directory
+    workspace_dir = os.path.abspath(os.path.join("data", "workspaces", session_id, "scratch"))
     
-    local_path = os.path.join(workspace_dir, filename)
-    with open(local_path, "w", encoding="utf-8") as f:
+    # Resolve the target path absolutely
+    target_path = os.path.abspath(os.path.join(workspace_dir, filename))
+    
+    # Verify target path is strictly within the workspace directory
+    if not target_path.startswith(workspace_dir):
+        raise ValueError("Security violation: Path must remain within the workspace scratchpad.")
+
+    # 1. Local Write
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    
+    with open(target_path, "w", encoding="utf-8") as f:
         f.write(content)
     
-    print(f"Saved scratchpad locally: {local_path}")
+    print(f"[STORAGE] Saved scratchpad locally: {target_path}")
 
     # 2. GCS Sync (Production)
     if settings.GCS_BUCKET_NAME:
@@ -66,12 +75,13 @@ def save_scratchpad_file(session_id: str, filename: str, content: str):
             storage_client = storage.Client()
             bucket = storage_client.bucket(settings.GCS_BUCKET_NAME)
             
-            # GCS path: workspaces/{session_id}/scratch/{filename}
-            gcs_path = f"workspaces/{session_id}/scratch/{filename}"
+            # GCS path must use forward slashes and be relative
+            relative_path = os.path.relpath(target_path, workspace_dir).replace(os.path.sep, "/")
+            gcs_path = f"workspaces/{session_id}/scratch/{relative_path}"
             blob = bucket.blob(gcs_path)
             blob.upload_from_string(content)
-            print(f"Synced scratchpad to GCS: gs://{settings.GCS_BUCKET_NAME}/{gcs_path}")
+            print(f"[STORAGE] Synced scratchpad to GCS: gs://{settings.GCS_BUCKET_NAME}/{gcs_path}")
         except Exception as e:
-            print(f"Failed to sync scratchpad to GCS: {e}")
+            print(f"[STORAGE] Failed to sync scratchpad to GCS: {e}")
     
-    return local_path
+    return target_path

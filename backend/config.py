@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     DATABASE_FILE: str = "data/aicodex.db"
     
     # Skills & Sandbox
-    ALLOWED_COMMANDS: str = "git,python,pip,node,npm,dir,type,cat,ls"
+    ALLOWED_COMMANDS: str = "git,python,pip,node,npm,dir,type,cat,ls,mkdir"
     MAX_EXECUTION_TIME: int = 30
     
     # GitHub

@@ -443,6 +443,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             data = await websocket.receive_text()
             payload = json.loads(data)
             
+            if payload.get("type") == "ping":
+                # Heartbeat ping from client to keep connection alive
+                continue
+            
             if payload.get("type") == "cancel":
                 print("PIPELINE: Cancel signal received from client")
                 for task in list(active_tasks):

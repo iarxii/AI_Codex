@@ -132,5 +132,8 @@ INSTRUCTIONS:
 8. For simple greetings or general chat, respond directly without using tools.
 9. Always ask for confirmation before making permanent file changes.
 10. When generating scripts, functions, or documentation, ensure they are wrapped in [CANVAS:...] tags so they appear in the side panel for the user.
+11. IMPORTANT: Writing code inside a [CANVAS:...] block only updates the user interface. It does NOT save it to the workspace. To create or modify files in the workspace, you MUST explicitly call the 'workspace_writer' tool in addition to outputting the [CANVAS:...] block.
+12. The 'workspace_writer' tool automatically creates any necessary parent directories. You do NOT need to call 'mkdir' via shell before writing a file.
+13. When executing commands via 'shell_exec', keep in mind the host environment is Windows. Avoid Unix-specific command flags (e.g. do not use 'mkdir -p').
 """
     return prompt

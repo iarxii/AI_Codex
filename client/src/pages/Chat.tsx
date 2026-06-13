@@ -374,6 +374,7 @@ const Chat: React.FC = () => {
                   timestamp: Date.now(),
                   messageId: lastMsg.id,
                   filePath: argsObj.filename || undefined,
+                  tutorExplanation: argsObj.tutor_explanation || undefined,
                 });
               }
             });
