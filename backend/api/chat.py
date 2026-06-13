@@ -88,6 +88,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
         request_start = time.perf_counter()
         full_ai_response = ""
+        history_len = 0
+        final_messages = None
 
         try:
             async with AsyncSessionLocal() as db:
@@ -155,15 +157,37 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 )
                 history_msgs = history_result.scalars().all()
                 
-                from langchain_core.messages import HumanMessage as _HumanMessage, AIMessage as _AIMessage
+                from langchain_core.messages import (
+                    HumanMessage as _HumanMessage, 
+                    AIMessage as _AIMessage, 
+                    ToolMessage as _ToolMessage, 
+                    SystemMessage as _SystemMessage
+                )
                 langchain_history = []
                 for m in history_msgs:
+                    meta = {}
+                    if m.metadata_json:
+                        try:
+                            meta = json.loads(m.metadata_json)
+                        except Exception:
+                            pass
+                            
                     if m.role == "user":
                         langchain_history.append(_HumanMessage(content=m.content))
                     elif m.role == "assistant":
-                        langchain_history.append(_AIMessage(content=m.content))
+                        tool_calls = meta.get("tool_calls", [])
+                        langchain_history.append(_AIMessage(content=m.content, tool_calls=tool_calls))
+                    elif m.role == "tool":
+                        langchain_history.append(_ToolMessage(
+                            content=m.content,
+                            name=meta.get("name", ""),
+                            tool_call_id=meta.get("tool_call_id", "")
+                        ))
+                    elif m.role == "system":
+                        langchain_history.append(_SystemMessage(content=m.content))
                 
                 # 2. Persist User Message
+                history_len = len(langchain_history) + 1
                 user_message_str = str(user_message) if user_message is not None else ""
                 new_user_msg = Message(
                     conversation_id=conversation_id,
@@ -349,12 +373,12 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         print(f"PIPELINE ERROR: {error_obj}")
                         await websocket.send_json({"type": "error", "message": f"Graph Error: {str(error_obj)}"})
                     
-                    # Capture final response from graph chain_end state
-                    # Most reliable way to get the AI response when on_chat_model_stream
-                    # events don't fire (e.g., local provider)
-                    elif kind == "on_chain_end" and not full_ai_response:
+                    elif kind == "on_chain_end":
                         output = event.get("data", {}).get("output", {})
-                        if isinstance(output, dict):
+                        if isinstance(output, dict) and "messages" in output:
+                            final_messages = output["messages"]
+                            
+                        if not full_ai_response and isinstance(output, dict):
                             msgs = output.get("messages", [])
                             for m in reversed(msgs):
                                 if hasattr(m, "content") and m.content and getattr(m, "type", "") == "ai":
@@ -406,9 +430,43 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             
             await websocket.send_json({"type": "error", "message": f"Execution Error: {friendly_msg}"})
         finally:
-            # Persist AI Response
-            if full_ai_response:
-                async with AsyncSessionLocal() as db:
+            # Re-fetch or save all generated messages
+            async with AsyncSessionLocal() as db:
+                if final_messages and len(final_messages) > history_len:
+                    # Save all new messages generated during the graph run
+                    new_msgs_to_save = final_messages[history_len:]
+                    for m in new_msgs_to_save:
+                        role = getattr(m, "type", "assistant")
+                        if role == "ai":
+                            role_str = "assistant"
+                        elif role == "human":
+                            role_str = "user"
+                        elif role == "tool":
+                            role_str = "tool"
+                        elif role == "system":
+                            role_str = "system"
+                        else:
+                            role_str = str(role)
+                            
+                        meta = {}
+                        if hasattr(m, "tool_calls") and m.tool_calls:
+                            meta["tool_calls"] = m.tool_calls
+                        if role == "tool":
+                            meta["name"] = getattr(m, "name", "")
+                            meta["tool_call_id"] = getattr(m, "tool_call_id", "")
+                            
+                        meta_json = json.dumps(meta) if meta else None
+                        
+                        new_db_msg = Message(
+                            conversation_id=conversation_id,
+                            role=role_str,
+                            content=str(m.content),
+                            metadata_json=meta_json
+                        )
+                        db.add(new_db_msg)
+                    await db.commit()
+                elif full_ai_response:
+                    # Fallback to save just the final response if graph run didn't finish normally
                     new_ai_msg = Message(
                         conversation_id=conversation_id,
                         role="assistant",

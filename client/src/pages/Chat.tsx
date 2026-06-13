@@ -507,12 +507,14 @@ const Chat: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        const mappedMsgs: Message[] = data.messages.map((m: any) => ({
-          id: m.id.toString(),
-          sender: m.role === 'user' ? 'user' : 'bot',
-          content: m.content,
-          status: 'done'
-        }));
+        const mappedMsgs: Message[] = data.messages
+          .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+          .map((m: any) => ({
+            id: m.id.toString(),
+            sender: m.role === 'user' ? 'user' : 'bot',
+            content: m.content,
+            status: 'done'
+          }));
         setMessages(mappedMsgs);
         
         // Update active space context based on conversation space_type
