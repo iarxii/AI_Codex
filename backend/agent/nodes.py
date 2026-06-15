@@ -517,8 +517,9 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
 
 async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
-    Tool execution node. Dispatches to the compiled LangChain tools.
+    Tool execution node. Dispatches to the compiled LangChain tools or delegates to client-side.
     """
+    import asyncio
     node_start = time.perf_counter()
     last_message = state["messages"][-1]
     tool_messages = []
@@ -530,33 +531,56 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
     tools = get_agent_tools(conversation_id)
     tool_map = {t.name: t for t in tools}
 
+    client_type = config.get("configurable", {}).get("client_type")
+    websocket = config.get("configurable", {}).get("websocket")
+    client_tool_responses = config.get("configurable", {}).get("client_tool_responses")
+
     for tool_call in last_message.tool_calls:
         tool_name = tool_call["name"]
         tool_args = tool_call["args"]
         tool_id = tool_call["id"]
         
-        logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+        is_client_tool = client_type == "vscode" and tool_name in ["workspace_writer", "workspace_reader", "shell_exec"]
         
-        start_time = time.perf_counter()
-        tool = tool_map.get(tool_name)
-        if tool:
+        if is_client_tool and websocket and client_tool_responses:
+            logger.info(f"Delegating tool execution to VS Code client: {tool_name} with args: {tool_args}")
             try:
-                # Use the compiled LangChain tool which safely handles async
-                result = await tool.ainvoke(tool_args)
-                duration = time.perf_counter() - start_time
-                log_performance("TOOL_CALL", duration, {"tool": tool_name})
-                
-                # result is usually the output string or a SkillResult if duck-typing applies
-                if hasattr(result, "success"):
-                    tool_result = result.output or result.error or "Success (no output)"
-                    if not result.success and not result.error:
-                        tool_result = f"Error: {tool_result}"
-                else:
-                    tool_result = str(result)
+                # Send tool execution request to client
+                await websocket.send_json({
+                    "type": "client_tool_call",
+                    "name": tool_name,
+                    "args": tool_args,
+                    "id": tool_id
+                })
+                # Wait for tool response from client (120s timeout)
+                response_payload = await asyncio.wait_for(client_tool_responses.get(), timeout=120.0)
+                tool_result = response_payload.get("output", "")
+            except asyncio.TimeoutError:
+                tool_result = f"Error: Tool execution timed out on the client."
             except Exception as e:
-                tool_result = f"Exception during tool execution: {str(e)}"
+                tool_result = f"Error during client tool execution delegation: {str(e)}"
         else:
-            tool_result = f"Error: Tool '{tool_name}' not found."
+            logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+            start_time = time.perf_counter()
+            tool = tool_map.get(tool_name)
+            if tool:
+                try:
+                    # Use the compiled LangChain tool which safely handles async
+                    result = await tool.ainvoke(tool_args)
+                    duration = time.perf_counter() - start_time
+                    log_performance("TOOL_CALL", duration, {"tool": tool_name})
+                    
+                    # result is usually the output string or a SkillResult if duck-typing applies
+                    if hasattr(result, "success"):
+                        tool_result = result.output or result.error or "Success (no output)"
+                        if not result.success and not result.error:
+                            tool_result = f"Error: {tool_result}"
+                    else:
+                        tool_result = str(result)
+                except Exception as e:
+                    tool_result = f"Exception during tool execution: {str(e)}"
+            else:
+                tool_result = f"Error: Tool '{tool_name}' not found."
         
         tool_messages.append(
             ToolMessage(

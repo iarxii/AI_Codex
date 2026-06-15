@@ -69,6 +69,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             
     print(f"DEBUG: WebSocket connected on /ws/agent for user: {user.username}")
     active_tasks: Set[asyncio.Task] = set()
+    client_tool_responses = asyncio.Queue()
 
     async def run_agent_task(payload_data):
         conversation_id = payload_data.get("conversation_id")
@@ -214,7 +215,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "agent_mode": agent_mode,
                         "local_backend_mode": local_backend_mode,
                         "user_id": user.id,
-                        "space_slug": space_type
+                        "space_slug": space_type,
+                        "client_type": payload_data.get("client_type"),
+                        "websocket": websocket,
+                        "client_tool_responses": client_tool_responses
                     },
                     "recursion_limit": 25
                 }
@@ -266,7 +270,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "agent_mode": agent_mode,
                         "local_backend_mode": local_backend_mode,
                         "user_id": user.id,
-                        "space_slug": space_type
+                        "space_slug": space_type,
+                        "client_type": payload_data.get("client_type"),
+                        "websocket": websocket,
+                        "client_tool_responses": client_tool_responses
                     },
                     "recursion_limit": 25
                 }
@@ -503,6 +510,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             
             if payload.get("type") == "ping":
                 # Heartbeat ping from client to keep connection alive
+                continue
+            
+            if payload.get("type") == "tool_response":
+                await client_tool_responses.put(payload)
                 continue
             
             if payload.get("type") == "cancel":
