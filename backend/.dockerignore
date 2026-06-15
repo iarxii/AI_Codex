@@ -1,7 +1,9 @@
 .venv
 __pycache__
 *.pyc
-data/
+data/*.db
+data/uploads/
+data/workspaces/
 OllamaOpt_local/.git
 OllamaOpt_local/.venv
 OllamaOpt_local/data

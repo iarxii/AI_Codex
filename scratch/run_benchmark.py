@@ -1,8 +1,12 @@
 import os
 import sys
 import asyncio
+import logging
 from pathlib import Path
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+
+# Configure logging to stdout
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 # Add project root to python path
 project_root = Path(__file__).resolve().parent.parent
