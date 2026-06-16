@@ -76,8 +76,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         user_message = payload_data.get("message")
         provider = payload_data.get("provider")
         model = payload_data.get("model")
-        api_key = payload_data.get("api_key") # Legacy fallback
-        api_keys = payload_data.get("api_keys", {}) # New multi-key support
+        api_key = payload_data.get("api_key")
+        api_keys = payload_data.get("api_keys")
+        if not isinstance(api_keys, dict):
+            api_keys = {}
         base_url = payload_data.get("base_url")
         model_config = payload_data.get("config", {})
         agent_mode = payload_data.get("agent_mode", True)
@@ -144,6 +146,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         
                     if provider_key and str(provider_key).strip():
                         api_key = str(provider_key).strip()
+                        api_keys[provider] = api_key
                         masked_key = f"{api_key[:6]}...{api_key[-4:]}" if len(api_key) > 10 else "****"
                         print(f"PIPELINE: Successfully resolved API key for [{provider}]: {masked_key}")
                     else:
@@ -209,6 +212,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "provider": provider, 
                         "model": model, 
                         "api_key": api_key,
+                        "api_keys": api_keys,
                         "base_url": base_url,
                         "model_config": model_config,
                         "conversation_id": str(conversation_id),

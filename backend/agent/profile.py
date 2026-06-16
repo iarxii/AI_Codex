@@ -78,12 +78,13 @@ def compress_markdown(text: str) -> str:
     text = re.sub(r' {2,}', ' ', text)
     return text.strip()
 
-def build_system_prompt(conversation_id: str = "default", allowed_skills: List[str] = None) -> str:
+def build_system_prompt(conversation_id: str = "default", allowed_skills: List[str] = None, tool_binding_status: str = "") -> str:
     """
     Assembles the System Prompt from modular markdown files (SOUL, USER, MEMORY, AGENTS).
     Applies programmatic compression to strike a balance between load and performance.
     Injects the Workspace Sentinel status for persistent session awareness.
     Injects mandatory and situational skills from the skills/ directory.
+    Optionally injects tool-binding telemetry so the model knows which tools are available.
     """
     soul = compress_markdown(load_profile_file("SOUL.md", "You are AICodex, an elite agentic assistant."))
     user = compress_markdown(load_profile_file("USER.md", "The user is a software developer."))
@@ -102,6 +103,9 @@ def build_system_prompt(conversation_id: str = "default", allowed_skills: List[s
     
     situational_skills = compress_markdown(load_situational_skills(allowed_skills))
     situational_skills_block = f"\n[SITUATIONAL SKILLS]\n{situational_skills}" if situational_skills else ""
+    
+    # Tool-binding telemetry injection (Layer 3)
+    tool_status_line = f"\n11. TOOL STATUS: {tool_binding_status}" if tool_binding_status else ""
     
     prompt = f"""[SOUL]
 {soul}
@@ -127,13 +131,12 @@ INSTRUCTIONS:
 3. Use [MEMORY] for grounding.
 4. Use [SPIRIT_BIRD] for educational context and tutoring.
 5. Use [STATUS] for current session awareness (if present).
-6. Use [PROCEDURES] for execution. **CRITICAL: Always use the Agent Canvas ([CANVAS:...] tags) for code, documentation, and research.**
+6. Use [PROCEDURES] for execution. Follow the Workspace Interaction precedence rule strictly.
 7. You are an autonomous agent. If a query requires technical context, use the 'codebase_search' tool.
 8. For simple greetings or general chat, respond directly without using tools.
 9. Always ask for confirmation before making permanent file changes.
-10. When generating scripts, functions, or documentation, ensure they are wrapped in [CANVAS:...] tags so they appear in the side panel for the user.
-11. IMPORTANT: Writing code inside a [CANVAS:...] block only updates the user interface. It does NOT save it to the workspace. To create or modify files in the workspace, you MUST explicitly call the 'workspace_writer' tool in addition to outputting the [CANVAS:...] block.
-12. The 'workspace_writer' tool automatically creates any necessary parent directories. You do NOT need to call 'mkdir' via shell before writing a file.
-13. When executing commands via 'shell_exec', keep in mind the host environment is Windows. Avoid Unix-specific command flags (e.g. do not use 'mkdir -p').
+10. CRITICAL: Writing code inside a [CANVAS:...] block does NOT save it to disk. To physically create or modify files, you MUST call the 'workspace_writer' tool. Call the tool FIRST, then optionally show a Canvas block afterward.
+{tool_status_line}
 """
     return prompt
+

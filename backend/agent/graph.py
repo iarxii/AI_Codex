@@ -1,11 +1,12 @@
 from langgraph.graph import StateGraph, END
 from .state import AgentState
-from .nodes import reason_node, execute_tool_node, init_node, guard_node
+from .nodes import reason_node, execute_tool_node, init_node, guard_node, validate_response_node
 from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node
 
 def should_continue(state: AgentState):
     """
     Check if tool calls are present.
+    Routes to execute_tool if tools were called, otherwise to the validator.
     """
     last_message = state["messages"][-1]
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
@@ -14,7 +15,7 @@ def should_continue(state: AgentState):
         if slug == "trading-space":
             return "mql5_enforcer"
         return "execute_tool"
-    return END
+    return "validate"
 
 def route_after_init(state: AgentState):
     """
@@ -28,9 +29,26 @@ def route_after_init(state: AgentState):
     
     return "reason"
 
+def after_validate(state: AgentState):
+    """
+    Route after validation: retry reasoning (via guard) or finish.
+    If the validator detected fabrication (is_complete=False), re-enter
+    through guard → reason for one retry. Otherwise, end.
+    """
+    if state.get("is_complete", True):
+        return END
+    return "guard"
+
 def create_agent_graph():
     """
     Creates and compiles the agent graph.
+    
+    Graph topology:
+      init → guard → reason → (tool calls?) → execute_tool → guard → reason → ...
+                                   ↓ (no tool calls)
+                               validate → (fabrication?) → guard → reason (max 1 retry)
+                                   ↓ (clean)
+                                  END
     """
     workflow = StateGraph(AgentState)
     
@@ -39,6 +57,7 @@ def create_agent_graph():
     workflow.add_node("guard", guard_node)
     workflow.add_node("reason", reason_node)
     workflow.add_node("execute_tool", execute_tool_node)
+    workflow.add_node("validate", validate_response_node)
     workflow.add_node("trading_debate", bull_bear_debate_node)
     workflow.add_node("mql5_enforcer", mql5_execution_enforcer_node)
     
@@ -61,13 +80,23 @@ def create_agent_graph():
     # After debate, go to guard (then reason)
     workflow.add_edge("trading_debate", "guard")
     
-    # Add conditional edges
+    # Add conditional edges out of reason
     workflow.add_conditional_edges(
         "reason",
         should_continue,
         {
             "mql5_enforcer": "mql5_enforcer",
             "execute_tool": "execute_tool",
+            "validate": "validate"
+        }
+    )
+    
+    # Validator → END or retry via guard
+    workflow.add_conditional_edges(
+        "validate",
+        after_validate,
+        {
+            "guard": "guard",
             END: END
         }
     )

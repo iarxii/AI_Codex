@@ -311,6 +311,49 @@ async def summarize_history(messages: List[BaseMessage], config: RunnableConfig)
     response = await llm.ainvoke([HumanMessage(content=f"{str(to_summarize)}\n\n{summary_prompt}")])
     return response.content
 
+def resolve_llm_fallback(current_provider: str, current_model: str, api_keys: dict) -> tuple[str, str, str]:
+    """
+    Resolves the next fallback provider, model name, and API key.
+    Ensures zero-cost local Ollama fallback is always available.
+    """
+    fallback_chain = ["groq", "gemini", "openrouter", "local"]
+    
+    # Normalize model mapping from current model to fallback models
+    model_mappings = {
+        "groq": {
+            "default": "llama3-8b-8192",
+            "llama3-8b-8192": "llama3-8b-8192",
+            "llama3-70b-8192": "llama3-70b-8192"
+        },
+        "gemini": {
+            "default": "gemini-1.5-flash",
+            "gemini-1.5-flash": "gemini-1.5-flash",
+            "gemini-1.5-pro": "gemini-1.5-pro"
+        },
+        "openrouter": {
+            "default": "meta-llama/llama-3-8b-instruct",
+            "meta-llama/llama-3-8b-instruct": "meta-llama/llama-3-8b-instruct",
+            "google/gemini-flash-1.5": "google/gemini-flash-1.5"
+        },
+        "local": {
+            "default": "default"
+        }
+    }
+    
+    for provider in fallback_chain:
+        if provider == current_provider:
+            continue
+        
+        # Check if API key is available (local doesn't need a key)
+        key = api_keys.get(provider)
+        if key or provider == "local":
+            provider_models = model_mappings.get(provider, {})
+            # Map equivalent model
+            fallback_model = provider_models.get(current_model, provider_models.get("default", "default"))
+            return provider, fallback_model, key
+            
+    return None, None, None
+
 async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
     Main reasoning node. Serves as the 'Planner'. 
@@ -351,10 +394,9 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     conversation_id = config.get("configurable", {}).get("conversation_id", "default")
     space_config = state.get("space_config", {})
     allowed_skills = space_config.get("skills", ["all"])
-    system_prompt = build_system_prompt(conversation_id, allowed_skills)
     
-    if space_config.get("system_prompt_prefix"):
-        system_prompt = f"{space_config['system_prompt_prefix']}\n\n{system_prompt}"
+    # NOTE: System prompt is built AFTER tool binding (see below, L~420)
+    # so we can inject tool-binding telemetry into the prompt.
 
     # Initialize context builder with provider-aware budget
     provider = config.get("configurable", {}).get("provider", "local")
@@ -372,20 +414,17 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 "context_data": {"error": "auth_missing"}
             }
 
-    logger.info(f"PIPELINE: Building context for provider={provider}...")
+    logger.info(f"PIPELINE: Initializing context builder for provider={provider}...")
     context_builder = get_context_builder(provider=provider)
     
-    # Wire the budget! 
-    # This transforms the raw message list into a budget-aware prompt
+    # Context builder is saved for use AFTER tool binding, when the system prompt is ready.
+    # At this point we only log its availability — actual context build happens post-binding.
     if context_builder:
-        messages = context_builder.build_context(messages, system_prompt=system_prompt)
+        logger.info("PIPELINE: ContextBuilder available. Will apply after tool binding.")
     else:
-        from langchain_core.messages import SystemMessage
-        # Fallback: Filter out old system prompts and prepend the new one
-        messages = [SystemMessage(content=system_prompt)] + [m for m in messages if m.type != "system"]
-        logger.warning("PIPELINE: ContextBuilder is None. Using fallback raw message formatting.")
+        logger.warning("PIPELINE: ContextBuilder is None. Will use fallback message formatting.")
     
-    logger.info(f"PIPELINE: Context built (len={len(messages)}). Initializing LLM...")
+    logger.info(f"PIPELINE: Proceeding to LLM init (message count={len(messages)})...")
     
     # Initialize tools and binding logic
     conversation_id = config.get("configurable", {}).get("conversation_id")
@@ -409,11 +448,16 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         capabilities = state.get("telemetry", {}).get("capabilities", [])
         has_tool_support = "Tools" in capabilities
         
+        tool_binding_status = ""
         if valid_tools and has_tool_support and not isinstance(llm, NativeLocalClient):
             logger.info(f"PIPELINE: Binding {len(valid_tools)} tools to LLM (Model: {model})")
             llm = llm.bind_tools(valid_tools)
+            tool_binding_status = f"Tools bound successfully: {[t.name for t in valid_tools]}. You MUST use these tools for file/command operations."
         elif valid_tools:
             logger.info(f"PIPELINE: Skipping tool binding for '{model}' (Capability 'Tools' not found in {capabilities})")
+            tool_binding_status = f"WARNING: Tool binding was SKIPPED for this model ({model}). You cannot call tools. Respond conversationally only."
+        else:
+            tool_binding_status = "No tools available for this session."
     except Exception as init_err:
         logger.error(f"PIPELINE ERROR: LLM init failed — {init_err}")
         return {
@@ -421,6 +465,19 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             "current_tool_calls": [],
             "context_data": {"error": str(init_err)}
         }
+    
+    # Build system prompt AFTER tool binding so we can inject tool-binding status (Layer 3)
+    system_prompt = build_system_prompt(conversation_id, allowed_skills, tool_binding_status)
+    
+    if space_config.get("system_prompt_prefix"):
+        system_prompt = f"{space_config['system_prompt_prefix']}\n\n{system_prompt}"
+    
+    # Rebuild context with the tool-aware system prompt
+    if context_builder:
+        messages = context_builder.build_context(messages, system_prompt=system_prompt)
+    else:
+        from langchain_core.messages import SystemMessage as _SysMsg
+        messages = [_SysMsg(content=system_prompt)] + [m for m in messages if m.type != "system"]
     
     # Base timeout: local and ollama_cloud are typically heavier on prefill latency
     base_timeout = 120.0 if provider in ("local", "ollama_cloud") else 60.0
@@ -456,21 +513,56 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     except (TimeoutError, Exception) as invoke_err:
         error_msg = str(invoke_err)
         
-        # ─── ROBUST FALLBACK ───
-        # If the model provider rejects the request because of tool calling,
-        # we retry WITHOUT tool binding to allow the model to still reply.
-        is_tool_error = "does not support tools" in error_msg or "invalid_request_error" in error_msg
-        if is_tool_error and "valid_tools" in locals() and valid_tools:
-            logger.warning(f"PIPELINE WARNING: Tool-calling error caught: {error_msg}. Retrying without tools...")
+        # ─── DYNAMIC PROVIDER FALLBACK (LOOP ENGINEERING) ───
+        api_keys = config.get("configurable", {}).get("api_keys", {})
+        fallback_prov, fallback_model, fallback_key = resolve_llm_fallback(provider, model, api_keys)
+        
+        if fallback_prov:
+            logger.warning(f"PIPELINE WARNING: Provider [{provider}] failed with [{error_msg}]. Automatically switching to [{fallback_prov}] fallback...")
+            
+            # Notify UI via WebSocket stream
+            websocket = config.get("configurable", {}).get("websocket")
+            if websocket:
+                try:
+                    await websocket.send_json({
+                        "type": "token",
+                        "content": f"\n\n⚠️ *[{provider.upper()}] rate/quota limit or connection error. Switching to [{fallback_prov.upper()}] ({fallback_model})...*\n\n",
+                        "node": "provider_fallback"
+                    })
+                except Exception as ws_err:
+                    logger.error(f"PIPELINE ERROR: Failed to stream fallback message: {ws_err}")
+            
             try:
-                # Re-initialize LLM without any tool binding
-                llm_fallback = await get_dynamic_llm(config, bind_tools=False)
+                # Construct config override for fallback
+                config_copy = dict(config)
+                config_copy["configurable"] = dict(config.get("configurable", {}))
+                config_copy["configurable"]["provider"] = fallback_prov
+                config_copy["configurable"]["model"] = fallback_model
+                config_copy["configurable"]["api_key"] = fallback_key
+                
+                llm_fallback = await get_dynamic_llm(config_copy, bind_tools=True)
                 response = await _asyncio.wait_for(llm_fallback.ainvoke(messages), timeout=request_timeout)
-                # Success! Override error_msg and continue
-                invoke_err = None 
-            except Exception as retry_err:
-                logger.error(f"PIPELINE ERROR: Fallback retry also failed: {retry_err}")
-                error_msg = f"Model failed with tool calling, and fallback also failed: {retry_err}"
+                
+                # Update loop variables on success
+                provider = fallback_prov
+                model = fallback_model
+                invoke_err = None  # Clear error!
+            except Exception as fallback_err:
+                logger.error(f"PIPELINE ERROR: Fallback switch also failed: {fallback_err}")
+                error_msg = f"Original error: {error_msg}. Fallback to {fallback_prov} also failed: {fallback_err}"
+        
+        # ─── TOOL FALLBACK ───
+        if invoke_err:
+            is_tool_error = "does not support tools" in error_msg or "invalid_request_error" in error_msg
+            if is_tool_error and "valid_tools" in locals() and valid_tools:
+                logger.warning(f"PIPELINE WARNING: Tool-calling error caught: {error_msg}. Retrying without tools...")
+                try:
+                    llm_fallback_no_tools = await get_dynamic_llm(config, bind_tools=False)
+                    response = await _asyncio.wait_for(llm_fallback_no_tools.ainvoke(messages), timeout=request_timeout)
+                    invoke_err = None 
+                except Exception as retry_err:
+                    logger.error(f"PIPELINE ERROR: Fallback without tools also failed: {retry_err}")
+                    error_msg = f"Model failed with tool calling, and fallback also failed: {retry_err}"
         
         if invoke_err:
             is_timeout = isinstance(invoke_err, (_asyncio.TimeoutError, TimeoutError)) or "TimeoutError" in type(invoke_err).__name__
@@ -596,3 +688,86 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
     telemetry["latencies"]["tool_execution"] = time.perf_counter() - node_start
 
     return {"messages": tool_messages, "current_tool_calls": [], "telemetry": telemetry}
+
+async def validate_response_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Post-reasoning validator (Layer 2). Detects if the model fabricated file/command
+    outputs without calling tools, and injects a correction message to trigger
+    one more reasoning cycle via guard → reason.
+    
+    This node only fires when reason_node returned NO tool calls (i.e.,
+    should_continue routed here instead of to execute_tool).
+    Max 1 retry to prevent infinite loops.
+    """
+    messages = state["messages"]
+    last_ai = messages[-1] if messages else None
+    
+    if not last_ai or getattr(last_ai, "type", "") != "ai":
+        return {"is_complete": True}  # Nothing to validate
+    
+    # Circuit breaker: check if we already retried
+    retry_count = state.get("context_data", {}).get("fabrication_retries", 0)
+    if retry_count >= 1:
+        logger.info("VALIDATOR: Max retries reached, accepting response as-is")
+        return {"is_complete": True}
+    
+    # Check: does the response contain Canvas code blocks but no tool calls?
+    content = str(last_ai.content)
+    has_canvas_code = "[CANVAS:CODE:" in content
+    has_fabricated_shell = any(marker in content for marker in [
+        "Successfully created", "File written to", "Script executed",
+        "I've created the file", "I have written"
+    ])
+    has_tool_calls = bool(getattr(last_ai, "tool_calls", []))
+    
+    # Check: does the model have tool support in this session?
+    capabilities = state.get("telemetry", {}).get("capabilities", [])
+    has_tool_support = "Tools" in capabilities
+    
+    if not has_tool_support:
+        # Model genuinely can't call tools — don't retry
+        return {"is_complete": True}
+    
+    if (has_canvas_code or has_fabricated_shell) and not has_tool_calls:
+        logger.warning(
+            f"VALIDATOR: Fabrication detected — Canvas/shell output present "
+            f"but 0 tool calls. Injecting correction. (retry={retry_count})"
+        )
+        correction = SystemMessage(
+            content=(
+                "CRITICAL CORRECTION: Your previous response contained code or "
+                "file creation claims without calling the required tools. "
+                "[CANVAS:...] blocks do NOT write files to disk. "
+                "You MUST call 'workspace_writer' to create files and "
+                "'shell_exec' to run commands. "
+                "Re-attempt your response using ONLY tool calls."
+            )
+        )
+        context_data = state.get("context_data", {})
+        context_data["fabrication_retries"] = retry_count + 1
+        
+        # Optimize token usage: truncate the fabricated response content in the history.
+        # This prevents sending back large code blocks as input tokens to the retry turn.
+        last_ai_id = getattr(last_ai, "id", None)
+        truncated_text = f"[Fabrication detected: Omitted original {len(content)} characters of code/text for token efficiency]"
+        if last_ai_id:
+            truncated_ai = AIMessage(
+                content=truncated_text,
+                id=last_ai_id,
+                tool_calls=[]
+            )
+            messages_to_return = [truncated_ai, correction]
+        else:
+            try:
+                last_ai.content = truncated_text
+            except Exception:
+                pass
+            messages_to_return = [correction]
+            
+        return {
+            "messages": messages_to_return,
+            "context_data": context_data,
+            "is_complete": False
+        }
+    
+    return {"is_complete": True}
