@@ -513,6 +513,12 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     except (TimeoutError, Exception) as invoke_err:
         error_msg = str(invoke_err)
         
+        # Track failed attempt in telemetry
+        telemetry = state.get("telemetry", {})
+        if "provider_attempts" not in telemetry:
+            telemetry["provider_attempts"] = []
+        telemetry["provider_attempts"].append(f"{provider} ({model}) - failed: {error_msg}")
+        
         # ─── DYNAMIC PROVIDER FALLBACK (LOOP ENGINEERING) ───
         api_keys = config.get("configurable", {}).get("api_keys", {})
         fallback_prov, fallback_model, fallback_key = resolve_llm_fallback(provider, model, api_keys)
@@ -546,6 +552,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 # Update loop variables on success
                 provider = fallback_prov
                 model = fallback_model
+                telemetry["provider_attempts"].append(f"{fallback_prov} ({fallback_model})")
                 invoke_err = None  # Clear error!
             except Exception as fallback_err:
                 logger.error(f"PIPELINE ERROR: Fallback switch also failed: {fallback_err}")
@@ -587,8 +594,6 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             }
     duration = time.perf_counter() - start_time
     
-    provider = config.get("configurable", {}).get("provider", "local")
-    model = config.get("configurable", {}).get("model", "default")
     log_performance("LLM_REASONING", duration, {"provider": provider, "model": model})
     logger.info(f"PIPELINE: LLM responded in {duration:.2f}s, content length={len(str(response.content))}")
     
@@ -599,6 +604,19 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     telemetry = state.get("telemetry", {})
     if "latencies" not in telemetry: telemetry["latencies"] = {}
     telemetry["latencies"]["reason_node"] = duration
+    
+    if "provider_attempts" not in telemetry:
+        telemetry["provider_attempts"] = []
+    
+    # Record success of current provider/model in the attempts list
+    success_str = f"{provider} ({model})"
+    if not telemetry["provider_attempts"] or not any(success_str in attempt for attempt in telemetry["provider_attempts"]):
+        telemetry["provider_attempts"].append(success_str)
+        
+    if "tokens" not in telemetry:
+        telemetry["tokens"] = {}
+    telemetry["tokens"]["input"] = total_tokens
+    telemetry["tokens"]["output"] = estimate_tokens(str(response.content))
     
     return {
         "messages": [response],
