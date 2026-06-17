@@ -11,9 +11,15 @@
 
 ## Setup
 
-The AI_Codex project consists of a **FastAPI Backend** and a **React Frontend**.
+The AI_Codex project consists of a **FastAPI Backend** and a **React Frontend**. You can set up the entire project using our setup script:
 
-### 1. Backend Setup (Python 3.10+)
+```sh
+./setup.sh
+```
+
+### Manual Setup
+
+#### 1. Backend Setup (Python 3.10+)
 ```sh
 cd backend
 python -m venv .venv
@@ -21,7 +27,7 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Frontend Setup (React)
+#### 2. Frontend Setup (React)
 ```sh
 cd client
 npm install
@@ -30,9 +36,9 @@ npm install
 ## Running the App
 
 ### Local Development (OllamaOpt / Local Focus)
-To start both services with a single command configured for local offline execution:
+To launch all services (including local databases and the FastAPI and React application servers) using the repository-level script:
 ```sh
-./start_website_dev.bat --aicodex --local
+./start-services.sh
 ```
 
 Alternatively, start them separately:
