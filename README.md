@@ -1,9 +1,11 @@
 # AdaptivIntelligenceCodex (AICodex)
 
-**AdaptivIntelligenceCodex (AICodex)** is a comprehensive knowledge base and code generation pipeline for Senior Agentic AI Engineers, designed for rapid prototyping and architecture mapping. It features an AI-powered Health and Oversight Data Analysis engine supporting both OpenAI (gpt-4o) and Google Gemini (2.5 Flash) models.
+**AdaptivIntelligenceCodex (AICodex)** is a comprehensive knowledge base and code generation pipeline for Senior Agentic AI Engineers, designed for rapid prototyping and architecture mapping. It features a local-first agentic oversight engine that prioritizes local offline inference via our optimized **OllamaOpt** pipeline, complemented by Bring-Your-Own-Key (BYOK) cloud provider routing.
 
 ## Core Capabilities
 
+- **OllamaOpt Inference**: High-performance local LLM execution via Ollama or Llama.cpp with optimized context window management and token stream caching.
+- **BYOK Cloud Integration**: Multi-provider cloud routing supporting OpenAI (GPT-4o), Google Gemini, Anthropic, and OpenRouter using your own developer keys.
 - **Neural Analytics**: Real-time hardware telemetry (NPU/GPU/CPU) tracking.
 - **Graphify Knowledge Graph**: Interactive structural codebase mapping and cross-project intelligence. [See Docs](docs/GRAPHIFY_INTEGRATION.md)
 
@@ -27,8 +29,8 @@ npm install
 
 ## Running the App
 
-### Local Development
-To start both services with a single command (requires the provided `.bat` or `.sh` scripts):
+### Local Development (OllamaOpt / Local Focus)
+To start both services with a single command configured for local offline execution:
 ```sh
 ./start_website_dev.bat --aicodex --local
 ```
@@ -42,13 +44,6 @@ Alternatively, start them separately:
 - **Hardware Guidelines**: Running large models locally requires significant RAM/VRAM. See [Hardware Requirements](docs/HARDWARE_REQUIREMENTS.md).
 - **Google Colab**: Deploy the GPU-enabled backend to Colab for premium performance. See [Colab Deployment Guide](docs/COLAB_DEPLOYMENT.md).
 - **Production (Cloud Run)**: Automated deployment to Google Cloud Run is supported. See [Production Deployment](deploy_production.bat).
-
-
-### Features
-
-- Modern OpenAI and Gemini integration
-- Provider selection per request
-- Designed for health data analysis, oversight, and feedback
 
 ---
 
