@@ -87,7 +87,7 @@ backend_process = subprocess.Popen(
 )
 
 print("✅ Backend starting in background...")
-print(f"📋 Use this URL in your AI_Codex UI: {BACKEND_URL}")
+print(f"📋 Spirit Bird - AICodex / VSCodex — Use this URL in your AI_Codex UI: {BACKEND_URL}")
 print()
 ```
 
