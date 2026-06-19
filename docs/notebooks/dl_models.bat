@@ -20,12 +20,12 @@ mkdir "%~dp0Google" 2>nul
 :: 3. Download Qwen 2.5 Coder 7B GGUF (Open access, no token required)
 echo.
 echo [1/2] Downloading Qwen 2.5 Coder 7B GGUF...
-hf download Qwen/Qwen2.5-Coder-7B-Instruct-GGUF qwen2.5-coder-7b-instruct-q4_k_m.gguf --local-dir "%~dp0Qwen" --local-dir-use-symlinks False
+hf download Qwen/Qwen2.5-Coder-7B-Instruct-GGUF qwen2.5-coder-7b-instruct-q4_k_m.gguf --local-dir "%~dp0Qwen"
 
 :: 4. Download Gemma 2 9B IT GGUF (Using a community repack to bypass gating token requirement)
 echo.
 echo [2/2] Downloading Gemma 2 9B IT GGUF...
-hf download bartowski/gemma-2-9b-it-GGUF gemma-2-9b-it-Q4_K_M.gguf --local-dir "%~dp0Google" --local-dir-use-symlinks False
+hf download bartowski/gemma-2-9b-it-GGUF gemma-2-9b-it-Q4_K_M.gguf --local-dir "%~dp0Google"
 
 echo.
 echo ==================================================
