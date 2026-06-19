@@ -27,6 +27,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const [geminiKey, setGeminiKey] = useState("");
   const [ollamaCloudKey, setOllamaCloudKey] = useState("");
   const [ollamaCloudUrl, setOllamaCloudUrl] = useState("");
+  const [enableLangsmith, setEnableLangsmith] = useState(false);
+  const [langsmithApiKey, setLangsmithApiKey] = useState("");
+  const [langsmithProject, setLangsmithProject] = useState("");
+  const [privateWorkspace, setPrivateWorkspace] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
@@ -43,6 +47,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
       setOllamaCloudUrl(
         localStorage.getItem("ollama_cloud_url") || "https://ollama.com",
       );
+      setEnableLangsmith(localStorage.getItem("enable_langsmith") === "true");
+      setLangsmithApiKey(localStorage.getItem("langsmith_api_key") || "");
+      setLangsmithProject(localStorage.getItem("langsmith_project") || "vscode-agent-react-benchmarks");
+      setPrivateWorkspace(localStorage.getItem("private_workspace") !== "false");
     }
   }, [isOpen, provider]);
 
@@ -50,9 +58,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
     setIsTesting(true);
     setTestResult(null);
     try {
+      const token = localStorage.getItem("token");
       const headers: Record<string, string> = {
         "X-Base-Url": ollamaCloudUrl || "https://ollama.com",
       };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       if (ollamaCloudKey) headers["X-API-Key"] = ollamaCloudKey;
 
       const response = await fetch(
@@ -94,6 +106,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
       localStorage.setItem("gemini_api_key", (geminiKey || "").trim());
       localStorage.setItem("ollama_cloud_key", (ollamaCloudKey || "").trim());
       localStorage.setItem("ollama_cloud_url", (ollamaCloudUrl || "").trim());
+      localStorage.setItem("enable_langsmith", enableLangsmith ? "true" : "false");
+      localStorage.setItem("langsmith_api_key", (langsmithApiKey || "").trim());
+      localStorage.setItem("langsmith_project", (langsmithProject || "").trim());
+      localStorage.setItem("private_workspace", privateWorkspace ? "true" : "false");
 
       // Dispatch custom event for parts of the app not yet using Context
       window.dispatchEvent(new Event("ai-settings-changed"));
@@ -334,6 +350,83 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                       />
                     </div>
                   )}
+                </div>
+
+                {/* LangSmith Telemetry Settings */}
+                <div className="mt-6 pt-6 border-t border-black/[0.06]">
+                  <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-4">
+                    LangSmith Telemetry
+                  </label>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between group">
+                      <span className="text-sm text-[#1A1D2E] font-medium group-hover:text-[#fd3b12] transition-colors">
+                        Enable LangSmith Tracing
+                      </span>
+                      <button
+                        onClick={() => setEnableLangsmith(!enableLangsmith)}
+                        className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          enableLangsmith ? "bg-[#fd3b12]" : "bg-[#D8DCE4]"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            enableLangsmith ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {enableLangsmith && (
+                      <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div>
+                          <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                            LangSmith API Key
+                          </label>
+                          <input
+                            type="password"
+                            value={langsmithApiKey}
+                            onChange={(e) => setLangsmithApiKey(e.target.value)}
+                            placeholder="ls__..."
+                            className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                            LangSmith Project
+                          </label>
+                          <input
+                            type="text"
+                            value={langsmithProject}
+                            onChange={(e) => setLangsmithProject(e.target.value)}
+                            placeholder="vscode-agent-react-benchmarks"
+                            className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between group">
+                          <div className="flex flex-col">
+                            <span className="text-sm text-[#1A1D2E] font-medium group-hover:text-[#fd3b12] transition-colors">
+                              Private Workspace
+                            </span>
+                            <span className="text-[10px] text-[#7A7D8E]">
+                              Enforces data egress restriction (gating telemetry)
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setPrivateWorkspace(!privateWorkspace)}
+                            className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              privateWorkspace ? "bg-[#fd3b12]" : "bg-[#D8DCE4]"
+                            }`}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                privateWorkspace ? "translate-x-5" : "translate-x-0"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Visual Identity Toggles */}
