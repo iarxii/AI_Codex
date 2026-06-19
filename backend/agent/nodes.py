@@ -316,10 +316,19 @@ def resolve_llm_fallback(current_provider: str, current_model: str, api_keys: di
     Resolves the next fallback provider, model name, and API key.
     Ensures zero-cost local Ollama fallback is always available.
     """
-    fallback_chain = ["groq", "gemini", "openrouter", "local"]
+    fallback_chain = ["ollama_cloud", "openrouter", "groq", "gemini", "local"]
     
     # Normalize model mapping from current model to fallback models
     model_mappings = {
+        "ollama_cloud": {
+            "default": "llama3",
+            "llama3": "llama3"
+        },
+        "openrouter": {
+            "default": "meta-llama/llama-3-8b-instruct",
+            "meta-llama/llama-3-8b-instruct": "meta-llama/llama-3-8b-instruct",
+            "google/gemini-flash-1.5": "google/gemini-flash-1.5"
+        },
         "groq": {
             "default": "llama3-8b-8192",
             "llama3-8b-8192": "llama3-8b-8192",
@@ -329,11 +338,6 @@ def resolve_llm_fallback(current_provider: str, current_model: str, api_keys: di
             "default": "gemini-1.5-flash",
             "gemini-1.5-flash": "gemini-1.5-flash",
             "gemini-1.5-pro": "gemini-1.5-pro"
-        },
-        "openrouter": {
-            "default": "meta-llama/llama-3-8b-instruct",
-            "meta-llama/llama-3-8b-instruct": "meta-llama/llama-3-8b-instruct",
-            "google/gemini-flash-1.5": "google/gemini-flash-1.5"
         },
         "local": {
             "default": "default"

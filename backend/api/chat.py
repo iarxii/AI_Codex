@@ -84,6 +84,58 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         model_config = payload_data.get("config", {})
         agent_mode = payload_data.get("agent_mode", True)
         local_backend_mode = payload_data.get("local_backend_mode", "ollama")
+        # LangSmith Telemetry Configuration
+        benchmark_mode = payload_data.get("benchmark_mode", False)
+        private_workspace = payload_data.get("private_workspace", True)
+        langsmith_api_key = payload_data.get("langsmith_api_key")
+        langsmith_project = payload_data.get("langsmith_project", "vscode-agent-react-benchmarks")
+
+        enable_tracing = benchmark_mode and not private_workspace and bool(langsmith_api_key)
+        
+        ls_client = None
+        if enable_tracing:
+            import langsmith as ls
+            
+            def scrub_telemetry_payload(inputs: dict) -> dict:
+                if not inputs or not isinstance(inputs, dict):
+                    return inputs
+                scrubbed = inputs.copy()
+                for key, val in list(scrubbed.items()):
+                    if isinstance(val, str) and len(val) > 1000:
+                        scrubbed[key] = val[:500] + "\n... [TRUNCATED FOR TELEMETRY SAVINGS] ...\n" + val[-500:]
+                if "messages" in scrubbed and isinstance(scrubbed["messages"], list):
+                    processed_msgs = []
+                    for msg in scrubbed["messages"]:
+                        if isinstance(msg, dict):
+                            content = msg.get("content")
+                            if isinstance(content, str) and len(content) > 1000:
+                                msg = msg.copy()
+                                msg["content"] = content[:500] + "\n... [TRUNCATED FOR TELEMETRY SAVINGS] ...\n" + content[-500:]
+                        elif hasattr(msg, "content"):
+                            content = msg.content
+                            if isinstance(content, str) and len(content) > 1000:
+                                truncated = content[:500] + "\n... [TRUNCATED FOR TELEMETRY SAVINGS] ...\n" + content[-500:]
+                                try:
+                                    msg = msg.__class__(
+                                        content=truncated,
+                                        **{k: v for k, v in msg.__dict__.items() if k not in ["content", "id", "type"]}
+                                    )
+                                except Exception:
+                                    pass
+                        processed_msgs.append(msg)
+                    scrubbed["messages"] = processed_msgs
+                return scrubbed
+
+            try:
+                ls_client = ls.Client(
+                    api_key=langsmith_api_key,
+                    hide_inputs=scrub_telemetry_payload,
+                    hide_outputs=scrub_telemetry_payload
+                )
+                print(f"PIPELINE: Dynamic LangSmith Tracing Client initialized for project '{langsmith_project}'")
+            except Exception as e:
+                print(f"PIPELINE ERROR: Failed to initialize LangSmith Client: {e}")
+                enable_tracing = False
         
         if not conversation_id:
             await websocket.send_json({"type": "error", "message": "conversation_id is required"})
@@ -308,113 +360,115 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         })
                     config["configurable"]["token_callback"] = _token_callback
                 
-                async for event in agent_graph.astream_events(initial_state, config=config, version="v2"):
-                    kind = event["event"]
-                    node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
+                from langsmith.run_helpers import tracing_context
+                with tracing_context(client=ls_client, project_name=langsmith_project, enabled=enable_tracing):
+                    async for event in agent_graph.astream_events(initial_state, config=config, version="v2"):
+                        kind = event["event"]
+                        node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
                     
-                    # Pipeline monitoring — filter graph-level events
-                    if kind == "on_chain_start" and node_name != "unknown" and event.get("name") == node_name:
-                        print(f"\nPIPELINE: Entering node [{node_name}]")
-                        await websocket.send_json({
-                            "type": "status",
-                            "status": f"Agent working in node: {node_name}",
-                            "node": node_name,
-                            "duration": time.perf_counter() - request_start
-                        })
-                    
-                    if kind == "on_chat_model_stream":
-                        content = event["data"]["chunk"].content
-                        if content:
-                            full_ai_response += content
-                            
-                            now = time.perf_counter()
-                            if initial_state["telemetry"]["ttft"] == 0:
-                                initial_state["telemetry"]["ttft"] = now - request_start
-                                await websocket.send_json({
-                                    "type": "telemetry",
-                                    "data": initial_state["telemetry"]
-                                })
-
-                            print(content, end="", flush=True)
+                        # Pipeline monitoring — filter graph-level events
+                        if kind == "on_chain_start" and node_name != "unknown" and event.get("name") == node_name:
+                            print(f"\nPIPELINE: Entering node [{node_name}]")
                             await websocket.send_json({
-                                "type": "token",
-                                "content": full_ai_response,
-                                "node": node_name,
-                                "provider": provider,
-                                "model": model,
-                                "duration": now - request_start
-                            })
-                    
-                    elif kind == "on_chat_model_end":
-                        msg = event["data"]["output"]
-                        if hasattr(msg, "tool_calls") and msg.tool_calls:
-                            print(f"PIPELINE: Tool Call detected: {msg.tool_calls[0]['name']}")
-                            await websocket.send_json({
-                                "type": "tool_call",
-                                "tool_calls": msg.tool_calls,
+                                "type": "status",
+                                "status": f"Agent working in node: {node_name}",
                                 "node": node_name,
                                 "duration": time.perf_counter() - request_start
                             })
-                        # Fallback: if no streaming tokens were captured but model returned content,
-                        # send the full response as a single token (handles providers that don't stream)
-                        elif hasattr(msg, "content") and msg.content and not full_ai_response:
-                            full_ai_response = msg.content
-                            print(f"\nPIPELINE: Non-streaming response captured ({len(msg.content)} chars)")
-                            await websocket.send_json({
-                                "type": "token",
-                                "content": full_ai_response,
-                                "node": node_name,
-                                "provider": provider,
-                                "model": model,
-                                "duration": time.perf_counter() - request_start
-                            })
-                            
-                    # Tool Results
-                    elif kind == "on_tool_end":
-                        print(f"PIPELINE: Tool Result: {str(event['data']['output'])[:50]}...")
-                        await websocket.send_json({
-                            "type": "tool_result",
-                            "content": str(event["data"]["output"]),
-                            "tool_call_id": event["metadata"].get("tool_call_id", "unknown"),
-                            "node": node_name
-                        })
                     
-                    elif kind == "on_error":
-                        error_obj = event.get("data", {}).get("error")
-                        print(f"PIPELINE ERROR: {error_obj}")
-                        await websocket.send_json({"type": "error", "message": f"Graph Error: {str(error_obj)}"})
-                    
-                    elif kind == "on_chain_end":
-                        output = event.get("data", {}).get("output", {})
-                        if isinstance(output, dict) and "messages" in output:
-                            final_messages = output["messages"]
+                        if kind == "on_chat_model_stream":
+                            content = event["data"]["chunk"].content
+                            if content:
+                                full_ai_response += content
                             
-                        if not full_ai_response and isinstance(output, dict):
-                            msgs = output.get("messages", [])
-                            for m in reversed(msgs):
-                                if hasattr(m, "content") and m.content and getattr(m, "type", "") == "ai":
-                                    content = m.content
-                                    if isinstance(content, list):
-                                        # Extract text from content blocks (common with Gemini/Multimodal)
-                                        text_parts = []
-                                        for part in content:
-                                            if isinstance(part, dict):
-                                                text_parts.append(part.get("text", ""))
-                                            else:
-                                                text_parts.append(str(part))
-                                        content = "".join(text_parts)
-                                    
-                                    full_ai_response = str(content)
-                                    print(f"\nPIPELINE: Captured response from chain_end ({len(full_ai_response)} chars)")
+                                now = time.perf_counter()
+                                if initial_state["telemetry"]["ttft"] == 0:
+                                    initial_state["telemetry"]["ttft"] = now - request_start
                                     await websocket.send_json({
-                                        "type": "token",
-                                        "content": full_ai_response,
-                                        "node": node_name,
-                                        "provider": provider,
-                                        "model": model,
-                                        "duration": time.perf_counter() - request_start
+                                        "type": "telemetry",
+                                        "data": initial_state["telemetry"]
                                     })
-                                    break
+
+                                print(content, end="", flush=True)
+                                await websocket.send_json({
+                                    "type": "token",
+                                    "content": full_ai_response,
+                                    "node": node_name,
+                                    "provider": provider,
+                                    "model": model,
+                                    "duration": now - request_start
+                                })
+                    
+                        elif kind == "on_chat_model_end":
+                            msg = event["data"]["output"]
+                            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                print(f"PIPELINE: Tool Call detected: {msg.tool_calls[0]['name']}")
+                                await websocket.send_json({
+                                    "type": "tool_call",
+                                    "tool_calls": msg.tool_calls,
+                                    "node": node_name,
+                                    "duration": time.perf_counter() - request_start
+                                })
+                            # Fallback: if no streaming tokens were captured but model returned content,
+                            # send the full response as a single token (handles providers that don't stream)
+                            elif hasattr(msg, "content") and msg.content and not full_ai_response:
+                                full_ai_response = msg.content
+                                print(f"\nPIPELINE: Non-streaming response captured ({len(msg.content)} chars)")
+                                await websocket.send_json({
+                                    "type": "token",
+                                    "content": full_ai_response,
+                                    "node": node_name,
+                                    "provider": provider,
+                                    "model": model,
+                                    "duration": time.perf_counter() - request_start
+                                })
+                            
+                        # Tool Results
+                        elif kind == "on_tool_end":
+                            print(f"PIPELINE: Tool Result: {str(event['data']['output'])[:50]}...")
+                            await websocket.send_json({
+                                "type": "tool_result",
+                                "content": str(event["data"]["output"]),
+                                "tool_call_id": event["metadata"].get("tool_call_id", "unknown"),
+                                "node": node_name
+                            })
+                    
+                        elif kind == "on_error":
+                            error_obj = event.get("data", {}).get("error")
+                            print(f"PIPELINE ERROR: {error_obj}")
+                            await websocket.send_json({"type": "error", "message": f"Graph Error: {str(error_obj)}"})
+                    
+                        elif kind == "on_chain_end":
+                            output = event.get("data", {}).get("output", {})
+                            if isinstance(output, dict) and "messages" in output:
+                                final_messages = output["messages"]
+                            
+                            if not full_ai_response and isinstance(output, dict):
+                                msgs = output.get("messages", [])
+                                for m in reversed(msgs):
+                                    if hasattr(m, "content") and m.content and getattr(m, "type", "") == "ai":
+                                        content = m.content
+                                        if isinstance(content, list):
+                                            # Extract text from content blocks (common with Gemini/Multimodal)
+                                            text_parts = []
+                                            for part in content:
+                                                if isinstance(part, dict):
+                                                    text_parts.append(part.get("text", ""))
+                                                else:
+                                                    text_parts.append(str(part))
+                                            content = "".join(text_parts)
+                                    
+                                        full_ai_response = str(content)
+                                        print(f"\nPIPELINE: Captured response from chain_end ({len(full_ai_response)} chars)")
+                                        await websocket.send_json({
+                                            "type": "token",
+                                            "content": full_ai_response,
+                                            "node": node_name,
+                                            "provider": provider,
+                                            "model": model,
+                                            "duration": time.perf_counter() - request_start
+                                        })
+                                        break
 
         except asyncio.CancelledError:
             log_debug(f"Task cancelled for conversation {conversation_id}")
@@ -558,8 +612,8 @@ async def quick_chat(payload: dict, current_user = Depends(get_current_user)):
     system_context = payload.get("system_context", "")
     message = payload.get("message", "")
     
-    provider = payload.get("provider", "groq").lower()
-    model_name = payload.get("model", "llama3-8b-8192")
+    provider = (payload.get("provider") or "ollama_cloud").lower()
+    model_name = payload.get("model") or "default"
     api_key = payload.get("api_key", None)
     
     try:
