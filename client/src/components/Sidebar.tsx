@@ -9,7 +9,8 @@ import {
   PencilSquareIcon,
   CloudIcon,
   CubeTransparentIcon,
-  RectangleStackIcon
+  RectangleStackIcon,
+  ArrowPathIcon
 } from "@heroicons/react/24/outline";
 import { useAI } from "../contexts/AIContext";
 import { config, getApiUrl } from "../config";
@@ -282,6 +283,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <>
                       <CloudIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
                       Neural Cloud
+                    </>
+                  )}
+                  {provider === "colab_bridge" && (
+                    <>
+                      <ArrowPathIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
+                      Neural Bridge
                     </>
                   )}
                   {provider === "groq" && (
