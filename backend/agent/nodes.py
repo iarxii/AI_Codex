@@ -290,7 +290,7 @@ async def guard_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any
             logger.warning(f"GUARD: Stuck loop detected — tool '{stuck_tool}' called 3 times consecutively with same arguments")
             return {
                 "messages": [AIMessage(
-                    content=f"⚠️ I appear to be stuck in a loop calling `{stuck_tool}` repeatedly with the same arguments. "
+                    content=f"[WARNING] I appear to be stuck in a loop calling `{stuck_tool}` repeatedly with the same arguments. "
                              "Let me step back and address your request differently. "
                              "Could you rephrase what you need, or should I try a different approach?"
                 )],
@@ -445,7 +445,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                     try:
                         await websocket.send_json({
                             "type": "token",
-                            "content": f"\n\n⚠️ *[{provider.upper()}] API key missing. Switching to [{fallback_prov.upper()}] ({fallback_model})...*\n\n",
+                            "content": f"\n\n[WARNING] *[{provider.upper()}] API key missing. Switching to [{fallback_prov.upper()}] ({fallback_model})...*\n\n",
                             "node": "provider_fallback"
                         })
                     except Exception as ws_err:
@@ -467,10 +467,8 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 
                 provider = fallback_prov
                 model = fallback_model
-            else:
-                p_label = provider.capitalize() if provider != "ollama_cloud" else "Ollama Cloud"
                 return {
-                    "messages": [AIMessage(content=f"❌ **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core.")],
+                    "messages": [AIMessage(content=f"[ERROR] **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core.")],
                     "current_tool_calls": [],
                     "context_data": {"error": "auth_missing"}
                 }
@@ -528,7 +526,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         if not telemetry["provider_attempts"] or failed_attempt not in telemetry["provider_attempts"]:
             telemetry["provider_attempts"].append(failed_attempt)
         return {
-            "messages": [AIMessage(content=f"❌ LLM initialization failed: {init_err}")],
+            "messages": [AIMessage(content=f"[ERROR] LLM initialization failed: {init_err}")],
             "current_tool_calls": [],
             "context_data": {"error": str(init_err)},
             "telemetry": telemetry
@@ -600,7 +598,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 try:
                     await websocket.send_json({
                         "type": "token",
-                        "content": f"\n\n⚠️ *[{provider.upper()}] rate/quota limit or connection error. Switching to [{fallback_prov.upper()}] ({fallback_model})...*\n\n",
+                        "content": f"\n\n[WARNING] *[{provider.upper()}] rate/quota limit or connection error. Switching to [{fallback_prov.upper()}] ({fallback_model})...*\n\n",
                         "node": "provider_fallback"
                     })
                 except Exception as ws_err:
@@ -656,7 +654,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 elif "Could not find model" in error_msg or "404" in error_msg:
                     error_msg = "Model not found. Please select a different model."
             return {
-                "messages": [AIMessage(content=f"❌ {error_msg}")],
+                "messages": [AIMessage(content=f"[ERROR] {error_msg}")],
                 "current_tool_calls": [],
                 "context_data": {"error": str(invoke_err)}
             }
