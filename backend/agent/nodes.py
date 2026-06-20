@@ -425,7 +425,16 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
 
     # Initialize context builder with provider-aware budget
     provider = config.get("configurable", {}).get("provider", "local")
-    
+    model = config.get("configurable", {}).get("model", "")
+    p_label = {
+        "groq": "Groq",
+        "openrouter": "OpenRouter",
+        "gemini": "Google Gemini",
+        "ollama_cloud": "Ollama Cloud",
+        "local": "Local Ollama",
+        "colab_bridge": "Colab Bridge",
+    }.get(provider, provider.title())
+
     # Early Auth Check for Cloud Providers
     if provider in ["groq", "openrouter", "gemini", "ollama_cloud"]:
         api_key = config.get("configurable", {}).get("api_key")
@@ -467,6 +476,9 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 
                 provider = fallback_prov
                 model = fallback_model
+                # Fallback applied — continue execution with new provider
+            else:
+                # No fallback available — return an error to the user
                 return {
                     "messages": [AIMessage(content=f"[ERROR] **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core.")],
                     "current_tool_calls": [],
