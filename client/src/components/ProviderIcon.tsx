@@ -12,9 +12,10 @@ const ProviderIcon: React.FC<ProviderIconProps> = ({ provider, size = 24, classN
   if (provider.brand) {
     const Component = (Icons as any)[provider.brand];
     if (Component) {
+      const TargetIcon = Component.Color || Component;
       return (
         <div className={`inline-flex items-center justify-center ${className}`} style={{ width: size, height: size }}>
-          <Component size={size} />
+          <TargetIcon size={size} />
         </div>
       );
     }

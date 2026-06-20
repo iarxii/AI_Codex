@@ -16,6 +16,8 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
     if model_name in ("default", "local", ""):
         if provider == "local":
             model_name = settings.DEFAULT_MODEL
+        elif provider == "colab_bridge":
+            model_name = "gemma-4-E4B_q4_0-it"
         elif provider == "ollama_cloud":
             model_name = "llama3"
         elif provider == "openrouter":
@@ -76,6 +78,14 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
             model=model_name,
             openai_api_key=api_key or "sk-ollama",
             openai_api_base=base_url,
+            temperature=temperature
+        )
+        
+    elif provider == "colab_bridge":
+        return ChatOpenAI(
+            model=model_name,
+            openai_api_key=api_key or "sk-colab",
+            openai_api_base=f"{settings.LLAMACPP_BASE_URL}/v1",
             temperature=temperature
         )
         

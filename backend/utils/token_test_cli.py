@@ -9,6 +9,12 @@ from datetime import datetime
 # Adjust Python path to resolve backend modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
+
 try:
     from dotenv import load_dotenv
     env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))

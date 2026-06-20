@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # Local LLM Backend
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     LLAMACPP_BASE_URL: str = "http://localhost:8080"
-    LOCAL_BACKEND_MODE: str = "ollama"  # "ollama" | "llamacpp"
+    LOCAL_BACKEND_MODE: str = "llamacpp"  # "ollama" | "llamacpp"
     DEFAULT_MODEL: str = "llama3.2:3b"
     
     # Database

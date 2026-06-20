@@ -2,6 +2,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Query, Header, Depends
 from typing import List, Dict, Any
 import json
+from pydantic import BaseModel
 from backend.config import settings
 from backend.db.session import get_db
 from backend.db.models import User
@@ -172,6 +173,38 @@ async def _list_models_raw(
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
 
+        elif provider == "colab_bridge":
+            if not x_base_url:
+                return [{"id": "gemma-4-E4B_q4_0-it", "name": "Gemma 4 QAT (Colab Bridge)"}]
+            try:
+                base_url = x_base_url.rstrip("/")
+                headers = {}
+                if actual_key:
+                    headers["Authorization"] = f"Bearer {actual_key}" if not actual_key.startswith("Bearer") else actual_key
+                
+                # Try OpenAI-compatible /v1/models first
+                try:
+                    response = await client.get(f"{base_url}/v1/models", headers=headers)
+                    if response.status_code == 200:
+                        data = response.json()
+                        return [{"id": m["id"], "name": m.get("name", m["id"])} for m in data.get("data", [])]
+                except Exception:
+                    pass
+
+                # Fallback: Try Ollama /api/tags
+                try:
+                    response = await client.get(f"{base_url}/api/tags", headers=headers)
+                    if response.status_code == 200:
+                        data = response.json()
+                        return [{"id": m["name"], "name": m["name"]} for m in data.get("models", [])]
+                except Exception:
+                    pass
+                
+                # If both fail, return a default placeholder
+                return [{"id": "gemma-4-E4B_q4_0-it", "name": "Gemma 4 QAT (Colab Bridge)"}]
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Colab Bridge error: {str(e)}")
+
         return []
 
 
@@ -227,3 +260,21 @@ async def list_models(
         ]
         
     return models
+
+
+class LoadModelRequest(BaseModel):
+    model_name: str
+
+
+@router.post("/load")
+async def load_model(payload: LoadModelRequest):
+    """
+    Endpoint to dynamically hot-swap/load a specific model flavor in llama-server.
+    Used by the Colab bridge client or frontend spaces to switch models.
+    """
+    from backend.utils.llama_manager import LlamaServerManager
+    success = LlamaServerManager.ensure_model_loaded(payload.model_name)
+    if success:
+        return {"status": "success", "message": f"Successfully loaded model flavor: {payload.model_name}"}
+    raise HTTPException(status_code=500, detail=f"Failed to load model flavor: {payload.model_name}")
+

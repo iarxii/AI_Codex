@@ -320,6 +320,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "provider": provider, 
                         "model": model, 
                         "api_key": api_key,
+                        "api_keys": api_keys,
                         "base_url": base_url,
                         "model_config": model_config,
                         "conversation_id": str(conversation_id),
