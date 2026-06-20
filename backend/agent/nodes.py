@@ -53,12 +53,27 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
 
     try:
         if provider == "colab_bridge":
-            from codex_spaces.backend.agent.bridge_llm import ChatBridge
-            user_id = config.get("configurable", {}).get("user_id")
-            space_slug = config.get("configurable", {}).get("space_slug")
-            if not user_id or not space_slug:
-                raise ValueError("Colab bridge requires 'user_id' and 'space_slug' in configuration.")
-            llm = ChatBridge(user_id=int(user_id), space_slug=str(space_slug), model_name=model or "default")
+            base_url = config.get("configurable", {}).get("base_url")
+            if base_url:
+                from langchain_openai import ChatOpenAI
+                target_model = model or "gemma-4-E4B_q4_0-it"
+                if not base_url.endswith("/v1"):
+                    base_url = f"{base_url.rstrip('/')}/v1"
+                llm = ChatOpenAI(
+                    model=target_model,
+                    base_url=base_url,
+                    api_key=api_key or "sk-colab",
+                    temperature=temp,
+                    max_tokens=max_toks,
+                    streaming=True
+                )
+            else:
+                from codex_spaces.backend.agent.bridge_llm import ChatBridge
+                user_id = config.get("configurable", {}).get("user_id")
+                space_slug = config.get("configurable", {}).get("space_slug")
+                if not user_id or not space_slug:
+                    raise ValueError("Colab bridge requires 'user_id' and 'space_slug' in configuration or a custom base URL.")
+                llm = ChatBridge(user_id=int(user_id), space_slug=str(space_slug), model_name=model or "default")
         elif provider == "groq":
             from langchain_groq import ChatGroq
             llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=temp, max_tokens=max_toks, streaming=True)
@@ -146,7 +161,13 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
             else:
                 # ── LLAMACPP MODE ──
                 # Direct connection to llama-server.exe with manual chat templates.
-                # Uses NativeLocalClient which auto-detects the template from model name.
+                # Ensure the correct model flavor is loaded/swapped dynamically
+                try:
+                    from backend.utils.llama_manager import LlamaServerManager
+                    LlamaServerManager.ensure_model_loaded(local_model)
+                except Exception as e:
+                    logger.warning(f"[LlamaManager] Dynamic model load check failed: {e}")
+
                 base_url = settings.LLAMACPP_BASE_URL
                 if not base_url.endswith("/v1"):
                     base_url = f"{base_url.rstrip('/')}/v1"
@@ -411,12 +432,48 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         
         is_missing = not api_key or (provider == "ollama_cloud" and api_key == "sk-ollama")
         if is_missing:
-            p_label = provider.capitalize() if provider != "ollama_cloud" else "Ollama Cloud"
-            return {
-                "messages": [AIMessage(content=f"❌ **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core.")],
-                "current_tool_calls": [],
-                "context_data": {"error": "auth_missing"}
-            }
+            # Try to resolve fallback since primary key is missing
+            api_keys = config.get("configurable", {}).get("api_keys", {})
+            fallback_prov, fallback_model, fallback_key = resolve_llm_fallback(provider, model, api_keys)
+            
+            if fallback_prov:
+                logger.warning(f"PIPELINE WARNING: Provider [{provider}] API key is missing. Automatically falling back to [{fallback_prov}]...")
+                
+                # Notify UI via WebSocket stream
+                websocket = config.get("configurable", {}).get("websocket")
+                if websocket:
+                    try:
+                        await websocket.send_json({
+                            "type": "token",
+                            "content": f"\n\n⚠️ *[{provider.upper()}] API key missing. Switching to [{fallback_prov.upper()}] ({fallback_model})...*\n\n",
+                            "node": "provider_fallback"
+                        })
+                    except Exception as ws_err:
+                        logger.error(f"PIPELINE ERROR: Failed to stream fallback message: {ws_err}")
+                
+                # Construct config override for fallback
+                config_copy = dict(config)
+                config_copy["configurable"] = dict(config.get("configurable", {}))
+                config_copy["configurable"]["provider"] = fallback_prov
+                config_copy["configurable"]["model"] = fallback_model
+                config_copy["configurable"]["api_key"] = fallback_key
+                config = config_copy
+                
+                # Record failed attempt and update loop variables
+                telemetry = state.get("telemetry", {})
+                if "provider_attempts" not in telemetry:
+                    telemetry["provider_attempts"] = []
+                telemetry["provider_attempts"].append(f"{provider} ({model}) - failed: API key missing")
+                
+                provider = fallback_prov
+                model = fallback_model
+            else:
+                p_label = provider.capitalize() if provider != "ollama_cloud" else "Ollama Cloud"
+                return {
+                    "messages": [AIMessage(content=f"❌ **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core.")],
+                    "current_tool_calls": [],
+                    "context_data": {"error": "auth_missing"}
+                }
 
     logger.info(f"PIPELINE: Initializing context builder for provider={provider}...")
     context_builder = get_context_builder(provider=provider)
@@ -464,10 +521,17 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             tool_binding_status = "No tools available for this session."
     except Exception as init_err:
         logger.error(f"PIPELINE ERROR: LLM init failed — {init_err}")
+        telemetry = state.get("telemetry", {})
+        if "provider_attempts" not in telemetry:
+            telemetry["provider_attempts"] = []
+        failed_attempt = f"{provider} ({model}) - failed: {init_err}"
+        if not telemetry["provider_attempts"] or failed_attempt not in telemetry["provider_attempts"]:
+            telemetry["provider_attempts"].append(failed_attempt)
         return {
             "messages": [AIMessage(content=f"❌ LLM initialization failed: {init_err}")],
             "current_tool_calls": [],
-            "context_data": {"error": str(init_err)}
+            "context_data": {"error": str(init_err)},
+            "telemetry": telemetry
         }
     
     # Build system prompt AFTER tool binding so we can inject tool-binding status (Layer 3)

@@ -27,6 +27,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const [geminiKey, setGeminiKey] = useState("");
   const [ollamaCloudKey, setOllamaCloudKey] = useState("");
   const [ollamaCloudUrl, setOllamaCloudUrl] = useState("");
+  const [colabBridgeKey, setColabBridgeKey] = useState("");
+  const [colabBridgeUrl, setColabBridgeUrl] = useState("");
   const [enableLangsmith, setEnableLangsmith] = useState(false);
   const [langsmithApiKey, setLangsmithApiKey] = useState("");
   const [langsmithProject, setLangsmithProject] = useState("");
@@ -47,6 +49,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
       setOllamaCloudUrl(
         localStorage.getItem("ollama_cloud_url") || "https://ollama.com",
       );
+      setColabBridgeKey(localStorage.getItem("colab_bridge_key") || "");
+      setColabBridgeUrl(localStorage.getItem("colab_bridge_url") || "");
       setEnableLangsmith(localStorage.getItem("enable_langsmith") === "true");
       setLangsmithApiKey(localStorage.getItem("langsmith_api_key") || "");
       setLangsmithProject(localStorage.getItem("langsmith_project") || "vscode-agent-react-benchmarks");
@@ -97,6 +101,49 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
     }
   };
 
+  const testColabBridge = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const token = localStorage.getItem("token");
+      const headers: Record<string, string> = {
+        "X-Base-Url": colabBridgeUrl || "",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      if (colabBridgeKey) headers["X-API-Key"] = colabBridgeKey;
+
+      const response = await fetch(
+        `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=colab_bridge`,
+        {
+          headers,
+        },
+      );
+
+      if (response.ok) {
+        const models = await response.json();
+        setTestResult({
+          success: true,
+          message:
+            models.length > 0
+              ? `Connected! Found ${models.length} models.`
+              : "Connected, but no models found.",
+        });
+      } else {
+        const err = await response.json();
+        setTestResult({
+          success: false,
+          message: err.detail || "Connection failed.",
+        });
+      }
+    } catch (e) {
+      setTestResult({ success: false, message: "Network error. Check URL." });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   const handleSave = () => {
     try {
       setProvider(activeProvider);
@@ -106,6 +153,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
       localStorage.setItem("gemini_api_key", (geminiKey || "").trim());
       localStorage.setItem("ollama_cloud_key", (ollamaCloudKey || "").trim());
       localStorage.setItem("ollama_cloud_url", (ollamaCloudUrl || "").trim());
+      localStorage.setItem("colab_bridge_key", (colabBridgeKey || "").trim());
+      localStorage.setItem("colab_bridge_url", (colabBridgeUrl || "").trim());
       localStorage.setItem("enable_langsmith", enableLangsmith ? "true" : "false");
       localStorage.setItem("langsmith_api_key", (langsmithApiKey || "").trim());
       localStorage.setItem("langsmith_project", (langsmithProject || "").trim());
@@ -271,6 +320,71 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                       <div className="flex flex-col gap-2">
                         <button
                           onClick={testOllamaCloud}
+                          disabled={isTesting}
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                            isTesting
+                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                          }`}
+                        >
+                          {isTesting ? (
+                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <ArrowPathIcon className="w-4 h-4" />
+                          )}
+                          Test Connection
+                        </button>
+
+                        {testResult && (
+                          <div
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
+                              testResult.success
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {testResult.success ? (
+                              <CheckCircleIcon className="w-4 h-4" />
+                            ) : (
+                              <ExclamationCircleIcon className="w-4 h-4" />
+                            )}
+                            {testResult.message}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeProvider === "colab_bridge" && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                          Colab Bridge Base URL
+                        </label>
+                        <input
+                          type="text"
+                          value={colabBridgeUrl}
+                          onChange={(e) => setColabBridgeUrl(e.target.value)}
+                          placeholder="https://xxxx.ngrok-free.app"
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                          Handshake Secret (Optional)
+                        </label>
+                        <input
+                          type="password"
+                          value={colabBridgeKey}
+                          onChange={(e) => setColabBridgeKey(e.target.value)}
+                          placeholder="Authentication token or API key"
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={testColabBridge}
                           disabled={isTesting}
                           className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
                             isTesting

@@ -35,7 +35,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 
 
   const fetchModels = async () => {
-    if (provider === "colab_bridge") {
+    const colabUrl = localStorage.getItem("colab_bridge_url");
+    if (provider === "colab_bridge" && !colabUrl) {
       setLoading(true);
       const formattedModels = bridgeModels.map((m) => ({ id: m, name: m }));
       setAvailableModels(formattedModels);
@@ -63,6 +64,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       apiKey = localStorage.getItem("gemini_api_key") || "";
     else if (provider === "ollama_cloud")
       apiKey = localStorage.getItem("ollama_cloud_key") || "";
+    else if (provider === "colab_bridge")
+      apiKey = localStorage.getItem("colab_bridge_key") || "";
 
     try {
       const url = `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/models?provider=${provider}`;
@@ -82,6 +85,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       if (provider === "ollama_cloud") {
         const cloudUrl = localStorage.getItem("ollama_cloud_url");
         if (cloudUrl) headers["X-Base-Url"] = cloudUrl;
+      } else if (provider === "colab_bridge") {
+        if (colabUrl) headers["X-Base-Url"] = colabUrl;
       }
 
       // Pass local backend mode so the API queries the correct server
