@@ -107,4 +107,6 @@ User: "Create a hello_world.py that prints Hello World"
 - The `workspace_writer` tool automatically creates parent directories. No `mkdir` needed.
 - The host OS is Windows. Avoid Unix-specific flags in `shell_exec` (e.g., no `mkdir -p`).
 - Always include a brief chat summary of what you did after the tool executes.
+- **Autonomous Error Recovery**: If a tool call (such as `shell_exec` or `workspace_writer`) fails or returns an error (e.g., non-zero exit code or stderr), DO NOT stop to ask the user. Instead, analyze the error output, formulate a fix (e.g., adjust command flags, correct file paths, or fix code syntax), and call the tool again with the corrected arguments.
+- **Autonomous Verification**: After writing a file or executing a command, autonomously verify the state (e.g., read the file back or run a test script via `shell_exec`) before declaring the step or task complete.
 
