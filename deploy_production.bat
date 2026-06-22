@@ -26,7 +26,9 @@ if "%~1"=="--be" (
     SET DEPLOY_FE=false
 ) else if "%~1"=="--fe" (
     echo Deployment Mode: Frontend Only
+    SET DEPLOY_FE=true
     SET DEPLOY_BE=false
+    SET DEPLOY_PREMIUM=false
 ) else if "%~1"=="--premium" (
     echo Deployment Mode: Premium Backend
     SET DEPLOY_PREMIUM=true
@@ -182,6 +184,16 @@ SET ROUTE_MAP_PATH=..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-rea
     echo   "last_deployed": "%DATE% %TIME%"
     echo }
 ) > route_map.json
+(
+    echo {
+    echo   "project": "%PROJECT_ID%",
+    echo   "region": "%REGION%",
+    echo   "backend_url": "!BACKEND_URL!",
+    echo   "frontend_url": "!FRONTEND_URL!",
+    echo   "premium_url": "!PREMIUM_URL!",
+    echo   "last_deployed": "%DATE% %TIME%"
+    echo }
+) > ..\..\..\route_map.json
 echo Route map updated.
 
 echo [6/6] Cleaning up old revisions...
