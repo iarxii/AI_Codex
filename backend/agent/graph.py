@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
 from .state import AgentState
-from .nodes import reason_node, execute_tool_node, init_node, guard_node, validate_response_node
+from .nodes import reason_node, execute_tool_node, init_node, guard_node, validate_response_node, verification_node
 from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node
 
 def should_continue(state: AgentState):
@@ -16,6 +16,15 @@ def should_continue(state: AgentState):
             return "mql5_enforcer"
         return "execute_tool"
     return "validate"
+
+def should_continue_verification(state: AgentState):
+    """
+    Route verification: execute tools if verification emitted them, otherwise proceed to guard.
+    """
+    last_message = state["messages"][-1] if state["messages"] else None
+    if last_message and hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        return "execute_tool"
+    return "guard"
 
 def route_after_init(state: AgentState):
     """
@@ -58,6 +67,7 @@ def create_agent_graph():
     workflow.add_node("reason", reason_node)
     workflow.add_node("execute_tool", execute_tool_node)
     workflow.add_node("validate", validate_response_node)
+    workflow.add_node("verification", verification_node)
     workflow.add_node("trading_debate", bull_bear_debate_node)
     workflow.add_node("mql5_enforcer", mql5_execution_enforcer_node)
     
@@ -117,7 +127,17 @@ def create_agent_graph():
     )
     
     # Add normal edges
-    workflow.add_edge("execute_tool", "guard")
+    workflow.add_edge("execute_tool", "verification")
+    
+    # Conditional edge from verification
+    workflow.add_conditional_edges(
+        "verification",
+        should_continue_verification,
+        {
+            "execute_tool": "execute_tool",
+            "guard": "guard"
+        }
+    )
     
     # Compile
     return workflow.compile()

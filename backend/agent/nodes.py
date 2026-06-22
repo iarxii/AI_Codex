@@ -27,7 +27,7 @@ def log_performance(event: str, duration: float, metadata: dict = None):
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {event}: {duration:.4f}s{meta_str}\n")
 
-async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
+async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier: str = "reasoning"):
     """
     Retrieves and configures the LLM provider based on the provided configuration.
     Includes robustness fixes for tool binding and connection failures.
@@ -40,6 +40,31 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
     model = config.get("configurable", {}).get("model")
     api_key = config.get("configurable", {}).get("api_key")
     agent_mode = config.get("configurable", {}).get("agent_mode", True)
+    
+    # ─── Tiered Model Routing ───
+    if tier in ("routing", "guard", "validation"):
+        if provider == "gemini":
+            model = "gemini-1.5-flash"
+        elif provider == "openrouter":
+            model = "meta-llama/llama-3-8b-instruct"
+        elif provider == "groq":
+            model = "llama-3.1-8b-instant"
+        elif provider == "local":
+            model = "llama3"
+    elif tier in ("reasoning", "coder"):
+        if provider == "gemini":
+            model = "gemini-1.5-pro"
+        elif provider == "openrouter":
+            model = "anthropic/claude-3.5-sonnet"
+        elif provider == "groq":
+            model = "llama-3.3-70b-versatile"
+        elif provider == "local":
+            model = "codellama"
+            
+    # Resolve API Key for the resolved provider from api_keys dict if available
+    api_keys = config.get("configurable", {}).get("api_keys", {})
+    if api_keys and provider in api_keys:
+        api_key = api_keys[provider]
     
     if not agent_mode:
         bind_tools = False
@@ -327,7 +352,7 @@ async def summarize_history(messages: List[BaseMessage], config: RunnableConfig)
     if not to_summarize:
         return ""
         
-    llm = await get_dynamic_llm(config, bind_tools=False)
+    llm = await get_dynamic_llm(config, bind_tools=False, tier="routing")
     summary_prompt = "Summarize the key points of the preceding conversation history concisely. Focus on technical decisions and user goals."
     response = await llm.ainvoke([HumanMessage(content=f"{str(to_summarize)}\n\n{summary_prompt}")])
     return response.content
@@ -498,14 +523,33 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     logger.info(f"PIPELINE: Proceeding to LLM init (message count={len(messages)})...")
     
     # Initialize tools and binding logic
-    conversation_id = config.get("configurable", {}).get("conversation_id")
-    allowed_skills = space_config.get("skills", ["all"])
     tools = get_agent_tools(conversation_id, allowed_skills)
+    
+    # Dynamically bind client-side MCP tools from scratchpad
+    scratchpad_data = state.get("scratchpad") or {}
+    mcp_tools_list = scratchpad_data.get("mcp_tools") or []
+    if mcp_tools_list:
+        from langchain_core.tools import StructuredTool
+        for mcp_t in mcp_tools_list:
+            tool_name = mcp_t.get("name")
+            if any(t.name == tool_name for t in tools):
+                continue
+            
+            async def dummy_coroutine(**kwargs):
+                return "Delegated to client"
+                
+            mcp_wrapped = StructuredTool(
+                name=tool_name,
+                description=mcp_t.get("description") or f"Client-side MCP tool: {tool_name}",
+                func=lambda *args, **kwargs: "Delegated to client",
+                coroutine=dummy_coroutine
+            )
+            tools.append(mcp_wrapped)
     
     # Use the dynamic LLM with tools bound
     try:
         # get_dynamic_llm is defined in this file
-        llm = await get_dynamic_llm(config, bind_tools=False) 
+        llm = await get_dynamic_llm(config, bind_tools=False, tier="reasoning") 
         
         # Sanity check tools before binding
         valid_tools = []
@@ -717,6 +761,28 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
 
     conversation_id = config.get("configurable", {}).get("conversation_id")
     tools = get_agent_tools(conversation_id)
+    
+    # Dynamically bind client-side MCP tools from scratchpad
+    scratchpad_data = state.get("scratchpad") or {}
+    mcp_tools_list = scratchpad_data.get("mcp_tools") or []
+    if mcp_tools_list:
+        from langchain_core.tools import StructuredTool
+        for mcp_t in mcp_tools_list:
+            tool_name = mcp_t.get("name")
+            if any(t.name == tool_name for t in tools):
+                continue
+            
+            async def dummy_coroutine(**kwargs):
+                return "Delegated to client"
+                
+            mcp_wrapped = StructuredTool(
+                name=tool_name,
+                description=mcp_t.get("description") or f"Client-side MCP tool: {tool_name}",
+                func=lambda *args, **kwargs: "Delegated to client",
+                coroutine=dummy_coroutine
+            )
+            tools.append(mcp_wrapped)
+            
     tool_map = {t.name: t for t in tools}
 
     client_type = config.get("configurable", {}).get("client_type")
@@ -867,3 +933,96 @@ async def validate_response_node(state: AgentState, config: RunnableConfig) -> D
         }
     
     return {"is_complete": True}
+
+
+async def verification_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Verification node following tool execution.
+    Checks if files were modified (via workspace_writer) and triggers client-side
+    linter/compiler compilation checks to feed back errors and self-correct.
+    """
+    import uuid
+    messages = state.get("messages", [])
+    if not messages:
+        return {}
+        
+    last_message = messages[-1]
+    
+    # Check if we just completed a verification tool call
+    if isinstance(last_message, ToolMessage) and last_message.name == "shell_exec":
+        # We just executed the compilation/linting tool
+        content = last_message.content.lower()
+        has_error = False
+        error_summary = ""
+        
+        # Look for typical compilation or syntax errors
+        if "error ts" in content or ("tsc -p" in content and "error" in content):
+            has_error = True
+            error_summary = "TypeScript compilation failed."
+        elif "syntaxerror" in content or "invalid syntax" in content:
+            has_error = True
+            error_summary = "Python syntax error."
+        elif "failed" in content or "exception" in content:
+            has_error = True
+            error_summary = "Test execution failed."
+            
+        if has_error:
+            feedback_msg = SystemMessage(
+                content=(
+                    f"⚠️ [VERIFICATION FAILURE] {error_summary}\n"
+                    f"Compiler/Linter Output:\n```\n{last_message.content}\n```\n"
+                    f"Please fix the errors in your code."
+                )
+            )
+            return {"messages": [feedback_msg]}
+        else:
+            feedback_msg = SystemMessage(
+                content="✅ [VERIFICATION SUCCESS] Code verification passed successfully. No errors detected."
+            )
+            return {"messages": [feedback_msg]}
+            
+    # Check if any workspace files were written in the recent turn
+    # Scan backwards from the end until we hit a HumanMessage
+    files_modified = []
+    for m in reversed(messages):
+        if isinstance(m, HumanMessage):
+            break
+        # If it's an AIMessage with tool_calls for writing files
+        if isinstance(m, AIMessage) and hasattr(m, "tool_calls") and m.tool_calls:
+            for tc in m.tool_calls:
+                if tc.get("name") == "workspace_writer":
+                    args = tc.get("args") or {}
+                    filename = args.get("filename")
+                    if filename:
+                        files_modified.append(filename)
+                        
+    if files_modified:
+        # Determine the appropriate verification command
+        command = ""
+        cwd = "."
+        
+        # Check if any modified file is in the vscode-extension
+        if any("vscode-extension" in f for f in files_modified):
+            command = "npm run compile"
+            cwd = "projects/iarxii/AI_Codex/vscode-extension"
+        elif any(f.endswith(".py") for f in files_modified):
+            # Check syntax for Python files
+            py_files = [f for f in files_modified if f.endswith(".py")]
+            # Run syntax compilation check on the first python file
+            command = f"python -m py_compile {py_files[0]}"
+            cwd = "."
+            
+        if command:
+            # Emit verification tool call
+            tool_call_id = f"verify_{uuid.uuid4().hex[:8]}"
+            verification_message = AIMessage(
+                content="[VERIFICATION] Verifying recent changes...",
+                tool_calls=[{
+                    "name": "shell_exec",
+                    "args": {"command": command, "cwd": cwd},
+                    "id": tool_call_id
+                }]
+            )
+            return {"messages": [verification_message]}
+            
+    return {}
