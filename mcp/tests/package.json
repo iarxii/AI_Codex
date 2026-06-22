@@ -1,0 +1,12 @@
+{
+  "name": "mcp-server-tests",
+  "version": "1.0.0",
+  "description": "Tests for Spirit Bird MCP Servers",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0",
+    "tsx": "^4.20.5"
+  }
+}
