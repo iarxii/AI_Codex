@@ -38,3 +38,6 @@ data/qdrant/
 # Temporary Build Contexts
 temp_*_build/
 backend/OllamaOpt_local/
+
+# MCP Server Build files
+mcp/build/
