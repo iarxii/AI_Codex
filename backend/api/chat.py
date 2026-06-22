@@ -206,13 +206,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         print(f"PIPELINE CRITICAL: No valid API key found for resolved provider [{provider}]")
 
                 # 1. Load History
-                history_result = await db.execute(
-                    select(Message)
-                    .filter_by(conversation_id=conversation_id)
-                    .order_by(Message.created_at)
-                )
-                history_msgs = history_result.scalars().all()
-                
+                client_messages = payload_data.get("messages")
+                save_to_db = payload_data.get("save_to_db", True)
+                if client_messages is not None:
+                    save_to_db = False
+
                 from langchain_core.messages import (
                     HumanMessage as _HumanMessage, 
                     AIMessage as _AIMessage, 
@@ -220,44 +218,77 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     SystemMessage as _SystemMessage
                 )
                 langchain_history = []
-                for m in history_msgs:
-                    meta = {}
-                    if m.metadata_json:
-                        try:
-                            meta = json.loads(m.metadata_json)
-                        except Exception:
-                            pass
-                            
-                    if m.role == "user":
-                        langchain_history.append(_HumanMessage(content=m.content))
-                    elif m.role == "assistant":
-                        tool_calls = meta.get("tool_calls", [])
-                        langchain_history.append(_AIMessage(content=m.content, tool_calls=tool_calls))
-                    elif m.role == "tool":
-                        langchain_history.append(_ToolMessage(
-                            content=m.content,
-                            name=meta.get("name", ""),
-                            tool_call_id=meta.get("tool_call_id", "")
-                        ))
-                    elif m.role == "system":
-                        langchain_history.append(_SystemMessage(content=m.content))
+                
+                if client_messages is not None:
+                    print(f"PIPELINE: Loading history from client payload ({len(client_messages)} messages)")
+                    for m in client_messages:
+                        role = m.get("role")
+                        content = m.get("content", "")
+                        meta = m.get("metadata") or {}
+                        
+                        if role == "user":
+                            langchain_history.append(_HumanMessage(content=content))
+                        elif role == "assistant":
+                            tool_calls = meta.get("tool_calls", [])
+                            langchain_history.append(_AIMessage(content=content, tool_calls=tool_calls))
+                        elif role == "tool":
+                            langchain_history.append(_ToolMessage(
+                                content=content,
+                                name=meta.get("name", ""),
+                                tool_call_id=meta.get("tool_call_id", "")
+                            ))
+                        elif role == "system":
+                            langchain_history.append(_SystemMessage(content=content))
+                else:
+                    # 1. Load History from DB
+                    history_result = await db.execute(
+                        select(Message)
+                        .filter_by(conversation_id=conversation_id)
+                        .order_by(Message.created_at)
+                    )
+                    history_msgs = history_result.scalars().all()
+                    
+                    for m in history_msgs:
+                        meta = {}
+                        if m.metadata_json:
+                            try:
+                                meta = json.loads(m.metadata_json)
+                            except Exception:
+                                pass
+                                
+                        if m.role == "user":
+                            langchain_history.append(_HumanMessage(content=m.content))
+                        elif m.role == "assistant":
+                            tool_calls = meta.get("tool_calls", [])
+                            langchain_history.append(_AIMessage(content=m.content, tool_calls=tool_calls))
+                        elif m.role == "tool":
+                            langchain_history.append(_ToolMessage(
+                                content=m.content,
+                                name=meta.get("name", ""),
+                                tool_call_id=meta.get("tool_call_id", "")
+                            ))
+                        elif m.role == "system":
+                            langchain_history.append(_SystemMessage(content=m.content))
                 
                 # 2. Persist User Message
                 history_len = len(langchain_history) + 1
                 user_message_str = str(user_message) if user_message is not None else ""
-                new_user_msg = Message(
-                    conversation_id=conversation_id,
-                    role="user",
-                    content=user_message_str
-                )
-                db.add(new_user_msg)
                 
-                # Update conversation timestamp
-                await db.execute(
-                    update(Conversation)
-                    .where(Conversation.id == conversation_id)
-                    .values(updated_at=datetime.utcnow())
-                )
+                if save_to_db:
+                    new_user_msg = Message(
+                        conversation_id=conversation_id,
+                        role="user",
+                        content=user_message_str
+                    )
+                    db.add(new_user_msg)
+                    
+                    # Update conversation timestamp
+                    await db.execute(
+                        update(Conversation)
+                        .where(Conversation.id == conversation_id)
+                        .values(updated_at=datetime.utcnow())
+                    )
+                    await db.commit()
                 
                 config = {
                     "configurable": {
@@ -290,11 +321,20 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         await websocket.send_json({"type": "token", "content": full_ai_response, "node": "auth_check", "provider": provider, "model": model, "duration": 0})
                         return
 
-                await db.commit()
-
                 # 3. Initial state for Graph
+                initial_messages = langchain_history.copy()
+                scratchpad_data = payload_data.get("scratchpad") or {}
+                retrieved_chunks = scratchpad_data.get("retrieved_chunks")
+                if retrieved_chunks:
+                    context_msg = "Here are the most relevant code snippets from the local codebase (semantic search results):\n\n"
+                    for idx, chunk in enumerate(retrieved_chunks):
+                        context_msg += f"[{idx + 1}] File: {chunk.get('file')} (Lines {chunk.get('lines')})\n"
+                        context_msg += f"```\n{chunk.get('content')}\n```\n\n"
+                    initial_messages.append(_SystemMessage(content=context_msg))
+                initial_messages.append(_HumanMessage(content=user_message_str))
+
                 initial_state = {
-                    "messages": langchain_history + [_HumanMessage(content=user_message_str)],
+                    "messages": initial_messages,
                     "current_tool_calls": [],
                     "context_data": {},
                     "routing_decision": {},
@@ -309,31 +349,12 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "provider": provider,
                         "model": model
                     },
-                    "space_config": s_config
+                    "space_config": s_config,
+                    "scratchpad": payload_data.get("scratchpad") or {}
                 }
                 
                 # 4. Execute graph with event streaming
                 log_debug(f"Starting graph execution for conv {conversation_id}")
-                
-                config = {
-                    "configurable": {
-                        "provider": provider, 
-                        "model": model, 
-                        "api_key": api_key,
-                        "api_keys": api_keys,
-                        "base_url": base_url,
-                        "model_config": model_config,
-                        "conversation_id": str(conversation_id),
-                        "agent_mode": agent_mode,
-                        "local_backend_mode": local_backend_mode,
-                        "user_id": user.id,
-                        "space_slug": space_type,
-                        "client_type": payload_data.get("client_type"),
-                        "websocket": websocket,
-                        "client_tool_responses": client_tool_responses
-                    },
-                    "recursion_limit": 25
-                }
                 
                 if provider == "local" and local_backend_mode == "llamacpp":
                     # NativeLocalClient streaming — only in llamacpp mode
@@ -497,49 +518,50 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             await websocket.send_json({"type": "error", "message": f"Execution Error: {friendly_msg}"})
         finally:
             # Re-fetch or save all generated messages
-            async with AsyncSessionLocal() as db:
-                if final_messages and len(final_messages) > history_len:
-                    # Save all new messages generated during the graph run
-                    new_msgs_to_save = final_messages[history_len:]
-                    for m in new_msgs_to_save:
-                        role = getattr(m, "type", "assistant")
-                        if role == "ai":
-                            role_str = "assistant"
-                        elif role == "human":
-                            role_str = "user"
-                        elif role == "tool":
-                            role_str = "tool"
-                        elif role == "system":
-                            role_str = "system"
-                        else:
-                            role_str = str(role)
+            if save_to_db:
+                async with AsyncSessionLocal() as db:
+                    if final_messages and len(final_messages) > history_len:
+                        # Save all new messages generated during the graph run
+                        new_msgs_to_save = final_messages[history_len:]
+                        for m in new_msgs_to_save:
+                            role = getattr(m, "type", "assistant")
+                            if role == "ai":
+                                role_str = "assistant"
+                            elif role == "human":
+                                role_str = "user"
+                            elif role == "tool":
+                                role_str = "tool"
+                            elif role == "system":
+                                role_str = "system"
+                            else:
+                                role_str = str(role)
+                                
+                            meta = {}
+                            if hasattr(m, "tool_calls") and m.tool_calls:
+                                meta["tool_calls"] = m.tool_calls
+                            if role == "tool":
+                                meta["name"] = getattr(m, "name", "")
+                                meta["tool_call_id"] = getattr(m, "tool_call_id", "")
+                                
+                            meta_json = json.dumps(meta) if meta else None
                             
-                        meta = {}
-                        if hasattr(m, "tool_calls") and m.tool_calls:
-                            meta["tool_calls"] = m.tool_calls
-                        if role == "tool":
-                            meta["name"] = getattr(m, "name", "")
-                            meta["tool_call_id"] = getattr(m, "tool_call_id", "")
-                            
-                        meta_json = json.dumps(meta) if meta else None
-                        
-                        new_db_msg = Message(
+                            new_db_msg = Message(
+                                conversation_id=conversation_id,
+                                role=role_str,
+                                content=str(m.content),
+                                metadata_json=meta_json
+                            )
+                            db.add(new_db_msg)
+                        await db.commit()
+                    elif full_ai_response:
+                        # Fallback to save just the final response if graph run didn't finish normally
+                        new_ai_msg = Message(
                             conversation_id=conversation_id,
-                            role=role_str,
-                            content=str(m.content),
-                            metadata_json=meta_json
+                            role="assistant",
+                            content=full_ai_response
                         )
-                        db.add(new_db_msg)
-                    await db.commit()
-                elif full_ai_response:
-                    # Fallback to save just the final response if graph run didn't finish normally
-                    new_ai_msg = Message(
-                        conversation_id=conversation_id,
-                        role="assistant",
-                        content=full_ai_response
-                    )
-                    db.add(new_ai_msg)
-                    await db.commit()
+                        db.add(new_ai_msg)
+                        await db.commit()
                     
                 # Send final telemetry
                 initial_state["telemetry"]["latencies"]["total"] = time.perf_counter() - request_start
