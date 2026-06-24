@@ -307,7 +307,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "websocket": websocket,
                         "client_tool_responses": client_tool_responses
                     },
-                    "recursion_limit": 25
+                    "recursion_limit": 100
                 }
                 
                 # Early Auth Check for Cloud Providers
