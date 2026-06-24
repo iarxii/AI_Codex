@@ -542,7 +542,8 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 name=tool_name,
                 description=mcp_t.get("description") or f"Client-side MCP tool: {tool_name}",
                 func=lambda *args, **kwargs: "Delegated to client",
-                coroutine=dummy_coroutine
+                coroutine=dummy_coroutine,
+                args_schema=mcp_t.get("inputSchema") or {}
             )
             tools.append(mcp_wrapped)
     
@@ -779,7 +780,8 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                 name=tool_name,
                 description=mcp_t.get("description") or f"Client-side MCP tool: {tool_name}",
                 func=lambda *args, **kwargs: "Delegated to client",
-                coroutine=dummy_coroutine
+                coroutine=dummy_coroutine,
+                args_schema=mcp_t.get("inputSchema") or {}
             )
             tools.append(mcp_wrapped)
             
