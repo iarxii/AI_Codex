@@ -163,6 +163,17 @@ for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-be --
 for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-lab --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set FRONTEND_URL=%%i
 for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-premium --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set PREMIUM_URL=%%i
 
+:: Map unique Cloud Run hashes to standard regional project number endpoints
+if "!BACKEND_URL!"=="https://aicodex-be-5yrzhangwq-uc.a.run.app" (
+    set BACKEND_URL=https://aicodex-be-1096425756328.us-central1.run.app
+)
+if "!FRONTEND_URL!"=="https://aicodex-lab-5yrzhangwq-uc.a.run.app" (
+    set FRONTEND_URL=https://aicodex-lab-1096425756328.us-central1.run.app
+)
+if "!PREMIUM_URL!"=="https://aicodex-premium-5yrzhangwq-uc.a.run.app" (
+    set PREMIUM_URL=https://aicodex-premium-1096425756328.us-central1.run.app
+)
+
 SET ROUTE_MAP_PATH=..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-react\src\data\route_map.json
 (
     echo {
@@ -194,6 +205,16 @@ SET ROUTE_MAP_PATH=..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-rea
     echo   "last_deployed": "%DATE% %TIME%"
     echo }
 ) > ..\..\..\route_map.json
+(
+    echo {
+    echo   "project": "%PROJECT_ID%",
+    echo   "region": "%REGION%",
+    echo   "backend_url": "!BACKEND_URL!",
+    echo   "frontend_url": "!FRONTEND_URL!",
+    echo   "premium_url": "!PREMIUM_URL!",
+    echo   "last_deployed": "%DATE% %TIME%"
+    echo }
+) > vscode-extension\route_map.json
 echo Route map updated.
 
 echo [6/6] Cleaning up old revisions...
