@@ -38,6 +38,7 @@ class ConversationDetail(ConversationRead):
 
 class ConversationCreate(BaseModel):
     title: str = "New Conversation"
+    session_id: str | None = None
 
 @router.get("/", response_model=List[ConversationRead])
 async def list_conversations(
@@ -57,9 +58,17 @@ async def create_conversation(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    if conv_in.session_id:
+        existing = await db.execute(select(Conversation).filter_by(session_id=conv_in.session_id, user_id=current_user.id))
+        existing_conv = existing.scalar_one_or_none()
+        if existing_conv:
+            return existing_conv
+
     new_conv = Conversation(
         title=conv_in.title,
-        user_id=current_user.id
+        session_id=conv_in.session_id,
+        user_id=current_user.id,
+        space_type="general"
     )
     db.add(new_conv)
     await db.commit()
@@ -81,6 +90,32 @@ async def get_conversation(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
+    return conv
+
+@router.get("/by-session/{session_id}", response_model=ConversationDetail)
+async def get_conversation_by_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(Conversation)
+        .options(selectinload(Conversation.messages))
+        .filter_by(session_id=session_id, user_id=current_user.id)
+    )
+    conv = result.scalar_one_or_none()
+    
+    if not conv and session_id.isdigit():
+        result = await db.execute(
+            select(Conversation)
+            .options(selectinload(Conversation.messages))
+            .filter_by(id=int(session_id), user_id=current_user.id)
+        )
+        conv = result.scalar_one_or_none()
+        
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+        
     return conv
 
 class ConversationUpdate(BaseModel):

@@ -25,6 +25,10 @@ async def _list_models_raw(
     Dynamically list available models for a given provider.
     Mutes local models for Standard workspaces and locks models for non-premium spaces.
     """
+    # 0. Normalization: Map google to gemini
+    if provider == "google":
+        provider = "gemini"
+
     # 1. Enforcement: Mute local models in Standard Workspaces (no slug)
     if provider == "local" and not x_space_slug:
         return []
@@ -220,6 +224,9 @@ async def list_models(
     current_user: User = Depends(get_current_user),
     db: Any = Depends(get_db)
 ):
+    if provider == "google":
+        provider = "gemini"
+
     models = await _list_models_raw(
         provider=provider,
         api_key=api_key,
