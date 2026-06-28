@@ -45,6 +45,14 @@ async def migrate_db(conn):
     if "space_type" not in existing_columns_conv:
         print("[MIGRATION] Adding column space_type to conversations table...")
         await conn.execute(text("ALTER TABLE conversations ADD COLUMN space_type VARCHAR(50) DEFAULT 'general'"))
+        
+    if "session_id" not in existing_columns_conv:
+        print("[MIGRATION] Adding column session_id to conversations table...")
+        await conn.execute(text("ALTER TABLE conversations ADD COLUMN session_id VARCHAR(100)"))
+        try:
+            await conn.execute(text("CREATE UNIQUE INDEX ix_conversations_session_id ON conversations(session_id)"))
+        except Exception:
+            pass
 
 async def init_db():
     try:

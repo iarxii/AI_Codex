@@ -19,6 +19,22 @@ from sqlalchemy import select, update
 
 router = APIRouter()
 
+async def generate_cloud_chat_title(conversation_id: int, first_message: str, provider: str, model: str, api_key: str):
+    """Generates a 3-5 word title using the cloud LLM and updates the Conversation."""
+    try:
+        from backend.agent.models import get_llm
+        llm = get_llm(provider=provider, model=model, api_key=api_key)
+        prompt = f"Summarize the following text in a short 3-5 word title. Output ONLY the title, no quotes or prefix.\n\nText: {first_message}"
+        response = await llm.ainvoke([{"role": "user", "content": prompt}])
+        title = response.content.strip().strip('"').strip("'")
+        
+        if title:
+            async with AsyncSessionLocal() as db:
+                await db.execute(update(Conversation).where(Conversation.id == conversation_id).values(title=title))
+                await db.commit()
+    except Exception as e:
+        log_error(f"Failed to generate cloud title for conv {conversation_id}: {e}", e)
+
 # Rate limiting state (In-memory for simplicity)
 # user_id -> last_request_timestamp
 user_cooldowns: dict[int, float] = {}
@@ -273,6 +289,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 # 2. Persist User Message
                 history_len = len(langchain_history) + 1
                 user_message_str = str(user_message) if user_message is not None else ""
+                
+                if history_len == 1 and conversation.title == "New Conversation":
+                    # Generate Title async in background
+                    asyncio.create_task(generate_cloud_chat_title(conversation_id, user_message_str, provider, model, api_key))
                 
                 if save_to_db:
                     new_user_msg = Message(

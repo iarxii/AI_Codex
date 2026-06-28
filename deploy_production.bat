@@ -215,6 +215,16 @@ SET ROUTE_MAP_PATH=..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-rea
     echo   "last_deployed": "%DATE% %TIME%"
     echo }
 ) > vscode-extension\route_map.json
+(
+    echo {
+    echo   "project": "%PROJECT_ID%",
+    echo   "region": "%REGION%",
+    echo   "backend_url": "!BACKEND_URL!",
+    echo   "frontend_url": "!FRONTEND_URL!",
+    echo   "premium_url": "!PREMIUM_URL!",
+    echo   "last_deployed": "%DATE% %TIME%"
+    echo }
+) > ..\AIDock\client\src\route_map.json
 echo Route map updated.
 
 echo [6/6] Cleaning up old revisions...

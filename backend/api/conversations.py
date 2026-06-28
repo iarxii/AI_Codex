@@ -24,6 +24,7 @@ class MessageRead(BaseModel):
 
 class ConversationRead(BaseModel):
     id: int
+    session_id: str | None = None
     title: str
     created_at: datetime
     updated_at: datetime
