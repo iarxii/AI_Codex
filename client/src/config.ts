@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://aicodex-be-5yrzhangwq-uc.a.run.app';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://aicodex-be-1096425756328.us-central1.run.app';
 const PREMIUM_API_URL = import.meta.env.VITE_PREMIUM_URL || '';
 const COLAB_URL = import.meta.env.VITE_COLAB_URL || '';
 const COLAB_SECRET = import.meta.env.VITE_COLAB_SECRET || '';

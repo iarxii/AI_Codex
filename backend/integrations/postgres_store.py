@@ -31,12 +31,27 @@ class PostgresVectorStore:
 
     def sync_search(self, query_embedding: List[float], top_k: int = 5, score_threshold: float = 0.3) -> List[Dict[str, Any]]:
         import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
         try:
-            # We need to run the async search in a way that works from a thread
-            return asyncio.run(self.search(query_embedding, top_k, score_threshold))
-        except Exception as e:
-            logger.error(f"Sync search failed: {e}")
-            return []
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+            
+        if loop and loop.is_running():
+            try:
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(asyncio.run, self.search(query_embedding, top_k, score_threshold))
+                    return future.result()
+            except Exception as e:
+                logger.error(f"Sync search thread execution failed: {e}")
+                return []
+        else:
+            try:
+                return asyncio.run(self.search(query_embedding, top_k, score_threshold))
+            except Exception as e:
+                logger.error(f"Sync search failed: {e}")
+                return []
 
     async def search(self, query_embedding: List[float], top_k: int = 5, score_threshold: float = 0.3) -> List[Dict[str, Any]]:
         async with AsyncSessionLocal() as session:

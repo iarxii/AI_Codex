@@ -37,17 +37,22 @@ class WorkspaceReaderSkill(BaseSkill):
         "required": ["action", "path"]
     }
 
-    def _get_abs_path(self, rel_path: str) -> Path:
+    def _get_abs_path(self, rel_path: str, conversation_id: Optional[str] = None) -> Path:
         root = Path(__file__).resolve().parents[3]
-        abs_path = (root / rel_path).resolve()
-        # Security: Ensure path is within root
-        if not str(abs_path).startswith(str(root)):
+        if conversation_id:
+            base_dir = (root / "data" / "workspaces" / conversation_id / "scratch").resolve()
+        else:
+            base_dir = root.resolve()
+            
+        abs_path = (base_dir / rel_path).resolve()
+        # Security: Ensure path is within base_dir
+        if not str(abs_path).startswith(str(base_dir)):
             raise ValueError("Access denied: Path is outside workspace root.")
         return abs_path
 
-    async def execute(self, action: str, path: str, query: Optional[str] = None, recursive: bool = False) -> SkillResult:
+    async def execute(self, action: str, path: str, query: Optional[str] = None, recursive: bool = False, conversation_id: Optional[str] = None) -> SkillResult:
         try:
-            abs_path = self._get_abs_path(path)
+            abs_path = self._get_abs_path(path, conversation_id=conversation_id)
             
             if action == "read":
                 if not abs_path.is_file():

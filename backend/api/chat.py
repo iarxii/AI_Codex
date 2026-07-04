@@ -19,6 +19,22 @@ from sqlalchemy import select, update
 
 router = APIRouter()
 
+async def generate_cloud_chat_title(conversation_id: int, first_message: str, provider: str, model: str, api_key: str):
+    """Generates a 3-5 word title using the cloud LLM and updates the Conversation."""
+    try:
+        from backend.agent.models import get_llm
+        llm = get_llm(provider=provider, model=model, api_key=api_key)
+        prompt = f"Summarize the following text in a short 3-5 word title. Output ONLY the title, no quotes or prefix.\n\nText: {first_message}"
+        response = await llm.ainvoke([{"role": "user", "content": prompt}])
+        title = response.content.strip().strip('"').strip("'")
+        
+        if title:
+            async with AsyncSessionLocal() as db:
+                await db.execute(update(Conversation).where(Conversation.id == conversation_id).values(title=title))
+                await db.commit()
+    except Exception as e:
+        log_error(f"Failed to generate cloud title for conv {conversation_id}: {e}", e)
+
 # Rate limiting state (In-memory for simplicity)
 # user_id -> last_request_timestamp
 user_cooldowns: dict[int, float] = {}
@@ -69,18 +85,73 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             
     print(f"DEBUG: WebSocket connected on /ws/agent for user: {user.username}")
     active_tasks: Set[asyncio.Task] = set()
+    client_tool_responses = asyncio.Queue()
 
     async def run_agent_task(payload_data):
         conversation_id = payload_data.get("conversation_id")
         user_message = payload_data.get("message")
         provider = payload_data.get("provider")
         model = payload_data.get("model")
-        api_key = payload_data.get("api_key") # Legacy fallback
-        api_keys = payload_data.get("api_keys", {}) # New multi-key support
+        api_key = payload_data.get("api_key")
+        api_keys = payload_data.get("api_keys")
+        if not isinstance(api_keys, dict):
+            api_keys = {}
         base_url = payload_data.get("base_url")
         model_config = payload_data.get("config", {})
         agent_mode = payload_data.get("agent_mode", True)
         local_backend_mode = payload_data.get("local_backend_mode", "ollama")
+        # LangSmith Telemetry Configuration
+        benchmark_mode = payload_data.get("benchmark_mode", False)
+        private_workspace = payload_data.get("private_workspace", True)
+        langsmith_api_key = payload_data.get("langsmith_api_key")
+        langsmith_project = payload_data.get("langsmith_project", "vscode-agent-react-benchmarks")
+
+        enable_tracing = benchmark_mode and not private_workspace and bool(langsmith_api_key)
+        
+        ls_client = None
+        if enable_tracing:
+            import langsmith as ls
+            
+            def scrub_telemetry_payload(inputs: dict) -> dict:
+                if not inputs or not isinstance(inputs, dict):
+                    return inputs
+                scrubbed = inputs.copy()
+                for key, val in list(scrubbed.items()):
+                    if isinstance(val, str) and len(val) > 1000:
+                        scrubbed[key] = val[:500] + "\n... [TRUNCATED FOR TELEMETRY SAVINGS] ...\n" + val[-500:]
+                if "messages" in scrubbed and isinstance(scrubbed["messages"], list):
+                    processed_msgs = []
+                    for msg in scrubbed["messages"]:
+                        if isinstance(msg, dict):
+                            content = msg.get("content")
+                            if isinstance(content, str) and len(content) > 1000:
+                                msg = msg.copy()
+                                msg["content"] = content[:500] + "\n... [TRUNCATED FOR TELEMETRY SAVINGS] ...\n" + content[-500:]
+                        elif hasattr(msg, "content"):
+                            content = msg.content
+                            if isinstance(content, str) and len(content) > 1000:
+                                truncated = content[:500] + "\n... [TRUNCATED FOR TELEMETRY SAVINGS] ...\n" + content[-500:]
+                                try:
+                                    msg = msg.__class__(
+                                        content=truncated,
+                                        **{k: v for k, v in msg.__dict__.items() if k not in ["content", "id", "type"]}
+                                    )
+                                except Exception:
+                                    pass
+                        processed_msgs.append(msg)
+                    scrubbed["messages"] = processed_msgs
+                return scrubbed
+
+            try:
+                ls_client = ls.Client(
+                    api_key=langsmith_api_key,
+                    hide_inputs=scrub_telemetry_payload,
+                    hide_outputs=scrub_telemetry_payload
+                )
+                print(f"PIPELINE: Dynamic LangSmith Tracing Client initialized for project '{langsmith_project}'")
+            except Exception as e:
+                print(f"PIPELINE ERROR: Failed to initialize LangSmith Client: {e}")
+                enable_tracing = False
         
         if not conversation_id:
             await websocket.send_json({"type": "error", "message": "conversation_id is required"})
@@ -88,6 +159,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
         request_start = time.perf_counter()
         full_ai_response = ""
+        history_len = 0
+        final_messages = None
 
         try:
             async with AsyncSessionLocal() as db:
@@ -141,6 +214,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         
                     if provider_key and str(provider_key).strip():
                         api_key = str(provider_key).strip()
+                        api_keys[provider] = api_key
                         masked_key = f"{api_key[:6]}...{api_key[-4:]}" if len(api_key) > 10 else "****"
                         print(f"PIPELINE: Successfully resolved API key for [{provider}]: {masked_key}")
                     else:
@@ -148,51 +222,112 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         print(f"PIPELINE CRITICAL: No valid API key found for resolved provider [{provider}]")
 
                 # 1. Load History
-                history_result = await db.execute(
-                    select(Message)
-                    .filter_by(conversation_id=conversation_id)
-                    .order_by(Message.created_at)
+                client_messages = payload_data.get("messages")
+                save_to_db = payload_data.get("save_to_db", True)
+                if client_messages is not None:
+                    save_to_db = False
+
+                from langchain_core.messages import (
+                    HumanMessage as _HumanMessage, 
+                    AIMessage as _AIMessage, 
+                    ToolMessage as _ToolMessage, 
+                    SystemMessage as _SystemMessage
                 )
-                history_msgs = history_result.scalars().all()
-                
-                from langchain_core.messages import HumanMessage as _HumanMessage, AIMessage as _AIMessage
                 langchain_history = []
-                for m in history_msgs:
-                    if m.role == "user":
-                        langchain_history.append(_HumanMessage(content=m.content))
-                    elif m.role == "assistant":
-                        langchain_history.append(_AIMessage(content=m.content))
+                
+                if client_messages is not None:
+                    print(f"PIPELINE: Loading history from client payload ({len(client_messages)} messages)")
+                    for m in client_messages:
+                        role = m.get("role")
+                        content = m.get("content", "")
+                        meta = m.get("metadata") or {}
+                        
+                        if role == "user":
+                            langchain_history.append(_HumanMessage(content=content))
+                        elif role == "assistant":
+                            tool_calls = meta.get("tool_calls", [])
+                            langchain_history.append(_AIMessage(content=content, tool_calls=tool_calls))
+                        elif role == "tool":
+                            langchain_history.append(_ToolMessage(
+                                content=content,
+                                name=meta.get("name", ""),
+                                tool_call_id=meta.get("tool_call_id", "")
+                            ))
+                        elif role == "system":
+                            langchain_history.append(_SystemMessage(content=content))
+                else:
+                    # 1. Load History from DB
+                    history_result = await db.execute(
+                        select(Message)
+                        .filter_by(conversation_id=conversation_id)
+                        .order_by(Message.created_at)
+                    )
+                    history_msgs = history_result.scalars().all()
+                    
+                    for m in history_msgs:
+                        meta = {}
+                        if m.metadata_json:
+                            try:
+                                meta = json.loads(m.metadata_json)
+                            except Exception:
+                                pass
+                                
+                        if m.role == "user":
+                            langchain_history.append(_HumanMessage(content=m.content))
+                        elif m.role == "assistant":
+                            tool_calls = meta.get("tool_calls", [])
+                            langchain_history.append(_AIMessage(content=m.content, tool_calls=tool_calls))
+                        elif m.role == "tool":
+                            langchain_history.append(_ToolMessage(
+                                content=m.content,
+                                name=meta.get("name", ""),
+                                tool_call_id=meta.get("tool_call_id", "")
+                            ))
+                        elif m.role == "system":
+                            langchain_history.append(_SystemMessage(content=m.content))
                 
                 # 2. Persist User Message
+                history_len = len(langchain_history) + 1
                 user_message_str = str(user_message) if user_message is not None else ""
-                new_user_msg = Message(
-                    conversation_id=conversation_id,
-                    role="user",
-                    content=user_message_str
-                )
-                db.add(new_user_msg)
                 
-                # Update conversation timestamp
-                await db.execute(
-                    update(Conversation)
-                    .where(Conversation.id == conversation_id)
-                    .values(updated_at=datetime.utcnow())
-                )
+                if history_len == 1 and conversation.title == "New Conversation":
+                    # Generate Title async in background
+                    asyncio.create_task(generate_cloud_chat_title(conversation_id, user_message_str, provider, model, api_key))
+                
+                if save_to_db:
+                    new_user_msg = Message(
+                        conversation_id=conversation_id,
+                        role="user",
+                        content=user_message_str
+                    )
+                    db.add(new_user_msg)
+                    
+                    # Update conversation timestamp
+                    await db.execute(
+                        update(Conversation)
+                        .where(Conversation.id == conversation_id)
+                        .values(updated_at=datetime.utcnow())
+                    )
+                    await db.commit()
                 
                 config = {
                     "configurable": {
                         "provider": provider, 
                         "model": model, 
                         "api_key": api_key,
+                        "api_keys": api_keys,
                         "base_url": base_url,
                         "model_config": model_config,
                         "conversation_id": str(conversation_id),
                         "agent_mode": agent_mode,
                         "local_backend_mode": local_backend_mode,
                         "user_id": user.id,
-                        "space_slug": space_type
+                        "space_slug": space_type,
+                        "client_type": payload_data.get("client_type"),
+                        "websocket": websocket,
+                        "client_tool_responses": client_tool_responses
                     },
-                    "recursion_limit": 25
+                    "recursion_limit": 100
                 }
                 
                 # Early Auth Check for Cloud Providers
@@ -206,11 +341,20 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         await websocket.send_json({"type": "token", "content": full_ai_response, "node": "auth_check", "provider": provider, "model": model, "duration": 0})
                         return
 
-                await db.commit()
-
                 # 3. Initial state for Graph
+                initial_messages = langchain_history.copy()
+                scratchpad_data = payload_data.get("scratchpad") or {}
+                retrieved_chunks = scratchpad_data.get("retrieved_chunks")
+                if retrieved_chunks:
+                    context_msg = "Here are the most relevant code snippets from the local codebase (semantic search results):\n\n"
+                    for idx, chunk in enumerate(retrieved_chunks):
+                        context_msg += f"[{idx + 1}] File: {chunk.get('file')} (Lines {chunk.get('lines')})\n"
+                        context_msg += f"```\n{chunk.get('content')}\n```\n\n"
+                    initial_messages.append(_SystemMessage(content=context_msg))
+                initial_messages.append(_HumanMessage(content=user_message_str))
+
                 initial_state = {
-                    "messages": langchain_history + [_HumanMessage(content=user_message_str)],
+                    "messages": initial_messages,
                     "current_tool_calls": [],
                     "context_data": {},
                     "routing_decision": {},
@@ -225,27 +369,12 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "provider": provider,
                         "model": model
                     },
-                    "space_config": s_config
+                    "space_config": s_config,
+                    "scratchpad": payload_data.get("scratchpad") or {}
                 }
                 
                 # 4. Execute graph with event streaming
                 log_debug(f"Starting graph execution for conv {conversation_id}")
-                
-                config = {
-                    "configurable": {
-                        "provider": provider, 
-                        "model": model, 
-                        "api_key": api_key,
-                        "base_url": base_url,
-                        "model_config": model_config,
-                        "conversation_id": str(conversation_id),
-                        "agent_mode": agent_mode,
-                        "local_backend_mode": local_backend_mode,
-                        "user_id": user.id,
-                        "space_slug": space_type
-                    },
-                    "recursion_limit": 25
-                }
                 
                 if provider == "local" and local_backend_mode == "llamacpp":
                     # NativeLocalClient streaming — only in llamacpp mode
@@ -273,113 +402,115 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         })
                     config["configurable"]["token_callback"] = _token_callback
                 
-                async for event in agent_graph.astream_events(initial_state, config=config, version="v2"):
-                    kind = event["event"]
-                    node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
+                from langsmith.run_helpers import tracing_context
+                with tracing_context(client=ls_client, project_name=langsmith_project, enabled=enable_tracing):
+                    async for event in agent_graph.astream_events(initial_state, config=config, version="v2"):
+                        kind = event["event"]
+                        node_name = event.get("metadata", {}).get("langgraph_node", "unknown")
                     
-                    # Pipeline monitoring — filter graph-level events
-                    if kind == "on_chain_start" and node_name != "unknown" and event.get("name") == node_name:
-                        print(f"\nPIPELINE: Entering node [{node_name}]")
-                        await websocket.send_json({
-                            "type": "status",
-                            "status": f"Agent working in node: {node_name}",
-                            "node": node_name,
-                            "duration": time.perf_counter() - request_start
-                        })
-                    
-                    if kind == "on_chat_model_stream":
-                        content = event["data"]["chunk"].content
-                        if content:
-                            full_ai_response += content
-                            
-                            now = time.perf_counter()
-                            if initial_state["telemetry"]["ttft"] == 0:
-                                initial_state["telemetry"]["ttft"] = now - request_start
-                                await websocket.send_json({
-                                    "type": "telemetry",
-                                    "data": initial_state["telemetry"]
-                                })
-
-                            print(content, end="", flush=True)
+                        # Pipeline monitoring — filter graph-level events
+                        if kind == "on_chain_start" and node_name != "unknown" and event.get("name") == node_name:
+                            print(f"\nPIPELINE: Entering node [{node_name}]")
                             await websocket.send_json({
-                                "type": "token",
-                                "content": full_ai_response,
-                                "node": node_name,
-                                "provider": provider,
-                                "model": model,
-                                "duration": now - request_start
-                            })
-                    
-                    elif kind == "on_chat_model_end":
-                        msg = event["data"]["output"]
-                        if hasattr(msg, "tool_calls") and msg.tool_calls:
-                            print(f"PIPELINE: Tool Call detected: {msg.tool_calls[0]['name']}")
-                            await websocket.send_json({
-                                "type": "tool_call",
-                                "tool_calls": msg.tool_calls,
+                                "type": "status",
+                                "status": f"Agent working in node: {node_name}",
                                 "node": node_name,
                                 "duration": time.perf_counter() - request_start
                             })
-                        # Fallback: if no streaming tokens were captured but model returned content,
-                        # send the full response as a single token (handles providers that don't stream)
-                        elif hasattr(msg, "content") and msg.content and not full_ai_response:
-                            full_ai_response = msg.content
-                            print(f"\nPIPELINE: Non-streaming response captured ({len(msg.content)} chars)")
-                            await websocket.send_json({
-                                "type": "token",
-                                "content": full_ai_response,
-                                "node": node_name,
-                                "provider": provider,
-                                "model": model,
-                                "duration": time.perf_counter() - request_start
-                            })
+                    
+                        if kind == "on_chat_model_stream":
+                            content = event["data"]["chunk"].content
+                            if content:
+                                full_ai_response += content
                             
-                    # Tool Results
-                    elif kind == "on_tool_end":
-                        print(f"PIPELINE: Tool Result: {str(event['data']['output'])[:50]}...")
-                        await websocket.send_json({
-                            "type": "tool_result",
-                            "content": str(event["data"]["output"]),
-                            "tool_call_id": event["metadata"].get("tool_call_id", "unknown"),
-                            "node": node_name
-                        })
-                    
-                    elif kind == "on_error":
-                        error_obj = event.get("data", {}).get("error")
-                        print(f"PIPELINE ERROR: {error_obj}")
-                        await websocket.send_json({"type": "error", "message": f"Graph Error: {str(error_obj)}"})
-                    
-                    # Capture final response from graph chain_end state
-                    # Most reliable way to get the AI response when on_chat_model_stream
-                    # events don't fire (e.g., local provider)
-                    elif kind == "on_chain_end" and not full_ai_response:
-                        output = event.get("data", {}).get("output", {})
-                        if isinstance(output, dict):
-                            msgs = output.get("messages", [])
-                            for m in reversed(msgs):
-                                if hasattr(m, "content") and m.content and getattr(m, "type", "") == "ai":
-                                    content = m.content
-                                    if isinstance(content, list):
-                                        # Extract text from content blocks (common with Gemini/Multimodal)
-                                        text_parts = []
-                                        for part in content:
-                                            if isinstance(part, dict):
-                                                text_parts.append(part.get("text", ""))
-                                            else:
-                                                text_parts.append(str(part))
-                                        content = "".join(text_parts)
-                                    
-                                    full_ai_response = str(content)
-                                    print(f"\nPIPELINE: Captured response from chain_end ({len(full_ai_response)} chars)")
+                                now = time.perf_counter()
+                                if initial_state["telemetry"]["ttft"] == 0:
+                                    initial_state["telemetry"]["ttft"] = now - request_start
                                     await websocket.send_json({
-                                        "type": "token",
-                                        "content": full_ai_response,
-                                        "node": node_name,
-                                        "provider": provider,
-                                        "model": model,
-                                        "duration": time.perf_counter() - request_start
+                                        "type": "telemetry",
+                                        "data": initial_state["telemetry"]
                                     })
-                                    break
+
+                                print(content, end="", flush=True)
+                                await websocket.send_json({
+                                    "type": "token",
+                                    "content": full_ai_response,
+                                    "node": node_name,
+                                    "provider": provider,
+                                    "model": model,
+                                    "duration": now - request_start
+                                })
+                    
+                        elif kind == "on_chat_model_end":
+                            msg = event["data"]["output"]
+                            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                print(f"PIPELINE: Tool Call detected: {msg.tool_calls[0]['name']}")
+                                await websocket.send_json({
+                                    "type": "tool_call",
+                                    "tool_calls": msg.tool_calls,
+                                    "node": node_name,
+                                    "duration": time.perf_counter() - request_start
+                                })
+                            # Fallback: if no streaming tokens were captured but model returned content,
+                            # send the full response as a single token (handles providers that don't stream)
+                            elif hasattr(msg, "content") and msg.content and not full_ai_response:
+                                full_ai_response = msg.content
+                                print(f"\nPIPELINE: Non-streaming response captured ({len(msg.content)} chars)")
+                                await websocket.send_json({
+                                    "type": "token",
+                                    "content": full_ai_response,
+                                    "node": node_name,
+                                    "provider": provider,
+                                    "model": model,
+                                    "duration": time.perf_counter() - request_start
+                                })
+                            
+                        # Tool Results
+                        elif kind == "on_tool_end":
+                            print(f"PIPELINE: Tool Result: {str(event['data']['output'])[:50]}...")
+                            await websocket.send_json({
+                                "type": "tool_result",
+                                "content": str(event["data"]["output"]),
+                                "tool_call_id": event["metadata"].get("tool_call_id", "unknown"),
+                                "node": node_name
+                            })
+                    
+                        elif kind == "on_error":
+                            error_obj = event.get("data", {}).get("error")
+                            print(f"PIPELINE ERROR: {error_obj}")
+                            await websocket.send_json({"type": "error", "message": f"Graph Error: {str(error_obj)}"})
+                    
+                        elif kind == "on_chain_end":
+                            output = event.get("data", {}).get("output", {})
+                            if isinstance(output, dict) and "messages" in output:
+                                final_messages = output["messages"]
+                            
+                            if not full_ai_response and isinstance(output, dict):
+                                msgs = output.get("messages", [])
+                                for m in reversed(msgs):
+                                    if hasattr(m, "content") and m.content and getattr(m, "type", "") == "ai":
+                                        content = m.content
+                                        if isinstance(content, list):
+                                            # Extract text from content blocks (common with Gemini/Multimodal)
+                                            text_parts = []
+                                            for part in content:
+                                                if isinstance(part, dict):
+                                                    text_parts.append(part.get("text", ""))
+                                                else:
+                                                    text_parts.append(str(part))
+                                            content = "".join(text_parts)
+                                    
+                                        full_ai_response = str(content)
+                                        print(f"\nPIPELINE: Captured response from chain_end ({len(full_ai_response)} chars)")
+                                        await websocket.send_json({
+                                            "type": "token",
+                                            "content": full_ai_response,
+                                            "node": node_name,
+                                            "provider": provider,
+                                            "model": model,
+                                            "duration": time.perf_counter() - request_start
+                                        })
+                                        break
 
         except asyncio.CancelledError:
             log_debug(f"Task cancelled for conversation {conversation_id}")
@@ -406,16 +537,51 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             
             await websocket.send_json({"type": "error", "message": f"Execution Error: {friendly_msg}"})
         finally:
-            # Persist AI Response
-            if full_ai_response:
+            # Re-fetch or save all generated messages
+            if save_to_db:
                 async with AsyncSessionLocal() as db:
-                    new_ai_msg = Message(
-                        conversation_id=conversation_id,
-                        role="assistant",
-                        content=full_ai_response
-                    )
-                    db.add(new_ai_msg)
-                    await db.commit()
+                    if final_messages and len(final_messages) > history_len:
+                        # Save all new messages generated during the graph run
+                        new_msgs_to_save = final_messages[history_len:]
+                        for m in new_msgs_to_save:
+                            role = getattr(m, "type", "assistant")
+                            if role == "ai":
+                                role_str = "assistant"
+                            elif role == "human":
+                                role_str = "user"
+                            elif role == "tool":
+                                role_str = "tool"
+                            elif role == "system":
+                                role_str = "system"
+                            else:
+                                role_str = str(role)
+                                
+                            meta = {}
+                            if hasattr(m, "tool_calls") and m.tool_calls:
+                                meta["tool_calls"] = m.tool_calls
+                            if role == "tool":
+                                meta["name"] = getattr(m, "name", "")
+                                meta["tool_call_id"] = getattr(m, "tool_call_id", "")
+                                
+                            meta_json = json.dumps(meta) if meta else None
+                            
+                            new_db_msg = Message(
+                                conversation_id=conversation_id,
+                                role=role_str,
+                                content=str(m.content),
+                                metadata_json=meta_json
+                            )
+                            db.add(new_db_msg)
+                        await db.commit()
+                    elif full_ai_response:
+                        # Fallback to save just the final response if graph run didn't finish normally
+                        new_ai_msg = Message(
+                            conversation_id=conversation_id,
+                            role="assistant",
+                            content=full_ai_response
+                        )
+                        db.add(new_ai_msg)
+                        await db.commit()
                     
                 # Send final telemetry
                 initial_state["telemetry"]["latencies"]["total"] = time.perf_counter() - request_start
@@ -442,6 +608,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         while True:
             data = await websocket.receive_text()
             payload = json.loads(data)
+            
+            if payload.get("type") == "ping":
+                # Heartbeat ping from client to keep connection alive
+                continue
+            
+            if payload.get("type") == "tool_response":
+                await client_tool_responses.put(payload)
+                continue
             
             if payload.get("type") == "cancel":
                 print("PIPELINE: Cancel signal received from client")
@@ -481,8 +655,8 @@ async def quick_chat(payload: dict, current_user = Depends(get_current_user)):
     system_context = payload.get("system_context", "")
     message = payload.get("message", "")
     
-    provider = payload.get("provider", "groq").lower()
-    model_name = payload.get("model", "llama3-8b-8192")
+    provider = (payload.get("provider") or "ollama_cloud").lower()
+    model_name = payload.get("model") or "default"
     api_key = payload.get("api_key", None)
     
     try:

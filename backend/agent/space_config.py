@@ -77,7 +77,7 @@ SPACE_CONFIGS: Dict[str, Dict[str, Any]] = {
         "system_prompt_prefix": SPIRIT_BOOK_SYSTEM_PROMPT,
         "graph_type": "default",
         "skills": ["all"],
-        "recommended_provider": "google",
+        "recommended_provider": "gemini",
         "recommended_model": "gemini-2.0-flash-exp",
         "constraints": {}
     }

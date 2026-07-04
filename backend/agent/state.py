@@ -32,3 +32,6 @@ class AgentState(TypedDict):
     
     # Optional domain-specific states
     trading_context: Optional[dict]
+
+    # Client-injected workspace data and semantic context
+    scratchpad: Optional[dict]

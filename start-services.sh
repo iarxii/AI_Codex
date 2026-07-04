@@ -1,13 +1,28 @@
 #!/bin/bash
 
 # This script starts all the necessary services for the AI_Codex project.
+# It aligns with start_website_dev.bat local mode execution.
 
-# Start the MCP server with the inspector in a new window
-echo "Starting MCP server with inspector..."
-cd mcp && start "MCP Inspector" cmd /c "npm run server:inspect" && cd ..
+echo "Starting Docker containers (PostgreSQL + pgvector)..."
+docker-compose up -d
 
-# Start the main application server in a new window
-echo "Starting main application server..."
-cd server && start "Main Server" cmd /c "npm run server" && cd ..
+# Start backend service
+echo "Starting FastAPI Backend on port 9000..."
+export PYTHONPATH=.
+source backend/.venv/bin/activate || source backend/.venv/Scripts/activate
+uvicorn backend.main:app --reload --reload-dir backend --host 0.0.0.0 --port 9000 &
 
-echo "All services are starting in separate windows."
+BACKEND_PID=$!
+
+# Start client/frontend service
+echo "Starting React Frontend..."
+cd client
+npm run dev &
+CLIENT_PID=$!
+cd ..
+
+# Handle graceful shutdown of both background processes
+trap "kill $BACKEND_PID $CLIENT_PID; exit" INT TERM EXIT
+
+echo "All services are running. Press Ctrl+C to stop."
+wait

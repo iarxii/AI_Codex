@@ -27,7 +27,7 @@ def log_performance(event: str, duration: float, metadata: dict = None):
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(f"[{timestamp}] {event}: {duration:.4f}s{meta_str}\n")
 
-async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
+async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier: str = "reasoning"):
     """
     Retrieves and configures the LLM provider based on the provided configuration.
     Includes robustness fixes for tool binding and connection failures.
@@ -41,6 +41,31 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
     api_key = config.get("configurable", {}).get("api_key")
     agent_mode = config.get("configurable", {}).get("agent_mode", True)
     
+    # ─── Tiered Model Routing ───
+    if tier in ("routing", "guard", "validation"):
+        if provider == "gemini":
+            model = "gemini-1.5-flash"
+        elif provider == "openrouter":
+            model = "meta-llama/llama-3-8b-instruct"
+        elif provider == "groq":
+            model = "llama-3.1-8b-instant"
+        elif provider == "local":
+            model = "llama3"
+    elif tier in ("reasoning", "coder"):
+        if provider == "gemini":
+            model = "gemini-1.5-pro"
+        elif provider == "openrouter":
+            model = "anthropic/claude-3.5-sonnet"
+        elif provider == "groq":
+            model = "llama-3.3-70b-versatile"
+        elif provider == "local":
+            model = "codellama"
+            
+    # Resolve API Key for the resolved provider from api_keys dict if available
+    api_keys = config.get("configurable", {}).get("api_keys", {})
+    if api_keys and provider in api_keys:
+        api_key = api_keys[provider]
+    
     if not agent_mode:
         bind_tools = False
 
@@ -49,16 +74,31 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
 
     model_config = config.get("configurable", {}).get("model_config", {})
     temp = model_config.get("temperature", 0.0)
-    max_toks = model_config.get("max_tokens", 1024)
+    max_toks = model_config.get("max_tokens", 4096)
 
     try:
         if provider == "colab_bridge":
-            from codex_spaces.backend.agent.bridge_llm import ChatBridge
-            user_id = config.get("configurable", {}).get("user_id")
-            space_slug = config.get("configurable", {}).get("space_slug")
-            if not user_id or not space_slug:
-                raise ValueError("Colab bridge requires 'user_id' and 'space_slug' in configuration.")
-            llm = ChatBridge(user_id=int(user_id), space_slug=str(space_slug), model_name=model or "default")
+            base_url = config.get("configurable", {}).get("base_url")
+            if base_url:
+                from langchain_openai import ChatOpenAI
+                target_model = model or "gemma-4-E4B_q4_0-it"
+                if not base_url.endswith("/v1"):
+                    base_url = f"{base_url.rstrip('/')}/v1"
+                llm = ChatOpenAI(
+                    model=target_model,
+                    base_url=base_url,
+                    api_key=api_key or "sk-colab",
+                    temperature=temp,
+                    max_tokens=max_toks,
+                    streaming=True
+                )
+            else:
+                from codex_spaces.backend.agent.bridge_llm import ChatBridge
+                user_id = config.get("configurable", {}).get("user_id")
+                space_slug = config.get("configurable", {}).get("space_slug")
+                if not user_id or not space_slug:
+                    raise ValueError("Colab bridge requires 'user_id' and 'space_slug' in configuration or a custom base URL.")
+                llm = ChatBridge(user_id=int(user_id), space_slug=str(space_slug), model_name=model or "default")
         elif provider == "groq":
             from langchain_groq import ChatGroq
             llm = ChatGroq(model=model or "llama3-8b-8192", api_key=api_key, temperature=temp, max_tokens=max_toks, streaming=True)
@@ -146,7 +186,13 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True):
             else:
                 # ── LLAMACPP MODE ──
                 # Direct connection to llama-server.exe with manual chat templates.
-                # Uses NativeLocalClient which auto-detects the template from model name.
+                # Ensure the correct model flavor is loaded/swapped dynamically
+                try:
+                    from backend.utils.llama_manager import LlamaServerManager
+                    LlamaServerManager.ensure_model_loaded(local_model)
+                except Exception as e:
+                    logger.warning(f"[LlamaManager] Dynamic model load check failed: {e}")
+
                 base_url = settings.LLAMACPP_BASE_URL
                 if not base_url.endswith("/v1"):
                     base_url = f"{base_url.rstrip('/')}/v1"
@@ -234,6 +280,66 @@ async def init_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]
     
     return {"telemetry": telemetry}
 
+async def guard_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Pre-reasoning guard that validates context health before invoking the LLM.
+    Detects:
+      1. Stuck loops — 3+ identical consecutive tool calls
+      2. Excessive context — token count approaching model limits
+    Short-circuits with a user-friendly error instead of producing garbage.
+    """
+    messages = state["messages"]
+    provider = config.get("configurable", {}).get("provider", "local")
+    model = config.get("configurable", {}).get("model", "default")
+    
+    # 1. Stuck Loop Detection: check last N tool calls for repetition within the current turn
+    recent_tool_calls = []
+    for m in reversed(messages):
+        if isinstance(m, HumanMessage):
+            break
+        if hasattr(m, "tool_calls") and m.tool_calls:
+            for tc in m.tool_calls:
+                import json
+                try:
+                    args_str = json.dumps(tc.get("args", {}), sort_keys=True)
+                except Exception:
+                    args_str = str(tc.get("args", {}))
+                recent_tool_calls.append((tc.get("name", ""), args_str))
+            if len(recent_tool_calls) >= 3:
+                break
+    
+    if len(recent_tool_calls) >= 3:
+        last_three = recent_tool_calls[:3]
+        if len(set(last_three)) == 1:
+            stuck_tool = last_three[0][0]
+            logger.warning(f"GUARD: Stuck loop detected — tool '{stuck_tool}' called 3 times consecutively with same arguments")
+            return {
+                "messages": [AIMessage(
+                    content=f"[WARNING] I appear to be stuck in a loop calling `{stuck_tool}` repeatedly with the same arguments. "
+                             "Let me step back and address your request differently. "
+                             "Could you rephrase what you need, or should I try a different approach?"
+                )],
+                "current_tool_calls": [],
+                "is_complete": True
+            }
+    
+    # 2. Context Budget Pre-check (warn, don't block — reason_node handles summarization)
+    from backend.utils.telemetry import estimate_tokens, get_model_context_limit
+    total_tokens = sum(estimate_tokens(str(m.content)) for m in messages)
+    context_limit = get_model_context_limit(provider, model)
+    
+    if total_tokens > context_limit * 0.95:
+        logger.warning(f"GUARD: Context critically full ({total_tokens}/{context_limit} tokens)")
+        # Don't block — reason_node will summarize, but log for observability
+    
+    telemetry = state.get("telemetry", {})
+    if "latencies" not in telemetry:
+        telemetry["latencies"] = {}
+    telemetry["context_tokens"] = total_tokens
+    telemetry["context_limit"] = context_limit
+    
+    return {"telemetry": telemetry}
+
 async def summarize_history(messages: List[BaseMessage], config: RunnableConfig) -> str:
     """
     Summarizes older messages to save context space.
@@ -246,10 +352,57 @@ async def summarize_history(messages: List[BaseMessage], config: RunnableConfig)
     if not to_summarize:
         return ""
         
-    llm = await get_dynamic_llm(config, bind_tools=False)
+    llm = await get_dynamic_llm(config, bind_tools=False, tier="routing")
     summary_prompt = "Summarize the key points of the preceding conversation history concisely. Focus on technical decisions and user goals."
     response = await llm.ainvoke([HumanMessage(content=f"{str(to_summarize)}\n\n{summary_prompt}")])
     return response.content
+
+def resolve_llm_fallback(current_provider: str, current_model: str, api_keys: dict) -> tuple[str, str, str]:
+    """
+    Resolves the next fallback provider, model name, and API key.
+    Ensures zero-cost local Ollama fallback is always available.
+    """
+    fallback_chain = ["ollama_cloud", "openrouter", "groq", "gemini", "local"]
+    
+    # Normalize model mapping from current model to fallback models
+    model_mappings = {
+        "ollama_cloud": {
+            "default": "llama3",
+            "llama3": "llama3"
+        },
+        "openrouter": {
+            "default": "meta-llama/llama-3-8b-instruct",
+            "meta-llama/llama-3-8b-instruct": "meta-llama/llama-3-8b-instruct",
+            "google/gemini-flash-1.5": "google/gemini-flash-1.5"
+        },
+        "groq": {
+            "default": "llama3-8b-8192",
+            "llama3-8b-8192": "llama3-8b-8192",
+            "llama3-70b-8192": "llama3-70b-8192"
+        },
+        "gemini": {
+            "default": "gemini-1.5-flash",
+            "gemini-1.5-flash": "gemini-1.5-flash",
+            "gemini-1.5-pro": "gemini-1.5-pro"
+        },
+        "local": {
+            "default": "default"
+        }
+    }
+    
+    for provider in fallback_chain:
+        if provider == current_provider:
+            continue
+        
+        # Check if API key is available (local doesn't need a key)
+        key = api_keys.get(provider)
+        if key or provider == "local":
+            provider_models = model_mappings.get(provider, {})
+            # Map equivalent model
+            fallback_model = provider_models.get(current_model, provider_models.get("default", "default"))
+            return provider, fallback_model, key
+            
+    return None, None, None
 
 async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
@@ -272,55 +425,132 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             write_workspace_status(conversation_id, status)
             logger.info(f"SENTINEL: Status updated at turn {turn_count} ({len(status)} chars)")
     
-    # Context Budgeting: If history is long, summarize older parts
+    # Context Budgeting: Token-aware summarization
+    from backend.utils.telemetry import estimate_tokens, get_model_context_limit
+    
+    total_tokens = sum(estimate_tokens(str(m.content)) for m in messages)
+    context_limit = get_model_context_limit(provider, model)
+    budget_threshold = int(context_limit * 0.7)  # Leave 30% headroom for system prompt + response
+    
     summary = ""
-    if len(messages) > 15:
+    if total_tokens > budget_threshold and len(messages) > 6:
+        logger.info(f"PIPELINE: Context budget exceeded ({total_tokens}/{budget_threshold} tokens). Summarizing...")
         summary = await summarize_history(messages, config)
         # Keep only the system message, the summary, and the last 5 messages
         system_msg = messages[0]
         recent_msgs = messages[-5:]
         messages = [system_msg, HumanMessage(content=f"Summary of previous turns: {summary}")] + recent_msgs
+        logger.info(f"PIPELINE: Context compressed to {len(messages)} messages")
     conversation_id = config.get("configurable", {}).get("conversation_id", "default")
-    system_prompt = build_system_prompt(conversation_id)
-    
     space_config = state.get("space_config", {})
-    if space_config.get("system_prompt_prefix"):
-        system_prompt = f"{space_config['system_prompt_prefix']}\n\n{system_prompt}"
+    allowed_skills = space_config.get("skills", ["all"])
+    
+    # NOTE: System prompt is built AFTER tool binding (see below, L~420)
+    # so we can inject tool-binding telemetry into the prompt.
 
     # Initialize context builder with provider-aware budget
     provider = config.get("configurable", {}).get("provider", "local")
-    
+    model = config.get("configurable", {}).get("model", "")
+    p_label = {
+        "groq": "Groq",
+        "openrouter": "OpenRouter",
+        "gemini": "Google Gemini",
+        "ollama_cloud": "Ollama Cloud",
+        "local": "Local Ollama",
+        "colab_bridge": "Colab Bridge",
+    }.get(provider, provider.title())
+
     # Early Auth Check for Cloud Providers
     if provider in ["groq", "openrouter", "gemini", "ollama_cloud"]:
         api_key = config.get("configurable", {}).get("api_key")
         
         is_missing = not api_key or (provider == "ollama_cloud" and api_key == "sk-ollama")
         if is_missing:
-            p_label = provider.capitalize() if provider != "ollama_cloud" else "Ollama Cloud"
-            return {
-                "messages": [AIMessage(content=f"❌ **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core.")],
-                "current_tool_calls": [],
-                "context_data": {"error": "auth_missing"}
-            }
+            # Try to resolve fallback since primary key is missing
+            api_keys = config.get("configurable", {}).get("api_keys", {})
+            fallback_prov, fallback_model, fallback_key = resolve_llm_fallback(provider, model, api_keys)
+            
+            if fallback_prov:
+                logger.warning(f"PIPELINE WARNING: Provider [{provider}] API key is missing. Automatically falling back to [{fallback_prov}]...")
+                
+                # Notify UI via WebSocket stream
+                websocket = config.get("configurable", {}).get("websocket")
+                if websocket:
+                    try:
+                        await websocket.send_json({
+                            "type": "token",
+                            "content": f"\n\n[WARNING] *[{provider.upper()}] API key missing. Switching to [{fallback_prov.upper()}] ({fallback_model})...*\n\n",
+                            "node": "provider_fallback"
+                        })
+                    except Exception as ws_err:
+                        logger.error(f"PIPELINE ERROR: Failed to stream fallback message: {ws_err}")
+                
+                # Construct config override for fallback
+                config_copy = dict(config)
+                config_copy["configurable"] = dict(config.get("configurable", {}))
+                config_copy["configurable"]["provider"] = fallback_prov
+                config_copy["configurable"]["model"] = fallback_model
+                config_copy["configurable"]["api_key"] = fallback_key
+                config = config_copy
+                
+                # Record failed attempt and update loop variables
+                telemetry = state.get("telemetry", {})
+                if "provider_attempts" not in telemetry:
+                    telemetry["provider_attempts"] = []
+                telemetry["provider_attempts"].append(f"{provider} ({model}) - failed: API key missing")
+                
+                provider = fallback_prov
+                model = fallback_model
+                # Fallback applied — continue execution with new provider
+            else:
+                # No fallback available — return an error to the user
+                return {
+                    "messages": [AIMessage(content=f"[ERROR] **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core.")],
+                    "current_tool_calls": [],
+                    "context_data": {"error": "auth_missing"}
+                }
 
-    logger.info(f"PIPELINE: Building context for provider={provider}...")
+    logger.info(f"PIPELINE: Initializing context builder for provider={provider}...")
     context_builder = get_context_builder(provider=provider)
     
-    # Wire the budget! 
-    # This transforms the raw message list into a budget-aware prompt
-    messages = context_builder.build_context(messages, system_prompt=system_prompt)
+    # Context builder is saved for use AFTER tool binding, when the system prompt is ready.
+    # At this point we only log its availability — actual context build happens post-binding.
+    if context_builder:
+        logger.info("PIPELINE: ContextBuilder available. Will apply after tool binding.")
+    else:
+        logger.warning("PIPELINE: ContextBuilder is None. Will use fallback message formatting.")
     
-    logger.info(f"PIPELINE: Context built (len={len(messages)}). Initializing LLM...")
+    logger.info(f"PIPELINE: Proceeding to LLM init (message count={len(messages)})...")
     
     # Initialize tools and binding logic
-    conversation_id = config.get("configurable", {}).get("conversation_id")
-    allowed_skills = space_config.get("skills", ["all"])
     tools = get_agent_tools(conversation_id, allowed_skills)
+    
+    # Dynamically bind client-side MCP tools from scratchpad
+    scratchpad_data = state.get("scratchpad") or {}
+    mcp_tools_list = scratchpad_data.get("mcp_tools") or []
+    if mcp_tools_list:
+        from langchain_core.tools import StructuredTool
+        for mcp_t in mcp_tools_list:
+            tool_name = mcp_t.get("name")
+            if any(t.name == tool_name for t in tools):
+                continue
+            
+            async def dummy_coroutine(**kwargs):
+                return "Delegated to client"
+                
+            mcp_wrapped = StructuredTool(
+                name=tool_name,
+                description=mcp_t.get("description") or f"Client-side MCP tool: {tool_name}",
+                func=lambda *args, **kwargs: "Delegated to client",
+                coroutine=dummy_coroutine,
+                args_schema=mcp_t.get("inputSchema") or {}
+            )
+            tools.append(mcp_wrapped)
     
     # Use the dynamic LLM with tools bound
     try:
         # get_dynamic_llm is defined in this file
-        llm = await get_dynamic_llm(config, bind_tools=False) 
+        llm = await get_dynamic_llm(config, bind_tools=False, tier="reasoning") 
         
         # Sanity check tools before binding
         valid_tools = []
@@ -334,18 +564,43 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         capabilities = state.get("telemetry", {}).get("capabilities", [])
         has_tool_support = "Tools" in capabilities
         
+        tool_binding_status = ""
         if valid_tools and has_tool_support and not isinstance(llm, NativeLocalClient):
             logger.info(f"PIPELINE: Binding {len(valid_tools)} tools to LLM (Model: {model})")
             llm = llm.bind_tools(valid_tools)
+            tool_binding_status = f"Tools bound successfully: {[t.name for t in valid_tools]}. You MUST use these tools for file/command operations."
         elif valid_tools:
             logger.info(f"PIPELINE: Skipping tool binding for '{model}' (Capability 'Tools' not found in {capabilities})")
+            tool_binding_status = f"WARNING: Tool binding was SKIPPED for this model ({model}). You cannot call tools. Respond conversationally only."
+        else:
+            tool_binding_status = "No tools available for this session."
     except Exception as init_err:
         logger.error(f"PIPELINE ERROR: LLM init failed — {init_err}")
+        telemetry = state.get("telemetry", {})
+        if "provider_attempts" not in telemetry:
+            telemetry["provider_attempts"] = []
+        failed_attempt = f"{provider} ({model}) - failed: {init_err}"
+        if not telemetry["provider_attempts"] or failed_attempt not in telemetry["provider_attempts"]:
+            telemetry["provider_attempts"].append(failed_attempt)
         return {
-            "messages": [AIMessage(content=f"❌ LLM initialization failed: {init_err}")],
+            "messages": [AIMessage(content=f"[ERROR] LLM initialization failed: {init_err}")],
             "current_tool_calls": [],
-            "context_data": {"error": str(init_err)}
+            "context_data": {"error": str(init_err)},
+            "telemetry": telemetry
         }
+    
+    # Build system prompt AFTER tool binding so we can inject tool-binding status (Layer 3)
+    system_prompt = build_system_prompt(conversation_id, allowed_skills, tool_binding_status)
+    
+    if space_config.get("system_prompt_prefix"):
+        system_prompt = f"{space_config['system_prompt_prefix']}\n\n{system_prompt}"
+    
+    # Rebuild context with the tool-aware system prompt
+    if context_builder:
+        messages = context_builder.build_context(messages, system_prompt=system_prompt)
+    else:
+        from langchain_core.messages import SystemMessage as _SysMsg
+        messages = [_SysMsg(content=system_prompt)] + [m for m in messages if m.type != "system"]
     
     # Base timeout: local and ollama_cloud are typically heavier on prefill latency
     base_timeout = 120.0 if provider in ("local", "ollama_cloud") else 60.0
@@ -381,21 +636,63 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     except (TimeoutError, Exception) as invoke_err:
         error_msg = str(invoke_err)
         
-        # ─── ROBUST FALLBACK ───
-        # If the model provider rejects the request because of tool calling,
-        # we retry WITHOUT tool binding to allow the model to still reply.
-        is_tool_error = "does not support tools" in error_msg or "invalid_request_error" in error_msg
-        if is_tool_error and "valid_tools" in locals() and valid_tools:
-            logger.warning(f"PIPELINE WARNING: Tool-calling error caught: {error_msg}. Retrying without tools...")
+        # Track failed attempt in telemetry
+        telemetry = state.get("telemetry", {})
+        if "provider_attempts" not in telemetry:
+            telemetry["provider_attempts"] = []
+        telemetry["provider_attempts"].append(f"{provider} ({model}) - failed: {error_msg}")
+        
+        # ─── DYNAMIC PROVIDER FALLBACK (LOOP ENGINEERING) ───
+        api_keys = config.get("configurable", {}).get("api_keys", {})
+        fallback_prov, fallback_model, fallback_key = resolve_llm_fallback(provider, model, api_keys)
+        
+        if fallback_prov:
+            logger.warning(f"PIPELINE WARNING: Provider [{provider}] failed with [{error_msg}]. Automatically switching to [{fallback_prov}] fallback...")
+            
+            # Notify UI via WebSocket stream
+            websocket = config.get("configurable", {}).get("websocket")
+            if websocket:
+                try:
+                    await websocket.send_json({
+                        "type": "token",
+                        "content": f"\n\n[WARNING] *[{provider.upper()}] rate/quota limit or connection error. Switching to [{fallback_prov.upper()}] ({fallback_model})...*\n\n",
+                        "node": "provider_fallback"
+                    })
+                except Exception as ws_err:
+                    logger.error(f"PIPELINE ERROR: Failed to stream fallback message: {ws_err}")
+            
             try:
-                # Re-initialize LLM without any tool binding
-                llm_fallback = await get_dynamic_llm(config, bind_tools=False)
+                # Construct config override for fallback
+                config_copy = dict(config)
+                config_copy["configurable"] = dict(config.get("configurable", {}))
+                config_copy["configurable"]["provider"] = fallback_prov
+                config_copy["configurable"]["model"] = fallback_model
+                config_copy["configurable"]["api_key"] = fallback_key
+                
+                llm_fallback = await get_dynamic_llm(config_copy, bind_tools=True)
                 response = await _asyncio.wait_for(llm_fallback.ainvoke(messages), timeout=request_timeout)
-                # Success! Override error_msg and continue
-                invoke_err = None 
-            except Exception as retry_err:
-                logger.error(f"PIPELINE ERROR: Fallback retry also failed: {retry_err}")
-                error_msg = f"Model failed with tool calling, and fallback also failed: {retry_err}"
+                
+                # Update loop variables on success
+                provider = fallback_prov
+                model = fallback_model
+                telemetry["provider_attempts"].append(f"{fallback_prov} ({fallback_model})")
+                invoke_err = None  # Clear error!
+            except Exception as fallback_err:
+                logger.error(f"PIPELINE ERROR: Fallback switch also failed: {fallback_err}")
+                error_msg = f"Original error: {error_msg}. Fallback to {fallback_prov} also failed: {fallback_err}"
+        
+        # ─── TOOL FALLBACK ───
+        if invoke_err:
+            is_tool_error = "does not support tools" in error_msg or "invalid_request_error" in error_msg
+            if is_tool_error and "valid_tools" in locals() and valid_tools:
+                logger.warning(f"PIPELINE WARNING: Tool-calling error caught: {error_msg}. Retrying without tools...")
+                try:
+                    llm_fallback_no_tools = await get_dynamic_llm(config, bind_tools=False)
+                    response = await _asyncio.wait_for(llm_fallback_no_tools.ainvoke(messages), timeout=request_timeout)
+                    invoke_err = None 
+                except Exception as retry_err:
+                    logger.error(f"PIPELINE ERROR: Fallback without tools also failed: {retry_err}")
+                    error_msg = f"Model failed with tool calling, and fallback also failed: {retry_err}"
         
         if invoke_err:
             is_timeout = isinstance(invoke_err, (_asyncio.TimeoutError, TimeoutError)) or "TimeoutError" in type(invoke_err).__name__
@@ -414,14 +711,12 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 elif "Could not find model" in error_msg or "404" in error_msg:
                     error_msg = "Model not found. Please select a different model."
             return {
-                "messages": [AIMessage(content=f"❌ {error_msg}")],
+                "messages": [AIMessage(content=f"[ERROR] {error_msg}")],
                 "current_tool_calls": [],
                 "context_data": {"error": str(invoke_err)}
             }
     duration = time.perf_counter() - start_time
     
-    provider = config.get("configurable", {}).get("provider", "local")
-    model = config.get("configurable", {}).get("model", "default")
     log_performance("LLM_REASONING", duration, {"provider": provider, "model": model})
     logger.info(f"PIPELINE: LLM responded in {duration:.2f}s, content length={len(str(response.content))}")
     
@@ -433,6 +728,19 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     if "latencies" not in telemetry: telemetry["latencies"] = {}
     telemetry["latencies"]["reason_node"] = duration
     
+    if "provider_attempts" not in telemetry:
+        telemetry["provider_attempts"] = []
+    
+    # Record success of current provider/model in the attempts list
+    success_str = f"{provider} ({model})"
+    if not telemetry["provider_attempts"] or not any(success_str in attempt for attempt in telemetry["provider_attempts"]):
+        telemetry["provider_attempts"].append(success_str)
+        
+    if "tokens" not in telemetry:
+        telemetry["tokens"] = {}
+    telemetry["tokens"]["input"] = total_tokens
+    telemetry["tokens"]["output"] = estimate_tokens(str(response.content))
+    
     return {
         "messages": [response],
         "current_tool_calls": tool_calls,
@@ -442,8 +750,9 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
 
 async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
-    Tool execution node. Dispatches to the compiled LangChain tools.
+    Tool execution node. Dispatches to the compiled LangChain tools or delegates to client-side.
     """
+    import asyncio
     node_start = time.perf_counter()
     last_message = state["messages"][-1]
     tool_messages = []
@@ -453,35 +762,81 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
 
     conversation_id = config.get("configurable", {}).get("conversation_id")
     tools = get_agent_tools(conversation_id)
+    
+    # Dynamically bind client-side MCP tools from scratchpad
+    scratchpad_data = state.get("scratchpad") or {}
+    mcp_tools_list = scratchpad_data.get("mcp_tools") or []
+    if mcp_tools_list:
+        from langchain_core.tools import StructuredTool
+        for mcp_t in mcp_tools_list:
+            tool_name = mcp_t.get("name")
+            if any(t.name == tool_name for t in tools):
+                continue
+            
+            async def dummy_coroutine(**kwargs):
+                return "Delegated to client"
+                
+            mcp_wrapped = StructuredTool(
+                name=tool_name,
+                description=mcp_t.get("description") or f"Client-side MCP tool: {tool_name}",
+                func=lambda *args, **kwargs: "Delegated to client",
+                coroutine=dummy_coroutine,
+                args_schema=mcp_t.get("inputSchema") or {}
+            )
+            tools.append(mcp_wrapped)
+            
     tool_map = {t.name: t for t in tools}
+
+    client_type = config.get("configurable", {}).get("client_type")
+    websocket = config.get("configurable", {}).get("websocket")
+    client_tool_responses = config.get("configurable", {}).get("client_tool_responses")
 
     for tool_call in last_message.tool_calls:
         tool_name = tool_call["name"]
         tool_args = tool_call["args"]
         tool_id = tool_call["id"]
         
-        logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+        is_client_tool = client_type == "vscode" and tool_name in ["workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"]
         
-        start_time = time.perf_counter()
-        tool = tool_map.get(tool_name)
-        if tool:
+        if is_client_tool and websocket and client_tool_responses:
+            logger.info(f"Delegating tool execution to VS Code client: {tool_name} with args: {tool_args}")
             try:
-                # Use the compiled LangChain tool which safely handles async
-                result = await tool.ainvoke(tool_args)
-                duration = time.perf_counter() - start_time
-                log_performance("TOOL_CALL", duration, {"tool": tool_name})
-                
-                # result is usually the output string or a SkillResult if duck-typing applies
-                if hasattr(result, "success"):
-                    tool_result = result.output or result.error or "Success (no output)"
-                    if not result.success and not result.error:
-                        tool_result = f"Error: {tool_result}"
-                else:
-                    tool_result = str(result)
+                # Send tool execution request to client
+                await websocket.send_json({
+                    "type": "client_tool_call",
+                    "name": tool_name,
+                    "args": tool_args,
+                    "id": tool_id
+                })
+                # Wait for tool response from client (120s timeout)
+                response_payload = await asyncio.wait_for(client_tool_responses.get(), timeout=120.0)
+                tool_result = response_payload.get("output", "")
+            except asyncio.TimeoutError:
+                tool_result = f"Error: Tool execution timed out on the client."
             except Exception as e:
-                tool_result = f"Exception during tool execution: {str(e)}"
+                tool_result = f"Error during client tool execution delegation: {str(e)}"
         else:
-            tool_result = f"Error: Tool '{tool_name}' not found."
+            logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+            start_time = time.perf_counter()
+            tool = tool_map.get(tool_name)
+            if tool:
+                try:
+                    # Use the compiled LangChain tool which safely handles async
+                    result = await tool.ainvoke(tool_args)
+                    duration = time.perf_counter() - start_time
+                    log_performance("TOOL_CALL", duration, {"tool": tool_name})
+                    
+                    # result is usually the output string or a SkillResult if duck-typing applies
+                    if hasattr(result, "success"):
+                        tool_result = result.output or result.error or "Success (no output)"
+                        if not result.success and not result.error:
+                            tool_result = f"Error: {tool_result}"
+                    else:
+                        tool_result = str(result)
+                except Exception as e:
+                    tool_result = f"Exception during tool execution: {str(e)}"
+            else:
+                tool_result = f"Error: Tool '{tool_name}' not found."
         
         tool_messages.append(
             ToolMessage(
@@ -497,3 +852,179 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
     telemetry["latencies"]["tool_execution"] = time.perf_counter() - node_start
 
     return {"messages": tool_messages, "current_tool_calls": [], "telemetry": telemetry}
+
+async def validate_response_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Post-reasoning validator (Layer 2). Detects if the model fabricated file/command
+    outputs without calling tools, and injects a correction message to trigger
+    one more reasoning cycle via guard → reason.
+    
+    This node only fires when reason_node returned NO tool calls (i.e.,
+    should_continue routed here instead of to execute_tool).
+    Max 1 retry to prevent infinite loops.
+    """
+    messages = state["messages"]
+    last_ai = messages[-1] if messages else None
+    
+    if not last_ai or getattr(last_ai, "type", "") != "ai":
+        return {"is_complete": True}  # Nothing to validate
+    
+    # Circuit breaker: check if we already retried
+    retry_count = state.get("context_data", {}).get("fabrication_retries", 0)
+    if retry_count >= 1:
+        logger.info("VALIDATOR: Max retries reached, accepting response as-is")
+        return {"is_complete": True}
+    
+    # Check: does the response contain Canvas code blocks but no tool calls?
+    content = str(last_ai.content)
+    has_canvas_code = "[CANVAS:CODE:" in content
+    has_fabricated_shell = any(marker in content for marker in [
+        "Successfully created", "File written to", "Script executed",
+        "I've created the file", "I have written"
+    ])
+    has_tool_calls = bool(getattr(last_ai, "tool_calls", []))
+    
+    # Check: does the model have tool support in this session?
+    capabilities = state.get("telemetry", {}).get("capabilities", [])
+    has_tool_support = "Tools" in capabilities
+    
+    if not has_tool_support:
+        # Model genuinely can't call tools — don't retry
+        return {"is_complete": True}
+    
+    if (has_canvas_code or has_fabricated_shell) and not has_tool_calls:
+        logger.warning(
+            f"VALIDATOR: Fabrication detected — Canvas/shell output present "
+            f"but 0 tool calls. Injecting correction. (retry={retry_count})"
+        )
+        correction = SystemMessage(
+            content=(
+                "CRITICAL CORRECTION: Your previous response contained code or "
+                "file creation claims without calling the required tools. "
+                "[CANVAS:...] blocks do NOT write files to disk. "
+                "You MUST call 'workspace_writer' to create files and "
+                "'shell_exec' to run commands. "
+                "Re-attempt your response using ONLY tool calls."
+            )
+        )
+        context_data = state.get("context_data", {})
+        context_data["fabrication_retries"] = retry_count + 1
+        
+        # Optimize token usage: truncate the fabricated response content in the history.
+        # This prevents sending back large code blocks as input tokens to the retry turn.
+        last_ai_id = getattr(last_ai, "id", None)
+        truncated_text = f"[Fabrication detected: Omitted original {len(content)} characters of code/text for token efficiency]"
+        if last_ai_id:
+            truncated_ai = AIMessage(
+                content=truncated_text,
+                id=last_ai_id,
+                tool_calls=[]
+            )
+            messages_to_return = [truncated_ai, correction]
+        else:
+            try:
+                last_ai.content = truncated_text
+            except Exception:
+                pass
+            messages_to_return = [correction]
+            
+        return {
+            "messages": messages_to_return,
+            "context_data": context_data,
+            "is_complete": False
+        }
+    
+    return {"is_complete": True}
+
+
+async def verification_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Verification node following tool execution.
+    Checks if files were modified (via workspace_writer) and triggers client-side
+    linter/compiler compilation checks to feed back errors and self-correct.
+    """
+    import uuid
+    messages = state.get("messages", [])
+    if not messages:
+        return {}
+        
+    last_message = messages[-1]
+    
+    # Check if we just completed a verification tool call
+    if isinstance(last_message, ToolMessage) and last_message.name == "shell_exec":
+        # We just executed the compilation/linting tool
+        content = last_message.content.lower()
+        has_error = False
+        error_summary = ""
+        
+        # Look for typical compilation or syntax errors
+        if "error ts" in content or ("tsc -p" in content and "error" in content):
+            has_error = True
+            error_summary = "TypeScript compilation failed."
+        elif "syntaxerror" in content or "invalid syntax" in content:
+            has_error = True
+            error_summary = "Python syntax error."
+        elif "failed" in content or "exception" in content:
+            has_error = True
+            error_summary = "Test execution failed."
+            
+        if has_error:
+            feedback_msg = SystemMessage(
+                content=(
+                    f"⚠️ [VERIFICATION FAILURE] {error_summary}\n"
+                    f"Compiler/Linter Output:\n```\n{last_message.content}\n```\n"
+                    f"Please fix the errors in your code."
+                )
+            )
+            return {"messages": [feedback_msg]}
+        else:
+            feedback_msg = SystemMessage(
+                content="✅ [VERIFICATION SUCCESS] Code verification passed successfully. No errors detected."
+            )
+            return {"messages": [feedback_msg]}
+            
+    # Check if any workspace files were written in the recent turn
+    # Scan backwards from the end until we hit a HumanMessage
+    files_modified = []
+    for m in reversed(messages):
+        if isinstance(m, HumanMessage):
+            break
+        # If it's an AIMessage with tool_calls for writing files
+        if isinstance(m, AIMessage) and hasattr(m, "tool_calls") and m.tool_calls:
+            for tc in m.tool_calls:
+                if tc.get("name") == "workspace_writer":
+                    args = tc.get("args") or {}
+                    filename = args.get("filename")
+                    if filename:
+                        files_modified.append(filename)
+                        
+    if files_modified:
+        # Determine the appropriate verification command
+        command = ""
+        cwd = "."
+        
+        # Check if any modified file is in the vscode-extension
+        if any("vscode-extension" in f for f in files_modified):
+            command = "npm run compile"
+            cwd = "projects/iarxii/AI_Codex/vscode-extension"
+        elif any(f.endswith(".py") for f in files_modified):
+            # Check syntax for Python files
+            py_files = [f for f in files_modified if f.endswith(".py")]
+            # Run syntax compilation check on the first python file
+            command = f"python -m py_compile {py_files[0]}"
+            cwd = "."
+            
+        if command:
+            # Emit verification tool call
+            tool_call_id = f"verify_{uuid.uuid4().hex[:8]}"
+            verification_message = AIMessage(
+                content="[VERIFICATION] Verifying recent changes...",
+                tool_calls=[{
+                    "name": "shell_exec",
+                    "args": {"command": command, "cwd": cwd},
+                    "id": tool_call_id
+                }]
+            )
+            return {"messages": [verification_message]}
+            
+    return {}

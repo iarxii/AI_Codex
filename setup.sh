@@ -1,31 +1,38 @@
 #!/bin/bash
-# GP HealthMedAgentix setup script
+# AI_Codex project setup script
 
 set -e
 
-# Install dependencies in client and server
-for dir in client server mcp; do
-  echo "Installing dependencies in $dir..."
-  cd "$dir"
-  npm install
-  # Create .env if it doesn't exist
-  if [ ! -f .env ]; then
-    echo "Creating starter .env in $dir..."
-    echo -e "# Example .env for $dir\nPORT=3000" > .env
-  fi
-  cd ..
-done
+echo "=== Setting up AI_Codex ==="
 
-  # Run database migration
-  echo "Running database migration..."
-  if command -v sqlite3 >/dev/null 2>&1; then
-    if [ -f db_lite/migrations/001_create_schema.sql ]; then
-      sqlite3 db_lite/chat.db < db_lite/migrations/001_create_schema.sql
-      echo "Migration applied to db_lite/chat.db."
-    else
-      echo "Migration file not found: db_lite/migrations/001_create_schema.sql"
-    fi
-  else
-    echo "sqlite3 not found. Please install SQLite3 and run the migration manually."
-  fi
-echo "Setup complete."
+# 1. Setup Backend Python Virtual Environment
+if [ -d "backend" ]; then
+  echo "Setting up Python virtual environment in backend/..."
+  cd backend
+  python3 -m venv .venv
+  source .venv/bin/activate || source .venv/Scripts/activate
+  pip install -r requirements.txt
+  cd ..
+else
+  echo "[WARNING] Backend directory not found."
+fi
+
+# 2. Setup Client Frontend Dependencies
+if [ -d "client" ]; then
+  echo "Installing client dependencies..."
+  cd client
+  npm install
+  cd ..
+else
+  echo "[WARNING] Client directory not found."
+fi
+
+# 3. Setup MCP dependencies (if present)
+if [ -d "mcp" ] && [ -f "mcp/package.json" ]; then
+  echo "Installing MCP dependencies..."
+  cd mcp
+  npm install
+  cd ..
+fi
+
+echo "=== Setup Complete ==="

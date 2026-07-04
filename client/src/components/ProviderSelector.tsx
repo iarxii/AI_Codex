@@ -30,22 +30,13 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
     fetchModels();
   }, [provider, backendMode, bridgeModels]);
 
-  // Fallback to Groq if user is in Standard Workspace and tries to use local models
-  useEffect(() => {
-    if (!activeSpace && provider === "local") {
-      setProvider("groq");
-    }
-  }, [activeSpace, provider, setProvider]);
 
-  // Fallback if current provider is groq but space is code-lab or gpt-oss
-  useEffect(() => {
-    if (activeSpace && ["code-lab", "gpt-oss"].includes(activeSpace.slug) && provider === "groq") {
-      setProvider("local");
-    }
-  }, [activeSpace, provider, setProvider]);
+
+
 
   const fetchModels = async () => {
-    if (provider === "colab_bridge") {
+    const colabUrl = localStorage.getItem("colab_bridge_url");
+    if (provider === "colab_bridge" && !colabUrl) {
       setLoading(true);
       const formattedModels = bridgeModels.map((m) => ({ id: m, name: m }));
       setAvailableModels(formattedModels);
@@ -73,10 +64,16 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       apiKey = localStorage.getItem("gemini_api_key") || "";
     else if (provider === "ollama_cloud")
       apiKey = localStorage.getItem("ollama_cloud_key") || "";
+    else if (provider === "colab_bridge")
+      apiKey = localStorage.getItem("colab_bridge_key") || "";
 
     try {
       const url = `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/models?provider=${provider}`;
       const headers: Record<string, string> = {};
+      const token = localStorage.getItem("token");
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       if (apiKey) headers["X-API-Key"] = apiKey;
       
       // Inject space awareness headers for backend enforcement
@@ -88,6 +85,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       if (provider === "ollama_cloud") {
         const cloudUrl = localStorage.getItem("ollama_cloud_url");
         if (cloudUrl) headers["X-Base-Url"] = cloudUrl;
+      } else if (provider === "colab_bridge") {
+        if (colabUrl) headers["X-Base-Url"] = colabUrl;
       }
 
       // Pass local backend mode so the API queries the correct server
@@ -269,8 +268,9 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                     if (p.id === 'ollama_cloud') return true;
 
                     // Restrict local LLM options if no active Codex Space (Standard Workspace)
-                    // But allow them for admins for debugging/universal access
-                    if (!activeSpace && p.id === 'local' && !isAdmin) {
+                    // But allow them for admins for debugging/universal access, or in local development mode
+                    const isLocalDev = config.API_BASE_URL.includes("localhost") || config.API_BASE_URL.includes("127.0.0.1");
+                    if (!activeSpace && p.id === 'local' && !isAdmin && !isLocalDev) {
                       return false;
                     }
                     return true;

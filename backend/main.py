@@ -218,6 +218,7 @@ async def get_workspace_graph(session_id: str):
 Path("data/workspaces").mkdir(parents=True, exist_ok=True)
 app.mount("/graph", StaticFiles(directory="data/workspaces", html=True), name="workspace-graphs")
 
+@app.get("/api/healthz")
 @app.get("/healthz")
 async def health_check():
     from datetime import datetime

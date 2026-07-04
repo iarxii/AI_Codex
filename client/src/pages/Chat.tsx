@@ -374,6 +374,7 @@ const Chat: React.FC = () => {
                   timestamp: Date.now(),
                   messageId: lastMsg.id,
                   filePath: argsObj.filename || undefined,
+                  tutorExplanation: argsObj.tutor_explanation || undefined,
                 });
               }
             });
@@ -506,12 +507,14 @@ const Chat: React.FC = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        const mappedMsgs: Message[] = data.messages.map((m: any) => ({
-          id: m.id.toString(),
-          sender: m.role === 'user' ? 'user' : 'bot',
-          content: m.content,
-          status: 'done'
-        }));
+        const mappedMsgs: Message[] = data.messages
+          .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+          .map((m: any) => ({
+            id: m.id.toString(),
+            sender: m.role === 'user' ? 'user' : 'bot',
+            content: m.content,
+            status: 'done'
+          }));
         setMessages(mappedMsgs);
         
         // Update active space context based on conversation space_type
@@ -621,7 +624,11 @@ const Chat: React.FC = () => {
         agent_mode: agentMode,
         local_backend_mode: getLocalBackendMode(),
         config: modelConfig,
-        base_url: localStorage.getItem('ollama_cloud_url') || ''
+        base_url: localStorage.getItem('ollama_cloud_url') || '',
+        benchmark_mode: localStorage.getItem('enable_langsmith') === 'true',
+        private_workspace: localStorage.getItem('private_workspace') !== 'false',
+        langsmith_api_key: localStorage.getItem('langsmith_api_key') || '',
+        langsmith_project: localStorage.getItem('langsmith_project') || 'vscode-agent-react-benchmarks'
       };
       ws.current.send(JSON.stringify(payload));
       
