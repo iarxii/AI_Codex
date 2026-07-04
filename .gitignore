@@ -41,3 +41,8 @@ backend/OllamaOpt_local/
 
 # MCP Server Build files
 mcp/build/
+
+# Deployment Scripts
+deploy_production.bat
+deploy_frontend.bat
+
