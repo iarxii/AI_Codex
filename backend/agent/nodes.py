@@ -796,7 +796,7 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
         tool_args = tool_call["args"]
         tool_id = tool_call["id"]
         
-        is_client_tool = client_type == "vscode" and tool_name in ["workspace_writer", "workspace_reader", "shell_exec"]
+        is_client_tool = client_type == "vscode" and tool_name in ["workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"]
         
         if is_client_tool and websocket and client_tool_responses:
             logger.info(f"Delegating tool execution to VS Code client: {tool_name} with args: {tool_args}")

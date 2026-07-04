@@ -23,6 +23,11 @@ def make_wrapped_workspace_writer(skill: BaseSkill, conversation_id: str):
         return await skill.execute(filename=filename, content=content, type=type, tutor_explanation=tutor_explanation, conversation_id=conversation_id)
     return wrapped_workspace_writer
 
+def make_wrapped_workspace_patcher(skill: BaseSkill, conversation_id: str):
+    async def wrapped_workspace_patcher(filename: str, search_string: str, replace_string: str, tutor_explanation: str = None):
+        return await skill.execute(filename=filename, search_string=search_string, replace_string=replace_string, tutor_explanation=tutor_explanation, conversation_id=conversation_id)
+    return wrapped_workspace_patcher
+
 def make_wrapped_shell_exec(skill: BaseSkill, conversation_id: str):
     async def wrapped_shell_exec(command: str, cwd: str = "."):
         return await skill.execute(command=command, cwd=cwd, conversation_id=conversation_id)
@@ -53,6 +58,12 @@ def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = Non
             if skill.name == "workspace_writer":
                 tool = StructuredTool.from_function(
                     coroutine=make_wrapped_workspace_writer(skill, conversation_id),
+                    name=skill.name,
+                    description=skill.description,
+                )
+            elif skill.name == "workspace_patcher":
+                tool = StructuredTool.from_function(
+                    coroutine=make_wrapped_workspace_patcher(skill, conversation_id),
                     name=skill.name,
                     description=skill.description,
                 )

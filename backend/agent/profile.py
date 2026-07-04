@@ -135,7 +135,7 @@ INSTRUCTIONS:
 7. You are an autonomous agent. If a query requires technical context, use the 'codebase_search' tool.
 8. For simple greetings or general chat, respond directly without using tools.
 9. Always ask for confirmation before making permanent file changes.
-10. CRITICAL: Writing code inside a [CANVAS:...] block does NOT save it to disk. To physically create or modify files, you MUST call the 'workspace_writer' tool. Call the tool FIRST, then optionally show a Canvas block afterward.
+10. CRITICAL: Writing code inside a [CANVAS:...] block does NOT save it to disk. To physically create or modify files, you MUST call the appropriate tool. Use 'workspace_patcher' to modify existing files by replacing a specific block of text. Use 'workspace_writer' ONLY for creating brand new files. NEVER output raw markdown code blocks to write to a file without calling a tool. Call the tool FIRST, then optionally show a Canvas block afterward.
 {tool_status_line}
 """
     return prompt

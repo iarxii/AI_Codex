@@ -1,21 +1,42 @@
 from langgraph.graph import StateGraph, END
 from .state import AgentState
 from .nodes import reason_node, execute_tool_node, init_node, guard_node, validate_response_node, verification_node
-from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node
+from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node  # or INFO, WARN, ERROR …
 
+import logging
+logger = logging.getLogger(__name__)   # automatically uses the configured root logger
+logger.info("Starting graph construction")
+
+# def should_continue(state: AgentState):
+#     """
+#     Check if tool calls are present.
+#     Routes to execute_tool if tools were called, otherwise to the validator.
+#     """
+#     last_message = state["messages"][-1]
+#     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+#         # If in trading space, we route to the enforcer first
+#         slug = state.get("space_config", {}).get("slug", "")
+#         if slug == "trading-space":
+#             return "mql5_enforcer"
+#         return "execute_tool"
+#     return "validate"
 def should_continue(state: AgentState):
-    """
-    Check if tool calls are present.
-    Routes to execute_tool if tools were called, otherwise to the validator.
-    """
     last_message = state["messages"][-1]
-    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
-        # If in trading space, we route to the enforcer first
+    has_calls = hasattr(last_message, "tool_calls") and last_message.tool_calls
+    content_preview = str(getattr(last_message, "content", ""))[:200]
+    
+    logger.info(
+        f"ROUTER: tool_calls={len(last_message.tool_calls) if has_calls else 0} "
+        f"| content_len={len(str(getattr(last_message, 'content', '')))} "
+        f"| preview={content_preview!r}"
+    )
+    
+    if has_calls:
         slug = state.get("space_config", {}).get("slug", "")
         if slug == "trading-space":
             return "mql5_enforcer"
         return "execute_tool"
-    return "validate"
+    return END
 
 def should_continue_verification(state: AgentState):
     """
@@ -97,7 +118,8 @@ def create_agent_graph():
         {
             "mql5_enforcer": "mql5_enforcer",
             "execute_tool": "execute_tool",
-            "validate": "validate"
+            "validate": "validate",
+            END: END
         }
     )
     
