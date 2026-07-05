@@ -1,0 +1,22 @@
+# Tasks: Agent Loop Evolution, Memory Compaction & Telemetry
+
+- [x] Extend Graph State in `state.py`
+  - [x] Add `task_goal`, `execution_artifacts`, `evaluation_report`, `recent_actions_fingerprint`, `token_metrics`, `quality_history`, and `consideration_vector`.
+- [x] Implement Node Logic in `nodes.py`
+  - [x] Update `reason_node` to inject `consideration_vector` and the scratchpad JSON `task_plan` into the prompt, and log fingerprints.
+  - [x] Implement `evaluate_turn_node` (Quality Scoring, additions vs deletions, consideration vector).
+  - [x] Implement `final_report_node` (Synthesis post-mortem).
+- [x] Implement Tools in `tools.py`
+  - [x] Implement `compact_context` (Python-based context compaction).
+  - [x] Implement `write_scratchpad` (Accepts JSON list of tasks, writes to `scratchpad["task_plan"]`).
+  - [x] Register tools in `get_agent_tools()`.
+- [x] Update Graph Topology and Routing in `graph.py`
+  - [x] Register `evaluate_turn` and `final_report` nodes.
+  - [x] Refactor conditional routing to inject Quality Gate checks and stagnation/degradation handlers.
+- [x] Update WebSocket Stream in `chat.py`
+  - [x] Add streaming message handlers for new node states and context telemetry events.
+- [x] Register Extension Views & Settings in VS Code `package.json`
+  - [x] Register token stops: `spiritBirdAiCodex.token.warningStop`, `spiritBirdAiCodex.token.maxStop`.
+  - [x] Register sidebar Webview: `spirit-bird-context-window` under views.
+- [x] Create VS Code Context Window Provider
+  - [x] Implement `ContextWindowPanelProvider.ts` resolving webview HTML dashboard and task checklist.

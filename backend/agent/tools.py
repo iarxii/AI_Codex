@@ -98,6 +98,8 @@ def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = Non
     tools.append(codebase_search)
     tools.append(get_terminal_viewport)
     tools.append(mt5_dispatch_signal)
+    tools.append(compact_context)
+    tools.append(write_scratchpad)
     
     return tools
 
@@ -217,3 +219,21 @@ async def mt5_dispatch_signal(symbol: str, tp: float, sl: float, entry: float, d
             f"MT5_DISPATCH [{direction.upper()}] offline bypass. "
             f"Trade complies with Risk Enforcer. Logged action: {symbol} @ {entry}. TP: {tp}, SL: {sl}."
         )
+
+
+@StructuredTool.from_function
+async def compact_context(force_reason: str) -> str:
+    """
+    Enables the agent to clear short-term memory by compressing historical multi-turn chat records,
+    logs, and tool outputs into a high-density summary.
+    """
+    return "Memory compaction request queued."
+
+
+@StructuredTool.from_function
+async def write_scratchpad(task_list_json: str) -> str:
+    """
+    Allows the agent to write, append, or update its detailed task checklist and engineering plan.
+    Must pass a valid JSON string representing the checklist array of tasks, e.g. '[{"text": "Refactor router", "done": false}]'.
+    """
+    return "Scratchpad planning board updated."

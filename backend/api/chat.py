@@ -482,6 +482,52 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     
                         elif kind == "on_chain_end":
                             output = event.get("data", {}).get("output", {})
+                            
+                            # Accumulate state updates
+                            if isinstance(output, dict):
+                                for k, v in output.items():
+                                    if k == "messages":
+                                        from langgraph.graph.message import add_messages
+                                        initial_state["messages"] = add_messages(initial_state["messages"], v)
+                                    else:
+                                        initial_state[k] = v
+                                        
+                                # Stream context telemetry
+                                msgs = initial_state.get("messages", [])
+                                if msgs and node_name != "unknown":
+                                    total_tok = sum(estimate_tokens(str(m.content)) for m in msgs)
+                                    
+                                    system_msgs = [m for m in msgs if getattr(m, "type", "") == "system" or m.__class__.__name__ == "SystemMessage"]
+                                    sys_tok = estimate_tokens(str(system_msgs[0].content)) if system_msgs else 0
+                                    
+                                    summary_tok = 0
+                                    for m in msgs:
+                                        content_str = str(m.content)
+                                        if "[CONTEXT COMPACTED]" in content_str or "Summary of previous turns" in content_str:
+                                            summary_tok += estimate_tokens(content_str)
+                                            
+                                    tail_msgs = msgs[-4:]
+                                    tail_tok = sum(estimate_tokens(str(m.content)) for m in tail_msgs)
+                                    
+                                    await websocket.send_json({
+                                        "type": "context_telemetry",
+                                        "metrics": {
+                                            "system": sys_tok,
+                                            "summary": summary_tok,
+                                            "tail": tail_tok,
+                                            "total": total_tok,
+                                            "limit": initial_state.get("telemetry", {}).get("context_limit", 1000000)
+                                        },
+                                        "node": node_name
+                                    })
+                                    
+                                    # Send scratchpad update if present
+                                    if "scratchpad" in output and output["scratchpad"]:
+                                        await websocket.send_json({
+                                            "type": "scratchpad_update",
+                                            "scratchpad": output["scratchpad"]
+                                        })
+                                    
                             if isinstance(output, dict) and "messages" in output:
                                 final_messages = output["messages"]
                             

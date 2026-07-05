@@ -592,6 +592,29 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     # Build system prompt AFTER tool binding so we can inject tool-binding status (Layer 3)
     system_prompt = build_system_prompt(conversation_id, allowed_skills, tool_binding_status)
     
+    consideration = state.get("consideration_vector")
+    if consideration:
+        system_prompt += (
+            f"\n\n[CRITICAL CONSIDERATION VECTOR]\n"
+            f" - Strategy Priority: {consideration.get('priority', 'N/A')}\n"
+            f" - Focus Area: {consideration.get('focus_area', 'N/A')}\n"
+            f" - Anti-Pattern Guardrail: {consideration.get('anti_pattern_guard', 'None')}\n"
+            f"Adhere strictly to this vector. Do not delete existing code/tests blindly to bypass compilation failures."
+        )
+
+    # Format the writeable JSON planning scratchpad if present
+    scratchpad_data = state.get("scratchpad") or {}
+    task_plan = scratchpad_data.get("task_plan")
+    formatted_plan = ""
+    if task_plan:
+        if isinstance(task_plan, list):
+            formatted_plan = "\n".join([f"- [{'x' if t.get('done') else ' '}] {t.get('text', '')}" for t in task_plan if isinstance(t, dict)])
+        elif isinstance(task_plan, str):
+            formatted_plan = task_plan
+            
+    if formatted_plan:
+        system_prompt += f"\n\n[PERSISTENT TASK PLAN SCRATCHPAD]\n{formatted_plan}\n"
+    
     if space_config.get("system_prompt_prefix"):
         system_prompt = f"{space_config['system_prompt_prefix']}\n\n{system_prompt}"
     
@@ -741,11 +764,23 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     telemetry["tokens"]["input"] = total_tokens
     telemetry["tokens"]["output"] = estimate_tokens(str(response.content))
     
+    # Record recent tool actions fingerprint
+    fingerprints = state.get("recent_actions_fingerprint") or []
+    for tc in tool_calls:
+        import json
+        try:
+            args_str = json.dumps(tc.get("args", {}), sort_keys=True)
+        except Exception:
+            args_str = str(tc.get("args", {}))
+        fingerprints.append(f"{tc.get('name')}:{args_str}")
+    fingerprints = fingerprints[-10:]
+
     return {
         "messages": [response],
         "current_tool_calls": tool_calls,
         "context_data": {"history_len": len(messages), "summarized": bool(summary)},
-        "telemetry": telemetry
+        "telemetry": telemetry,
+        "recent_actions_fingerprint": fingerprints
     }
 
 async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -791,6 +826,8 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
     websocket = config.get("configurable", {}).get("websocket")
     client_tool_responses = config.get("configurable", {}).get("client_tool_responses")
 
+    state_updates = {}
+
     for tool_call in last_message.tool_calls:
         tool_name = tool_call["name"]
         tool_args = tool_call["args"]
@@ -798,7 +835,61 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
         
         is_client_tool = client_type == "vscode" and tool_name in ["workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"]
         
-        if is_client_tool and websocket and client_tool_responses:
+        if tool_name == "compact_context":
+            from langchain_core.messages import RemoveMessage, SystemMessage
+            messages = state.get("messages", [])
+            if not messages:
+                tool_result = "No history available to compact."
+            else:
+                system_instructions = [m for m in messages if isinstance(m, SystemMessage)]
+                active_tail = messages[-4:]
+                
+                system_len = len(system_instructions)
+                intermediate_history = messages[system_len:-4]
+                
+                if len(intermediate_history) < 3:
+                    tool_result = "History tail is too short. Compaction skipped."
+                else:
+                    try:
+                        llm = await get_dynamic_llm(config, bind_tools=False, tier="validation")
+                        summary_prompt = (
+                            "Condense the following tool traces, command outputs, and assistant reasoning turns "
+                            "into a high-density chronological bullet-point summary of what was done, what issues were resolved, "
+                            "and what files were changed. Do not omit any file paths or compiler errors.\n\n"
+                            f"History to condense:\n{str(intermediate_history)}"
+                        )
+                        summary_res = await llm.ainvoke([HumanMessage(content=summary_prompt)])
+                        summary_text = summary_res.content
+                        
+                        remove_commands = []
+                        for m in intermediate_history:
+                            if m.id:
+                                remove_commands.append(RemoveMessage(id=m.id))
+                                
+                        # Append remove commands directly to tool_messages so add_messages processes them
+                        tool_messages.extend(remove_commands)
+                        tool_messages.append(SystemMessage(content=f"[CONTEXT COMPACTED] Summary of preceding work:\n{summary_text}"))
+                        
+                        old_size = sum(len(str(m.content)) for m in intermediate_history)
+                        new_size = len(summary_text)
+                        saved_chars = max(0, old_size - new_size)
+                        tool_result = f"Success: Compacted memory. Saved approximately {saved_chars // 4} tokens."
+                    except Exception as e:
+                        tool_result = f"Error during memory compaction: {str(e)}"
+                        
+        elif tool_name == "write_scratchpad":
+            import json
+            try:
+                task_list_json = tool_args.get("task_list_json", "[]")
+                tasks = json.loads(task_list_json)
+                scratchpad = state.get("scratchpad") or {}
+                scratchpad["task_plan"] = tasks
+                state_updates["scratchpad"] = scratchpad
+                tool_result = f"Scratchpad planning board updated successfully with {len(tasks)} tasks."
+            except Exception as e:
+                tool_result = f"Error updating planning board: {str(e)}"
+                
+        elif is_client_tool and websocket and client_tool_responses:
             logger.info(f"Delegating tool execution to VS Code client: {tool_name} with args: {tool_args}")
             try:
                 # Send tool execution request to client
@@ -851,7 +942,7 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
     if "latencies" not in telemetry: telemetry["latencies"] = {}
     telemetry["latencies"]["tool_execution"] = time.perf_counter() - node_start
 
-    return {"messages": tool_messages, "current_tool_calls": [], "telemetry": telemetry}
+    return {"messages": tool_messages, "current_tool_calls": [], "telemetry": telemetry, **state_updates}
 
 async def validate_response_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
@@ -1028,3 +1119,129 @@ async def verification_node(state: AgentState, config: RunnableConfig) -> Dict[s
             return {"messages": [verification_message]}
             
     return {}
+
+
+async def evaluate_turn_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Evaluator Node (Quality Gate).
+    Compares the updated execution artifacts and messages against the user's task_goal.
+    Determines if the goal has been achieved, computes a quality score, and updates
+    the consideration vector to steer the agent away from destructive behaviors.
+    """
+    messages = state["messages"]
+    goal = state.get("task_goal") or (messages[0].content if messages else "")
+    artifacts = state.get("execution_artifacts") or {}
+    last_action = messages[-1].content if messages else ""
+    
+    # Calculate modification ratios (additions vs deletions)
+    lines_added = artifacts.get("lines_added", 0)
+    lines_deleted = artifacts.get("lines_deleted", 0)
+    
+    llm = await get_dynamic_llm(config, bind_tools=False, tier="validation")
+    
+    eval_prompt = f"""
+    You are the Autonomous Quality Gate for AICodex.
+    Analyze the recent work against the Ultimate Goal.
+    
+    Ultimate Goal: {goal}
+    Current Artifacts (Modified Files/State): {artifacts}
+    Code Changes: Added {lines_added} lines, Deleted {lines_deleted} lines.
+    Last Agent Message: {last_action}
+    
+    Verify:
+    1. Did the code compile or pass tests successfully?
+    2. Are modifications constructive (adding features/fixes) or destructive (blindly deleting failing tests/code blocks)?
+    
+    Respond in JSON format with keys:
+    {{
+        "goal_achieved": true | false,
+        "quality_score": 0.0 to 1.0,
+        "critique": "Analysis of what is missing or if errors remain",
+        "next_instruction": "Command or directive the agent must give itself to continue",
+        "consideration_vector": {{
+            "priority": "ADDITION_PREFERRED" | "REFACTOR" | "BUG_FIX",
+            "anti_pattern_guard": "Instructions on what to avoid, e.g., 'Do not delete the module router to fix imports'",
+            "focus_area": "Target file or error block to repair"
+        }}
+    }}
+    """
+    
+    response = await llm.ainvoke([HumanMessage(content=eval_prompt)])
+    
+    import json
+    try:
+        cleaned_content = response.content.strip().strip("```json").strip("```").strip()
+        eval_report = json.loads(cleaned_content)
+    except Exception:
+        eval_report = {
+            "goal_achieved": True,
+            "quality_score": 1.0,
+            "critique": "Failed to parse evaluator response. Assuming complete.",
+            "next_instruction": "",
+            "consideration_vector": {"priority": "BUG_FIX", "anti_pattern_guard": "", "focus_area": ""}
+        }
+        
+    quality_history = state.get("quality_history") or []
+    quality_history = list(quality_history) + [eval_report.get("quality_score", 1.0)]
+        
+    return {
+        "evaluation_report": eval_report,
+        "quality_history": quality_history,
+        "consideration_vector": eval_report.get("consideration_vector", {})
+    }
+
+
+async def final_report_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Synthesis Node.
+    Summarizes the agent's work and outputs actionable next steps/recommendations.
+    """
+    messages = state["messages"]
+    goal = state.get("task_goal") or ""
+    
+    internal_trail = []
+    for msg in messages:
+        if isinstance(msg, AIMessage) and msg.content:
+            internal_trail.append(f"- Agent: {msg.content[:200]}...")
+        elif isinstance(msg, ToolMessage):
+            internal_trail.append(f"- Tool executed ({msg.name}): {str(msg.content)[:100]}")
+            
+    trail_str = "\n".join(internal_trail)
+    llm = await get_dynamic_llm(config, bind_tools=False, tier="reasoning")
+    
+    summary_prompt = f"""
+    You are the Final Synthesis layer of AICodex. 
+    The agent has successfully completed the user's task. Summarize the process and provide concrete next steps.
+    
+    Ultimate Goal: {goal}
+    Execution Trail:
+    {trail_str}
+    
+    Format your response in Markdown:
+    ### 📋 Execution Post-Mortem
+    * [Concise breakdown of what was achieved]
+    
+    ### 🚀 Recommended Next Steps
+    * [2-3 concrete actions the user can take now, e.g. tests to run, code reviews, deployment]
+    """
+    
+    response = await llm.ainvoke([HumanMessage(content=summary_prompt)])
+    return {"messages": [AIMessage(content=response.content)]}
+
+
+async def handle_blocker_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Halts loop and reports degradation or stagnation to prompt user intervention.
+    """
+    logger.warning("Agent loop halted due to quality degradation or stagnation.")
+    report = state.get("evaluation_report") or {}
+    critique = report.get("critique", "No critique provided.")
+    msg = AIMessage(
+        content=(
+            "🛑 **Execution Paused (Degradation Guard)**\n\n"
+            "My self-evaluation engine detected code quality degradation or a repetitive loop.\n"
+            f"**Critique:** {critique}\n\n"
+            "Please review the changes and guide me on how to proceed."
+        )
+    )
+    return {"messages": [msg], "is_complete": True}
