@@ -27,3 +27,8 @@ google-genai
 aiosqlite
 google-cloud-storage
 yfinance
+
+# Google Agentic Stack — replaces langchain-core for the Code Lab
+google-adk>=2.0
+a2a-sdk[fastapi]>=1.0
+a2ui-agent-sdk
