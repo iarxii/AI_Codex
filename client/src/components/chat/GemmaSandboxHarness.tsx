@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Code, Cpu, Play, Info, Sparkles, Activity, Network, CheckCircle2, FastForward, Gauge, Database } from 'lucide-react';
 import { config } from '../../config';
 
 interface ThoughtLogEntry {
   text: string;
   timestamp: number;
-  type: string;
+  type?: string;
   details?: string;
 }
 
@@ -133,7 +133,6 @@ export const GemmaSandboxHarness: React.FC<GemmaSandboxHarnessProps> = ({ though
                   </div>
                 ) : (
                   thoughtLog.map((log, index) => {
-                    const isLast = index === thoughtLog.length - 1;
                     const isEndNode = log.type === 'END' || log.type === 'idle';
                     
                     // Determine if we should show the fast path badge
