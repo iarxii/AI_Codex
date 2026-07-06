@@ -48,3 +48,6 @@ class AgentState(TypedDict):
     # --- Self-Correction & Quality Tracking ---
     quality_history: Optional[List[float]]           # Rolling log of quality scores (0.0 - 1.0)
     consideration_vector: Optional[dict]             # Directives for reasoning constraint
+    
+    # --- Short-Process (Bypass) Routing ---
+    is_short_process: Optional[bool]                 # Tracks if this is a short-circuit conversational run

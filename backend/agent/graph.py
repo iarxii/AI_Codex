@@ -24,10 +24,17 @@ def should_continue(state: AgentState):
     )
     
     if has_calls:
+        # Dynamically promote to long process if tool calls are detected
+        state["is_short_process"] = False
         slug = state.get("space_config", {}).get("slug", "")
         if slug == "trading-space":
             return "mql5_enforcer"
         return "execute_tool"
+        
+    if state.get("is_short_process"):
+        logger.info("ROUTER: Short process detected and no tool calls. Fast-path routing directly to END.")
+        return END
+        
     return "evaluate_turn"
 
 
@@ -141,7 +148,8 @@ def create_agent_graph():
         {
             "mql5_enforcer": "mql5_enforcer",
             "execute_tool": "execute_tool",
-            "evaluate_turn": "evaluate_turn"
+            "evaluate_turn": "evaluate_turn",
+            END: END
         }
     )
     

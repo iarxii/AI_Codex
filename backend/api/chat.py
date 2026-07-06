@@ -631,6 +631,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     
                 # Send final telemetry
                 initial_state["telemetry"]["latencies"]["total"] = time.perf_counter() - request_start
+                initial_state["telemetry"]["is_short_process"] = initial_state.get("is_short_process", False)
                 if full_ai_response:
                     # Use utility for token estimation if not provided by model
                     initial_state["telemetry"]["usage"]["output"] = estimate_tokens(full_ai_response)

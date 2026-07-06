@@ -3,6 +3,9 @@ import { Send, Bot, Loader2, Calendar, BookOpen, Smile } from 'lucide-react';
 import { useAI } from '../../contexts/AIContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { getApiUrl } from '../../config';
 
 export const SpiritBirdChatHarness: React.FC = () => {
@@ -133,7 +136,10 @@ export const SpiritBirdChatHarness: React.FC = () => {
                 </div>
               )}
               <div className="prose prose-invert prose-sm max-w-none text-[11px] leading-relaxed font-sans text-left space-y-1">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
+                >
                   {msg.content}
                 </ReactMarkdown>
               </div>

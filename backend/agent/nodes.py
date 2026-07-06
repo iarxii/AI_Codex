@@ -259,16 +259,21 @@ async def init_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]
     """
     Tier 1 & 2: Metadata Handshake and "Canary" Probes.
     Verifies model health and capabilities before reasoning.
+    Also implements a fast-path heuristic classifier for conversational queries.
     """
     start_time = time.perf_counter()
     provider = config.get("configurable", {}).get("provider", "local")
     model = config.get("configurable", {}).get("model", "default")
     
     # Telemetry initialization (if not already done by chat.py)
-    telemetry = state.get("telemetry", {
-        "ttft": 0, "total_tokens": 0, "usage": {"input": 0, "output": 0},
-        "latencies": {}, "capabilities": [], "provider": provider, "model": model
-    })
+    telemetry = state.get("telemetry") or {}
+    if not telemetry:
+        telemetry = {
+            "ttft": 0, "total_tokens": 0, "usage": {"input": 0, "output": 0},
+            "latencies": {}, "capabilities": [], "provider": provider, "model": model
+        }
+    if "latencies" not in telemetry:
+        telemetry["latencies"] = {}
     
     # Tier 1: Metadata Handshake
     from backend.utils.telemetry import get_model_capabilities
@@ -278,7 +283,43 @@ async def init_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]
     # For now, we'll just mark the init node duration
     telemetry["latencies"]["init_node"] = time.perf_counter() - start_time
     
-    return {"telemetry": telemetry}
+    # Short Process Heuristic Classification
+    is_short_process = False
+    messages = state.get("messages", [])
+    if messages:
+        # Find the last HumanMessage
+        from langchain_core.messages import HumanMessage
+        last_human = None
+        for m in reversed(messages):
+            if isinstance(m, HumanMessage) or getattr(m, "type", "") == "human":
+                last_human = m
+                break
+        
+        if last_human and last_human.content:
+            query = str(last_human.content).strip().lower()
+            
+            # Common greetings and acknowledgments
+            greetings = {"hi", "hello", "hey", "hola", "greetings", "good morning", "good afternoon", "good evening", "yo"}
+            acknowledgments = {"thanks", "thank you", "ok", "okay", "yes", "no", "cool", "perfect", "bye", "goodbye", "awesome"}
+            
+            # Direct match or startswith check
+            is_greeting = query in greetings or any(query.startswith(g + " ") for g in greetings)
+            is_ack = query in acknowledgments or any(query.startswith(a + " ") for a in acknowledgments)
+            
+            if is_greeting or is_ack:
+                is_short_process = True
+            elif len(query) < 45:
+                # Check for technical actions and file extensions
+                action_words = {"create", "write", "run", "make", "build", "generate", "code", "modify", "implement", "add", "fix", "delete", "remove", "update"}
+                has_action = any(word in query for word in action_words)
+                
+                extensions = {".py", ".ts", ".js", ".html", ".css", ".json", ".yml", ".yaml", ".sh", ".bat", ".md"}
+                has_ext = any(ext in query for ext in extensions)
+                
+                if not has_action and not has_ext:
+                    is_short_process = True
+
+    return {"telemetry": telemetry, "is_short_process": is_short_process}
 
 async def guard_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """

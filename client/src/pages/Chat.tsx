@@ -850,7 +850,7 @@ const Chat: React.FC = () => {
                         </div>
                         <div className="flex-1 overflow-y-auto safe-area-bottom">
                           {activeSpace.slug === 'trading-space' && <SpiritBirdHarness spaceName={activeSpace.name} />}
-                          {activeSpace.slug === 'code-lab' && <GemmaSandboxHarness />}
+                          {activeSpace.slug === 'code-lab' && <GemmaSandboxHarness thoughtLog={thoughtLog} telemetry={telemetry} />}
                           {activeSpace.slug === 'spirit-book' && <SpiritBirdChatHarness />}
                         </div>
                       </div>
@@ -925,7 +925,7 @@ const Chat: React.FC = () => {
                         </div>
                         <div className="flex-1 overflow-y-auto flex flex-col">
                           {activeSpace.slug === 'trading-space' && <SpiritBirdHarness spaceName={activeSpace.name} />}
-                          {activeSpace.slug === 'code-lab' && <GemmaSandboxHarness />}
+                          {activeSpace.slug === 'code-lab' && <GemmaSandboxHarness thoughtLog={thoughtLog} telemetry={telemetry} />}
                           {activeSpace.slug === 'spirit-book' && <SpiritBirdChatHarness />}
                         </div>
                       </div>

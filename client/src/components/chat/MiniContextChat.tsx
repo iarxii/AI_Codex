@@ -3,6 +3,9 @@ import { Send, Bot, Loader2 } from 'lucide-react';
 import { useAI } from '../../contexts/AIContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { getApiUrl } from '../../config';
 
 interface MiniContextChatProps {
@@ -125,7 +128,10 @@ export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol, onInte
                 )}
                 <div className="prose prose-invert prose-sm max-w-none text-[11px] leading-relaxed">
                   {msg.role === 'assistant' ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm, remarkMath]}
+                      rehypePlugins={[rehypeKatex]}
+                    >
                       {msg.content}
                     </ReactMarkdown>
                   ) : (
