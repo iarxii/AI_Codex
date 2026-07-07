@@ -32,8 +32,8 @@ def should_continue(state: AgentState):
         return "execute_tool"
         
     if state.get("is_short_process"):
-        logger.info("ROUTER: Short process detected and no tool calls. Fast-path routing directly to END.")
-        return END
+        logger.info("ROUTER: Short process detected and no tool calls. Fast-path routing to final_report.")
+        return "final_report"
         
     return "evaluate_turn"
 
@@ -149,6 +149,7 @@ def create_agent_graph():
             "mql5_enforcer": "mql5_enforcer",
             "execute_tool": "execute_tool",
             "evaluate_turn": "evaluate_turn",
+            "final_report": "final_report",
             END: END
         }
     )

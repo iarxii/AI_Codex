@@ -1215,9 +1215,9 @@ async def evaluate_turn_node(state: AgentState, config: RunnableConfig) -> Dict[
         eval_report = json.loads(cleaned_content)
     except Exception:
         eval_report = {
-            "goal_achieved": True,
+            "goal_achieved": False,
             "quality_score": 1.0,
-            "critique": "Failed to parse evaluator response. Assuming complete.",
+            "critique": "Failed to parse evaluator response. Assuming incomplete.",
             "next_instruction": "",
             "consideration_vector": {"priority": "BUG_FIX", "anti_pattern_guard": "", "focus_area": ""}
         }
