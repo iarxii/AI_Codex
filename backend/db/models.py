@@ -106,3 +106,27 @@ class ArcadeScore(Base):
     time_spent_sec: Mapped[int] = mapped_column(Integer, default=0)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+
+class CachedStream(Base):
+    __tablename__ = "cached_streams"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    platform: Mapped[str] = mapped_column(String(50), index=True)
+    stream_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    title: Mapped[str] = mapped_column(Text)
+    channel_name: Mapped[str] = mapped_column(String(150))
+    thumbnail_url: Mapped[str] = mapped_column(Text)
+    stream_url: Mapped[str] = mapped_column(Text)
+    viewer_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PortalSyncMetadata(Base):
+    __tablename__ = "portal_sync_metadata"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    platform: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    last_sync_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    sync_status: Mapped[str] = mapped_column(String(50), default="success")
+
+

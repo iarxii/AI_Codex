@@ -225,7 +225,7 @@ async def health_check():
     return {"status": "healthy", "timestamp": str(datetime.now())}
 
 # Include routers
-from backend.api import auth, chat, metrics, rag, skills, conversations, models, workspace, profile, admin, market, arcade
+from backend.api import auth, chat, metrics, rag, skills, conversations, models, workspace, profile, admin, market, arcade, portal
 from codex_spaces.backend.api import spaces, bridge
 app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
 app.include_router(profile.router, prefix=settings.API_V1_STR + "/profile", tags=["profile"])
@@ -241,6 +241,8 @@ app.include_router(rag.router, prefix=settings.API_V1_STR + "/rag", tags=["rag"]
 app.include_router(skills.router, prefix=settings.API_V1_STR + "/skills", tags=["skills"])
 app.include_router(models.router, prefix=settings.API_V1_STR + "/models", tags=["models"])
 app.include_router(arcade.router, prefix=settings.API_V1_STR + "/arcade", tags=["arcade"])
+app.include_router(portal.router, prefix=settings.API_V1_STR + "/portal", tags=["portal"])
+
 
 @app.websocket("/ws/debug")
 async def debug_websocket(websocket: WebSocket):

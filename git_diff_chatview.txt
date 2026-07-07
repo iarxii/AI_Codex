@@ -1,0 +1,512 @@
+﻿diff --git a/src/panels/chatView.html b/src/panels/chatView.html
+index c43f83d..79b2f7a 100644
+--- a/src/panels/chatView.html
++++ b/src/panels/chatView.html
+@@ -3184,6 +3184,177 @@
+         }
+       }
+ 
++      /* Sub-Tabs Styling */
++      .sub-tabs-nav {
++        display: flex;
++        gap: 8px;
++        border-bottom: 1px solid var(--lm-border);
++        padding-bottom: 6px;
++        margin-bottom: 12px;
++      }
++      .sub-tab-btn {
++        background: transparent;
++        color: var(--lm-text-muted);
++        border: none;
++        padding: 6px 12px;
++        cursor: pointer;
++        font-size: 11px;
++        font-weight: 500;
++        border-radius: 4px;
++        transition: all 0.2s ease;
++      }
++      .sub-tab-btn.active, .sub-tab-btn:hover {
++        background: var(--lm-brand-dim);
++        color: var(--lm-brand);
++      }
++
++      /* Keyframe for spinner */
++      @keyframes rotate {
++        100% { transform: rotate(360deg); }
++      }
++
++      /* Streams Grid and Cards */
++      .streams-grid {
++        display: grid;
++        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
++        gap: 10px;
++        margin-top: 12px;
++      }
++      .stream-card {
++        background: var(--lm-surface-2);
++        border: 1px solid var(--lm-border);
++        border-radius: 8px;
++        overflow: hidden;
++        display: flex;
++        flex-direction: column;
++        transition: transform 0.2s ease, border-color 0.2s ease;
++      }
++      .stream-card:hover {
++        transform: translateY(-2px);
++        border-color: var(--lm-brand);
++      }
++      .stream-thumb-container {
++        position: relative;
++        width: 100%;
++        aspect-ratio: 16/9;
++        background: #000;
++      }
++      .stream-thumb {
++        width: 100%;
++        height: 100%;
++        object-fit: cover;
++      }
++      .stream-live-badge {
++        position: absolute;
++        top: 6px;
++        left: 6px;
++        background: #ff3b30;
++        color: #fff;
++        font-size: 9px;
++        font-weight: bold;
++        padding: 2px 6px;
++        border-radius: 4px;
++        display: flex;
++        align-items: center;
++        gap: 4px;
++      }
++      .stream-live-badge::before {
++        content: '';
++        display: inline-block;
++        width: 5px;
++        height: 5px;
++        background: #fff;
++        border-radius: 50%;
++        animation: pulse 1.5s infinite;
++      }
++      @keyframes pulse {
++        0% { transform: scale(0.9); opacity: 0.5; }
++        50% { transform: scale(1.1); opacity: 1; }
++        100% { transform: scale(0.9); opacity: 0.5; }
++      }
++      .stream-viewers {
++        position: absolute;
++        bottom: 6px;
++        right: 6px;
++        background: rgba(0, 0, 0, 0.7);
++        color: #fff;
++        font-size: 9px;
++        padding: 2px 4px;
++        border-radius: 4px;
++      }
++      .stream-info {
++        padding: 8px;
++        display: flex;
++        flex-direction: column;
++        flex: 1;
++      }
++      .stream-title {
++        font-weight: bold;
++        font-size: 11px;
++        line-height: 1.3;
++        margin-bottom: 4px;
++        display: -webkit-box;
++        -webkit-line-clamp: 2;
++        -webkit-box-orient: vertical;
++        overflow: hidden;
++        color: var(--lm-text);
++      }
++      .streamer-name {
++        font-size: 10px;
++        color: var(--lm-text-muted);
++        margin-top: auto;
++      }
++
++      /* RSS Feed Styles */
++      .rss-list {
++        display: flex;
++        flex-direction: column;
++        gap: 8px;
++        max-height: 400px;
++        overflow-y: auto;
++        padding-right: 4px;
++        margin-top: 12px;
++      }
++      .rss-card {
++        background: var(--lm-surface-2);
++        border: 1px solid var(--lm-border);
++        border-radius: 8px;
++        padding: 10px;
++        display: flex;
++        flex-direction: column;
++        gap: 6px;
++        cursor: pointer;
++        transition: transform 0.2s ease, border-color 0.2s ease;
++      }
++      .rss-card:hover {
++        transform: translateY(-1px);
++        border-color: var(--lm-brand);
++      }
++      .rss-card-title {
++        font-size: 11px;
++        font-weight: bold;
++        color: var(--lm-text);
++        margin: 0;
++        line-height: 1.4;
++      }
++      .rss-card-desc {
++        font-size: 10px;
++        color: var(--lm-text-muted);
++        line-height: 1.4;
++        display: -webkit-box;
++        -webkit-line-clamp: 2;
++        -webkit-box-orient: vertical;
++        overflow: hidden;
++      }
++      .rss-card-meta {
++        display: flex;
++        justify-content: space-between;
++        font-size: 9px;
++        color: var(--lm-brand);
++        font-weight: 500;
++        margin-top: 2px;
++      }
++
+       /* ÔöÇÔöÇÔöÇ Developer Sub-tab Styling ÔöÇÔöÇÔöÇ */
+       .dev-console-container {
+         background: rgba(10, 10, 12, 0.95);
+@@ -6034,7 +6205,23 @@
+       class="tab-content"
+       style="padding: 12px; display: none"
+     >
+-      <div class="station-container">
++      <!-- Nested Sub-Tabs Navigation -->
++      <div class="sub-tabs-nav">
++        <button class="sub-tab-btn active" onclick="switchSubTab('radio')">Online Radio</button>
++        <button class="sub-tab-btn" onclick="switchSubTab('portal-yt')">Portal.YT</button>
++        <button class="sub-tab-btn" onclick="switchSubTab('portal-twitch')">Portal.Twitch</button>
++        <button class="sub-tab-btn" onclick="switchSubTab('portal-rss')">Portal.RSS</button>
++      </div>
++
++      <!-- Cache Sync Alert Notification -->
++      <div id="portal-sync-alert" style="display: none; padding: 8px 12px; background: rgba(255, 87, 34, 0.1); border: 1px solid rgba(255, 87, 34, 0.2); border-radius: 6px; margin-bottom: 12px; font-size: 11px; color: var(--lm-brand, #ff5722); align-items: center; gap: 8px;">
++        <svg class="spinner" width="12" height="12" viewBox="0 0 50 50" style="animation: rotate 1s linear infinite; stroke: currentColor; fill: none; stroke-width: 5; stroke-linecap: round;"><circle cx="25" cy="25" r="20"></circle></svg>
++        <span>Refreshing active stream feeds from platform APIs... This may take a few seconds.</span>
++      </div>
++
++      <!-- Sub-Tab 1: Online Radio -->
++      <div id="sub-tab-radio" class="sub-tab-panel">
++        <div class="station-container">
+         <div class="player-metal player-base" id="player-5">
+           <audio id="station-audio"></audio>
+           <div class="player-header">
+@@ -6237,6 +6424,45 @@
+           </div>
+         </div>
+       </div>
++      
++      <!-- Sub-Tab 2: Portal.YT -->
++      <div id="sub-tab-portal-yt" class="sub-tab-panel" style="display: none;">
++        <div class="portal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
++          <h3 style="margin: 0; font-size: 12px; color: var(--lm-text);">Active YouTube Programming Streams</h3>
++          <button class="refresh-portal-btn" onclick="loadPortalStreams('youtube')" style="padding: 4px 8px; font-size: 10px; cursor: pointer; background: var(--lm-brand-dim); color: var(--lm-brand); border: 1px solid var(--lm-border-brand); border-radius: 4px;">Refresh</button>
++        </div>
++        <div class="streams-grid" id="yt-streams-grid">
++          <div class="portal-empty" style="color: var(--lm-text-muted); font-size: 11px; text-align: center; padding: 20px;">No active streams found. Click Refresh to load.</div>
++        </div>
++      </div>
++
++      <!-- Sub-Tab 3: Portal.Twitch -->
++      <div id="sub-tab-portal-twitch" class="sub-tab-panel" style="display: none;">
++        <div class="portal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
++          <h3 style="margin: 0; font-size: 12px; color: var(--lm-text);">Active Twitch Software Development Streams</h3>
++          <button class="refresh-portal-btn" onclick="loadPortalStreams('twitch')" style="padding: 4px 8px; font-size: 10px; cursor: pointer; background: var(--lm-brand-dim); color: var(--lm-brand); border: 1px solid var(--lm-border-brand); border-radius: 4px;">Refresh</button>
++        </div>
++        <div class="streams-grid" id="twitch-streams-grid">
++          <div class="portal-empty" style="color: var(--lm-text-muted); font-size: 11px; text-align: center; padding: 20px;">No active streams found. Click Refresh to load.</div>
++        </div>
++      </div>
++
++      <!-- Sub-Tab 4: Portal.RSS -->
++      <div id="sub-tab-portal-rss" class="sub-tab-panel" style="display: none;">
++        <div class="portal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
++          <div style="display: flex; align-items: center; gap: 6px;">
++            <h3 style="margin: 0; font-size: 12px; color: var(--lm-text);">Programming Feeds</h3>
++            <select id="rss-source-select" onchange="loadPortalRss()" style="background: var(--lm-input-bg); color: var(--lm-text); border: 1px solid var(--lm-border); border-radius: 4px; padding: 2px 4px; font-size: 10px; cursor: pointer;">
++              <option value="hn">Hacker News</option>
++              <option value="devto">Dev.to</option>
++            </select>
++          </div>
++          <button class="refresh-portal-btn" onclick="loadPortalRss()" style="padding: 4px 8px; font-size: 10px; cursor: pointer; background: var(--lm-brand-dim); color: var(--lm-brand); border: 1px solid var(--lm-border-brand); border-radius: 4px;">Refresh</button>
++        </div>
++        <div class="rss-list" id="rss-items-list">
++          <div class="portal-empty" style="color: var(--lm-text-muted); font-size: 11px; text-align: center; padding: 20px;">No RSS feed items loaded. Click Refresh to load.</div>
++        </div>
++      </div>
+     </div>
+ 
+     <!-- Settings Tab Content -->
+@@ -9369,6 +9595,14 @@
+             }
+             break;
+           }
++          case "portalStreamsLoaded": {
++            handlePortalStreamsLoaded(message);
++            break;
++          }
++          case "portalRssLoaded": {
++            handlePortalRssLoaded(message);
++            break;
++          }
+           case "connectionState": {
+             // Could add a connection indicator to the UI
+             console.log("WS Connection:", message.state);
+@@ -9631,6 +9865,13 @@
+ 
+             checkWelcomeCardVisibility();
+             startupCompleted = true;
++            
++            // Warm up the portal streams cache
++            try {
++              warmupPortalCache();
++            } catch (err) {
++              console.error("Failed to warmup portal cache:", err);
++            }
+             break;
+           case "connectionTestResult":
+             const testBtn = document.getElementById("test-btn");
+@@ -12470,6 +12711,229 @@
+         });
+         detail.innerHTML = html;
+       }
++
++      // Portal Tab / Sub-tab Logic
++      let portalActiveSubTab = 'radio';
++
++      function switchSubTab(subTabId) {
++        portalActiveSubTab = subTabId;
++        
++        // Update nav buttons active state
++        const navButtons = document.querySelectorAll('.sub-tabs-nav .sub-tab-btn');
++        navButtons.forEach(btn => {
++          btn.classList.remove('active');
++        });
++        
++        // Find the button containing the onclick for this subTabId
++        const clickedBtn = Array.from(navButtons).find(btn => btn.getAttribute('onclick') === `switchSubTab('${subTabId}')`);
++        if (clickedBtn) {
++          clickedBtn.classList.add('active');
++        }
++        
++        // Hide all sub-tab panels
++        const panels = document.querySelectorAll('.sub-tab-panel');
++        panels.forEach(panel => {
++          panel.style.display = 'none';
++        });
++        
++        // Show target panel
++        const targetPanel = document.getElementById(`sub-tab-${subTabId}`);
++        if (targetPanel) {
++          targetPanel.style.display = 'block';
++        }
++        
++        // If switched to YT, Twitch or RSS, trigger load if empty
++        if (subTabId === 'portal-yt') {
++          const grid = document.getElementById('yt-streams-grid');
++          if (grid && grid.querySelector('.portal-empty')) {
++            loadPortalStreams('youtube');
++          }
++        } else if (subTabId === 'portal-twitch') {
++          const grid = document.getElementById('twitch-streams-grid');
++          if (grid && grid.querySelector('.portal-empty')) {
++            loadPortalStreams('twitch');
++          }
++        } else if (subTabId === 'portal-rss') {
++          const list = document.getElementById('rss-items-list');
++          if (list && list.querySelector('.portal-empty')) {
++            loadPortalRss();
++          }
++        }
++      }
++
++      function loadPortalStreams(platform) {
++        // Show cache sync alert
++        const alertEl = document.getElementById('portal-sync-alert');
++        if (alertEl) {
++          alertEl.style.display = 'flex';
++        }
++        
++        // Disable refresh button to prevent double-clicks
++        const refreshBtns = document.querySelectorAll(`.refresh-portal-btn`);
++        refreshBtns.forEach(btn => btn.disabled = true);
++        
++        vscode.postMessage({
++          type: 'requestPortalStreams',
++          platform: platform
++        });
++      }
++
++      function warmupPortalCache() {
++        vscode.postMessage({
++          type: 'requestPortalStreams',
++          platform: 'youtube', // Warm up both or any
++          silent: true
++        });
++      }
++
++      function handlePortalStreamsLoaded(message) {
++        // Hide cache sync alert
++        const alertEl = document.getElementById('portal-sync-alert');
++        if (alertEl) {
++          alertEl.style.display = 'none';
++        }
++        
++        // Enable refresh buttons
++        const refreshBtns = document.querySelectorAll(`.refresh-portal-btn`);
++        refreshBtns.forEach(btn => btn.disabled = false);
++
++        if (message.silent) {
++          console.log("Portal cache warmed up successfully.");
++          return;
++        }
++
++        const platform = message.platform;
++        const streams = message.streams || [];
++        const gridId = platform === 'youtube' ? 'yt-streams-grid' : 'twitch-streams-grid';
++        const grid = document.getElementById(gridId);
++        
++        if (!grid) return;
++
++        if (message.error) {
++          grid.innerHTML = `<div class="portal-error" style="color: var(--vscode-errorForeground); font-size: 11px; text-align: center; padding: 20px;">Error loading streams: ${message.error}</div>`;
++          return;
++        }
++
++        if (streams.length === 0) {
++          grid.innerHTML = `<div class="portal-empty" style="color: var(--lm-text-muted); font-size: 11px; text-align: center; padding: 20px;">No active streams found. Click Refresh to load.</div>`;
++          return;
++        }
++
++        grid.innerHTML = '';
++        streams.forEach(stream => {
++          const card = document.createElement('div');
++          card.className = 'stream-card';
++          card.style.cursor = 'pointer';
++          card.onclick = () => {
++            vscode.postMessage({
++              type: 'openStreamUrl',
++              url: stream.stream_url
++            });
++          };
++
++          // Format viewer count
++          let viewersFormatted = '';
++          if (typeof stream.viewer_count === 'number') {
++            if (stream.viewer_count >= 1000) {
++              viewersFormatted = (stream.viewer_count / 1000).toFixed(1) + 'K';
++            } else {
++              viewersFormatted = stream.viewer_count.toString();
++            }
++          }
++
++          const badgeHtml = `<div class="stream-live-badge">LIVE</div>`;
++          const viewersHtml = viewersFormatted ? `<div class="stream-viewers">${viewersFormatted} watching</div>` : '';
++
++          card.innerHTML = `
++            <div class="stream-thumb-container">
++              <img class="stream-thumb" src="${stream.thumbnail_url}" alt="${stream.title}" onerror="this.src='https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=300&auto=format&fit=crop'" />
++              ${badgeHtml}
++              ${viewersHtml}
++            </div>
++            <div class="stream-info">
++              <div class="stream-title" title="${escapeHtml(stream.title)}">${escapeHtml(stream.title)}</div>
++              <div class="streamer-name">${escapeHtml(stream.channel_title || stream.channel_name || '')}</div>
++            </div>
++          `;
++          grid.appendChild(card);
++        });
++      }
++
++      function loadPortalRss() {
++        const select = document.getElementById('rss-source-select');
++        const source = select ? select.value : 'hn';
++        
++        // Show cache sync alert
++        const alertEl = document.getElementById('portal-sync-alert');
++        if (alertEl) {
++          alertEl.style.display = 'flex';
++        }
++        
++        // Disable refresh buttons
++        const refreshBtns = document.querySelectorAll(`.refresh-portal-btn`);
++        refreshBtns.forEach(btn => btn.disabled = true);
++        
++        vscode.postMessage({
++          type: 'requestPortalRss',
++          source: source
++        });
++      }
++
++      function handlePortalRssLoaded(message) {
++        // Hide cache sync alert
++        const alertEl = document.getElementById('portal-sync-alert');
++        if (alertEl) {
++          alertEl.style.display = 'none';
++        }
++        
++        // Enable refresh buttons
++        const refreshBtns = document.querySelectorAll(`.refresh-portal-btn`);
++        refreshBtns.forEach(btn => btn.disabled = false);
++
++        const source = message.source;
++        const items = message.items || [];
++        const list = document.getElementById('rss-items-list');
++        
++        if (!list) return;
++
++        if (message.error) {
++          list.innerHTML = `<div class="portal-error" style="color: var(--vscode-errorForeground); font-size: 11px; text-align: center; padding: 20px;">Error loading feed: ${message.error}</div>`;
++          return;
++        }
++
++        if (items.length === 0) {
++          list.innerHTML = `<div class="portal-empty" style="color: var(--lm-text-muted); font-size: 11px; text-align: center; padding: 20px;">No RSS feed items found. Click Refresh to load.</div>`;
++          return;
++        }
++
++        list.innerHTML = '';
++        items.forEach(item => {
++          const card = document.createElement('div');
++          card.className = 'rss-card';
++          card.onclick = () => {
++            vscode.postMessage({
++              type: 'openStreamUrl',
++              url: item.link
++            });
++          };
++
++          // Sanitize description snippet
++          let descText = item.description || '';
++          descText = descText.replace(/<[^>]*>/g, '').trim();
++          if (descText.length > 150) {
++            descText = descText.substring(0, 150) + '...';
++          }
++
++          card.innerHTML = `
++            <div class="rss-card-title">${escapeHtml(item.title)}</div>
++            ${descText ? `<div class="rss-card-desc">${escapeHtml(descText)}</div>` : ''}
++            <div class="rss-card-meta">
++              <span>${escapeHtml(item.pub_date || '')}</span>
++            </div>
++          `;
++          list.appendChild(card);
++        });
++      }
+     </script>
+   </body>
+ </html>

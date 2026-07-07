@@ -68,7 +68,7 @@ const SpacesCatalog: React.FC<SpacesCatalogProps> = ({ onSpaceSelected }) => {
     };
 
     return (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-y-auto">
+        <div className="flex-1 flex flex-col items-center justify-start p-8 overflow-y-auto">
             <div className="max-w-5xl w-full">
                 <div className="text-center mb-12">
                     <h1 className="text-4xl font-bold text-[var(--text-primary)] mb-4 tracking-tight">
