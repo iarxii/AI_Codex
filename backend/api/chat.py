@@ -159,6 +159,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
         request_start = time.perf_counter()
         full_ai_response = ""
+        node_has_streamed = False
         history_len = 0
         final_messages = None
 
@@ -411,6 +412,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         # Pipeline monitoring — filter graph-level events
                         if kind == "on_chain_start" and node_name != "unknown" and event.get("name") == node_name:
                             print(f"\nPIPELINE: Entering node [{node_name}]")
+                            node_has_streamed = False
                             await websocket.send_json({
                                 "type": "status",
                                 "status": f"Agent working in node: {node_name}",
@@ -422,6 +424,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             content = event["data"]["chunk"].content
                             if content:
                                 full_ai_response += content
+                                node_has_streamed = True
                             
                                 now = time.perf_counter()
                                 if initial_state["telemetry"]["ttft"] == 0:
@@ -453,8 +456,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                 })
                             # Fallback: if no streaming tokens were captured but model returned content,
                             # send the full response as a single token (handles providers that don't stream)
-                            elif hasattr(msg, "content") and msg.content and not full_ai_response:
+                            elif hasattr(msg, "content") and msg.content and not node_has_streamed:
                                 full_ai_response = msg.content
+                                node_has_streamed = True
                                 print(f"\nPIPELINE: Non-streaming response captured ({len(msg.content)} chars)")
                                 await websocket.send_json({
                                     "type": "token",
@@ -531,7 +535,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             if isinstance(output, dict) and "messages" in output:
                                 final_messages = output["messages"]
                             
-                            if not full_ai_response and isinstance(output, dict):
+                            if not node_has_streamed and isinstance(output, dict) and node_name != "unknown":
                                 msgs = output.get("messages", [])
                                 for m in reversed(msgs):
                                     if hasattr(m, "content") and m.content and getattr(m, "type", "") == "ai":
@@ -547,6 +551,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                             content = "".join(text_parts)
                                     
                                         full_ai_response = str(content)
+                                        node_has_streamed = True
                                         print(f"\nPIPELINE: Captured response from chain_end ({len(full_ai_response)} chars)")
                                         await websocket.send_json({
                                             "type": "token",
