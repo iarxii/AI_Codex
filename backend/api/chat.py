@@ -86,8 +86,36 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
     print(f"DEBUG: WebSocket connected on /ws/agent for user: {user.username}")
     active_tasks: Set[asyncio.Task] = set()
     client_tool_responses = asyncio.Queue()
+    
+    # Sleepy AI Time Checker state
+    current_node_name = "idle"
+    current_node_start_time = 0.0
 
     async def run_agent_task(payload_data):
+        nonlocal current_node_name, current_node_start_time
+        current_node_name = "starting"
+        current_node_start_time = time.time()
+        checker_task = None
+
+        async def sleepy_ai_time_checker_loop():
+            try:
+                while True:
+                    await asyncio.sleep(5.0)
+                    if current_node_name not in ["idle", "starting"] and current_node_start_time > 0:
+                        elapsed = time.time() - current_node_start_time
+                        if elapsed > 15.0:
+                            print(f"[sleepy-ai-time-checker] Node '{current_node_name}' has been running for {elapsed:.1f}s. Sending heartbeat.")
+                            await websocket.send_json({
+                                "type": "status",
+                                "status": f"sleepy-ai-time-checker: Node '{current_node_name}' is active ({elapsed:.1f}s)",
+                                "node": current_node_name,
+                                "duration": time.perf_counter() - request_start
+                            })
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                print(f"[sleepy-ai-time-checker] Error: {e}")
+
         conversation_id = payload_data.get("conversation_id")
         user_message = payload_data.get("message")
         provider = payload_data.get("provider")
@@ -158,6 +186,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             return
 
         request_start = time.perf_counter()
+        checker_task = asyncio.create_task(sleepy_ai_time_checker_loop())
         full_ai_response = ""
         node_has_streamed = False
         history_len = 0
@@ -413,6 +442,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         if kind == "on_chain_start" and node_name != "unknown" and event.get("name") == node_name:
                             print(f"\nPIPELINE: Entering node [{node_name}]")
                             node_has_streamed = False
+                            current_node_name = node_name
+                            current_node_start_time = time.time()
                             await websocket.send_json({
                                 "type": "status",
                                 "status": f"Agent working in node: {node_name}",
@@ -588,6 +619,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             
             await websocket.send_json({"type": "error", "message": f"Execution Error: {friendly_msg}"})
         finally:
+            if checker_task:
+                checker_task.cancel()
+            current_node_name = "idle"
+            current_node_start_time = 0.0
             # Re-fetch or save all generated messages
             if save_to_db:
                 async with AsyncSessionLocal() as db:
@@ -663,6 +698,25 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             
             if payload.get("type") == "ping":
                 # Heartbeat ping from client to keep connection alive
+                continue
+            
+            # Sleepy AI Time Checker client interaction
+            if isinstance(payload, dict) and str(payload.get("message")).strip().lower() in ["status?", "status"]:
+                print(f"[sleepy-ai-time-checker] Client query '{payload.get('message')}' received. Current node: '{current_node_name}'")
+                if current_node_name != "idle":
+                    elapsed = time.time() - current_node_start_time if current_node_start_time > 0 else 0
+                    await websocket.send_json({
+                        "type": "status",
+                        "status": f"sleepy-ai-time-checker: Agent is awake. Node '{current_node_name}' is active ({elapsed:.1f}s)...",
+                        "node": current_node_name
+                    })
+                else:
+                    await websocket.send_json({
+                        "type": "status",
+                        "status": "System is Idle",
+                        "node": "idle"
+                    })
+                await asyncio.sleep(0.1)
                 continue
             
             if payload.get("type") == "tool_response":
