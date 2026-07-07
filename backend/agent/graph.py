@@ -32,8 +32,8 @@ def should_continue(state: AgentState):
         return "execute_tool"
         
     if state.get("is_short_process"):
-        logger.info("ROUTER: Short process detected and no tool calls. Fast-path routing to final_report.")
-        return "final_report"
+        logger.info("ROUTER: Short process detected. Fast-path routing to END.")
+        return END
         
     return "evaluate_turn"
 

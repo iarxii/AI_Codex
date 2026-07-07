@@ -1252,18 +1252,26 @@ async def final_report_node(state: AgentState, config: RunnableConfig) -> Dict[s
     
     summary_prompt = f"""
     You are the Final Synthesis layer of AICodex. 
-    The agent has successfully completed the user's task. Summarize the process and provide concrete next steps.
+    The agent has successfully completed the user's task. Summarize the process, directly acknowledge the user, and provide concrete next steps.
     
     Ultimate Goal: {goal}
     Execution Trail:
     {trail_str}
     
-    Format your response in Markdown:
+    Format your response in Markdown according to these strict guidelines:
+    1. Begin the report by acknowledging the user directly (e.g., greet them, confirm the completion of their request).
+    
+    2. Then, provide the summary under these headings:
     ### 📋 Execution Post-Mortem
     * [Concise breakdown of what was achieved]
     
     ### 🚀 Recommended Next Steps
-    * [2-3 concrete actions the user can take now, e.g. tests to run, code reviews, deployment]
+    * [2-3 concrete actions the user can take now, e.g., tests to run, code reviews, deployment]
+    
+    3. At the very end of your response, you MUST include an educational tutor explanation detailing the core concepts, design choices, or architectural patterns relevant to this task. This section MUST be wrapped strictly inside `[TUTOR]` and `[/TUTOR]` tags:
+    [TUTOR]
+    [Educational explanation of concepts, files modified, or system design decisions]
+    [/TUTOR]
     """
     
     response = await llm.ainvoke([HumanMessage(content=summary_prompt)])
