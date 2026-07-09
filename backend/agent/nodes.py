@@ -1262,7 +1262,7 @@ async def final_report_node(state: AgentState, config: RunnableConfig) -> Dict[s
     1. Begin the report by acknowledging the user directly (e.g., greet them, confirm the completion of their request).
     
     2. Then, provide the summary under these headings:
-    ### 📋 Execution Post-Mortem
+    ### 📋 Execution Summary
     * [Concise breakdown of what was achieved]
     
     ### 🚀 Recommended Next Steps
@@ -1290,7 +1290,8 @@ async def handle_blocker_node(state: AgentState, config: RunnableConfig) -> Dict
             "🛑 **Execution Paused (Degradation Guard)**\n\n"
             "My self-evaluation engine detected code quality degradation or a repetitive loop.\n"
             f"**Critique:** {critique}\n\n"
-            "Please review the changes and guide me on how to proceed."
+            "Please review the changes and guide me on how to proceed.\n\n"
+            "[REQUEST_WALL]"
         )
     )
     return {"messages": [msg], "is_complete": True}
