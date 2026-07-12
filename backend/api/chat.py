@@ -353,7 +353,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "local_backend_mode": local_backend_mode,
                         "user_id": user.id,
                         "space_slug": space_type,
-                        "client_type": payload_data.get("client_type"),
+                        "client_type": payload_data.get("client_type", "web"),
                         "websocket": websocket,
                         "client_tool_responses": client_tool_responses
                     },
@@ -400,7 +400,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "model": model
                     },
                     "space_config": s_config,
-                    "scratchpad": payload_data.get("scratchpad") or {}
+                    "scratchpad": payload_data.get("scratchpad") or {},
+                    "client_type": payload_data.get("client_type", "web")
                 }
                 
                 # 4. Execute graph with event streaming

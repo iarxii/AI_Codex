@@ -628,7 +628,8 @@ const Chat: React.FC = () => {
         benchmark_mode: localStorage.getItem('enable_langsmith') === 'true',
         private_workspace: localStorage.getItem('private_workspace') !== 'false',
         langsmith_api_key: localStorage.getItem('langsmith_api_key') || '',
-        langsmith_project: localStorage.getItem('langsmith_project') || 'vscode-agent-react-benchmarks'
+        langsmith_project: localStorage.getItem('langsmith_project') || 'vscode-agent-react-benchmarks',
+        client_type: 'web'
       };
       ws.current.send(JSON.stringify(payload));
       
@@ -716,7 +717,8 @@ const Chat: React.FC = () => {
         agent_mode: agentMode,
         local_backend_mode: getLocalBackendMode(),
         config: modelConfig,
-        base_url: localStorage.getItem('ollama_cloud_url') || ''
+        base_url: localStorage.getItem('ollama_cloud_url') || '',
+        client_type: 'web'
       };
       ws.current.send(JSON.stringify(payload));
     } catch (err: any) {

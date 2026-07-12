@@ -51,3 +51,6 @@ class AgentState(TypedDict):
     
     # --- Short-Process (Bypass) Routing ---
     is_short_process: Optional[bool]                 # Tracks if this is a short-circuit conversational run
+
+    # --- Client Context ---
+    client_type: Optional[str]                       # Identifier for the client (web, vscode, aidock, android)

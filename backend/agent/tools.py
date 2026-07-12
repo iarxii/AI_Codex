@@ -38,11 +38,15 @@ def make_wrapped_workspace_reader(skill: BaseSkill, conversation_id: str):
         return await skill.execute(action=action, path=path, query=query, recursive=recursive, conversation_id=conversation_id)
     return wrapped_workspace_reader
 
-def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = None) -> List[StructuredTool]:
+def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = None, client_type: str = "web") -> List[StructuredTool]:
     """
     Discovers all skills and returns them as a list of LangChain tools.
-    Filters by allowed_skills if provided.
+    Filters by allowed_skills if provided, and strictly filters by client_type capability.
     """
+    # Client Capability Mapping
+    DELEGATED_TOOLS = {"workspace_writer", "workspace_patcher", "workspace_reader", "shell_exec"}
+    can_delegate = client_type in ("vscode", "aidock")
+    
     # Ensure skills are discovered
     registry.discover_builtin_skills()
     
@@ -52,6 +56,10 @@ def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = Non
     for skill in skills:
         if allowed_skills and "all" not in allowed_skills and skill.name not in allowed_skills:
             continue
+            
+        if skill.name in DELEGATED_TOOLS and not can_delegate:
+            continue
+
         try:
             # We must preserve the signature for StructuredTool.from_function to work.
             # For the workspace_writer, we know its specific signature.
@@ -94,9 +102,13 @@ def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = Non
         except Exception as e:
             logger.error(f"Failed to convert skill {skill.name} to tool: {e}")
             
-    # Add native agent tools
-    tools.append(codebase_search)
-    tools.append(get_terminal_viewport)
+    # Add native agent tools based on capabilities
+    if can_delegate:
+        tools.append(codebase_search)
+        
+    if client_type == "vscode":
+        tools.append(get_terminal_viewport)
+        
     tools.append(mt5_dispatch_signal)
     tools.append(compact_context)
     tools.append(write_scratchpad)

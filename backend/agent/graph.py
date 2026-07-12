@@ -23,17 +23,16 @@ def should_continue(state: AgentState):
         f"| preview={content_preview!r}"
     )
     
+    if state.get("is_short_process"):
+        logger.info("ROUTER: Short process detected. Fast-path routing to END.")
+        return END
+
     if has_calls:
-        # Dynamically promote to long process if tool calls are detected
-        state["is_short_process"] = False
+        # Dynamically route to tool execution
         slug = state.get("space_config", {}).get("slug", "")
         if slug == "trading-space":
             return "mql5_enforcer"
         return "execute_tool"
-        
-    if state.get("is_short_process"):
-        logger.info("ROUTER: Short process detected. Fast-path routing to END.")
-        return END
         
     return "evaluate_turn"
 

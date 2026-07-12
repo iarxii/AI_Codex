@@ -284,6 +284,7 @@ async def init_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]
     telemetry["latencies"]["init_node"] = time.perf_counter() - start_time
     
     # Short Process Heuristic Classification
+    client_type = state.get("client_type", config.get("configurable", {}).get("client_type", "web"))
     is_short_process = False
     messages = state.get("messages", [])
     if messages:
@@ -308,7 +309,7 @@ async def init_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]
             
             if is_greeting or is_ack:
                 is_short_process = True
-            elif len(query) < 45:
+            elif client_type in ("vscode", "aidock") and len(query) < 45:
                 # Check for technical actions and file extensions
                 action_words = {"create", "write", "run", "make", "build", "generate", "code", "modify", "implement", "add", "fix", "delete", "remove", "update"}
                 has_action = any(word in query for word in action_words)
@@ -564,7 +565,8 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     logger.info(f"PIPELINE: Proceeding to LLM init (message count={len(messages)})...")
     
     # Initialize tools and binding logic
-    tools = get_agent_tools(conversation_id, allowed_skills)
+    client_type = state.get("client_type", config.get("configurable", {}).get("client_type", "web"))
+    tools = get_agent_tools(conversation_id, allowed_skills, client_type=client_type)
     
     # Dynamically bind client-side MCP tools from scratchpad
     scratchpad_data = state.get("scratchpad") or {}
@@ -606,7 +608,12 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         has_tool_support = "Tools" in capabilities
         
         tool_binding_status = ""
-        if valid_tools and has_tool_support and not isinstance(llm, NativeLocalClient):
+        is_short_process = state.get("is_short_process", False)
+        
+        if is_short_process:
+            logger.info(f"PIPELINE: Short process detected. Suppressing tool binding for conversational reply.")
+            tool_binding_status = "No tools available. Respond conversationally."
+        elif valid_tools and has_tool_support and not isinstance(llm, NativeLocalClient):
             logger.info(f"PIPELINE: Binding {len(valid_tools)} tools to LLM (Model: {model})")
             llm = llm.bind_tools(valid_tools)
             tool_binding_status = f"Tools bound successfully: {[t.name for t in valid_tools]}. You MUST use these tools for file/command operations."
@@ -863,7 +870,7 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
             
     tool_map = {t.name: t for t in tools}
 
-    client_type = config.get("configurable", {}).get("client_type")
+    client_type = state.get("client_type", config.get("configurable", {}).get("client_type", "web"))
     websocket = config.get("configurable", {}).get("websocket")
     client_tool_responses = config.get("configurable", {}).get("client_tool_responses")
 
@@ -874,7 +881,13 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
         tool_args = tool_call["args"]
         tool_id = tool_call["id"]
         
-        is_client_tool = client_type == "vscode" and tool_name in ["workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"]
+        CLIENT_DELEGATED_TOOLS = {
+            "vscode": {"workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"},
+            "aidock": {"workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"}
+        }
+        
+        delegated_for_client = CLIENT_DELEGATED_TOOLS.get(client_type, set())
+        is_client_tool = tool_name in delegated_for_client
         
         if tool_name == "compact_context":
             from langchain_core.messages import RemoveMessage, SystemMessage
