@@ -575,6 +575,18 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         from langchain_core.tools import StructuredTool
         for mcp_t in mcp_tools_list:
             tool_name = mcp_t.get("name")
+            
+            # Smart Routing Heuristics for Sequential Thinking
+            if tool_name == "mcp__reasoning__sequentialthinking":
+                # 1. Skip if it's a short/repetitive process
+                if state.get("is_short_process", False):
+                    logger.info("PIPELINE: Skipping sequential-thinking tool (Short Process)")
+                    continue
+                # 2. Skip if the model natively supports reasoning
+                if any(kw in model.lower() for kw in ["o1", "o3", "thinking"]):
+                    logger.info(f"PIPELINE: Skipping sequential-thinking tool (Native reasoning model: {model})")
+                    continue
+                    
             if any(t.name == tool_name for t in tools):
                 continue
             
