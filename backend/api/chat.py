@@ -192,6 +192,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         history_len = 0
         final_messages = None
 
+        thought_log = []
+        tool_runs = []
+        node_stream_content = ""
+
         try:
             async with AsyncSessionLocal() as db:
                 # 0. Get Conversation space_type and Verify Access
@@ -445,9 +449,17 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             node_has_streamed = False
                             current_node_name = node_name
                             current_node_start_time = time.time()
+                            node_stream_content = ""
+                            
+                            status_text = f"Agent working in node: {node_name}"
+                            thought_log.append({
+                                "text": status_text,
+                                "type": node_name,
+                                "timestamp": time.time()
+                            })
                             await websocket.send_json({
                                 "type": "status",
-                                "status": f"Agent working in node: {node_name}",
+                                "status": status_text,
                                 "node": node_name,
                                 "duration": time.perf_counter() - request_start
                             })
@@ -456,6 +468,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             content = event["data"]["chunk"].content
                             if content:
                                 full_ai_response += content
+                                node_stream_content += content
                                 node_has_streamed = True
                             
                                 now = time.perf_counter()
@@ -465,11 +478,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                         "type": "telemetry",
                                         "data": initial_state["telemetry"]
                                     })
-
+ 
                                 print(content, end="", flush=True)
                                 await websocket.send_json({
                                     "type": "token",
-                                    "content": full_ai_response,
+                                    "content": node_stream_content,
                                     "node": node_name,
                                     "provider": provider,
                                     "model": model,
@@ -480,21 +493,28 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             msg = event["data"]["output"]
                             if hasattr(msg, "tool_calls") and msg.tool_calls:
                                 print(f"PIPELINE: Tool Call detected: {msg.tool_calls[0]['name']}")
+                                for tc in msg.tool_calls:
+                                    if not any(t.get("id") == tc.get("id") for t in tool_runs):
+                                        tool_runs.append({
+                                            "id": tc.get("id"),
+                                            "name": tc.get("name"),
+                                            "args": tc.get("args"),
+                                            "result": None
+                                        })
                                 await websocket.send_json({
                                     "type": "tool_call",
                                     "tool_calls": msg.tool_calls,
                                     "node": node_name,
                                     "duration": time.perf_counter() - request_start
                                 })
-                            # Fallback: if no streaming tokens were captured but model returned content,
-                            # send the full response as a single token (handles providers that don't stream)
                             elif hasattr(msg, "content") and msg.content and not node_has_streamed:
-                                full_ai_response = msg.content
+                                node_stream_content = msg.content
+                                full_ai_response += msg.content
                                 node_has_streamed = True
                                 print(f"\nPIPELINE: Non-streaming response captured ({len(msg.content)} chars)")
                                 await websocket.send_json({
                                     "type": "token",
-                                    "content": full_ai_response,
+                                    "content": node_stream_content,
                                     "node": node_name,
                                     "provider": provider,
                                     "model": model,
@@ -503,11 +523,16 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             
                         # Tool Results
                         elif kind == "on_tool_end":
-                            print(f"PIPELINE: Tool Result: {str(event['data']['output'])[:50]}...")
+                            tool_result_content = str(event["data"]["output"])
+                            tool_call_id = event["metadata"].get("tool_call_id", "unknown")
+                            print(f"PIPELINE: Tool Result: {tool_result_content[:50]}...")
+                            for tr in tool_runs:
+                                if tr["id"] == tool_call_id:
+                                    tr["result"] = tool_result_content
                             await websocket.send_json({
                                 "type": "tool_result",
-                                "content": str(event["data"]["output"]),
-                                "tool_call_id": event["metadata"].get("tool_call_id", "unknown"),
+                                "content": tool_result_content,
+                                "tool_call_id": tool_call_id,
                                 "node": node_name
                             })
                     
@@ -573,7 +598,6 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                     if hasattr(m, "content") and m.content and getattr(m, "type", "") == "ai":
                                         content = m.content
                                         if isinstance(content, list):
-                                            # Extract text from content blocks (common with Gemini/Multimodal)
                                             text_parts = []
                                             for part in content:
                                                 if isinstance(part, dict):
@@ -582,12 +606,13 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                                     text_parts.append(str(part))
                                             content = "".join(text_parts)
                                     
-                                        full_ai_response = str(content)
+                                        node_stream_content = str(content)
+                                        full_ai_response += node_stream_content
                                         node_has_streamed = True
-                                        print(f"\nPIPELINE: Captured response from chain_end ({len(full_ai_response)} chars)")
+                                        print(f"\nPIPELINE: Captured response from chain_end ({len(node_stream_content)} chars)")
                                         await websocket.send_json({
                                             "type": "token",
-                                            "content": full_ai_response,
+                                            "content": node_stream_content,
                                             "node": node_name,
                                             "provider": provider,
                                             "model": model,
@@ -627,68 +652,48 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             # Re-fetch or save all generated messages
             if save_to_db:
                 async with AsyncSessionLocal() as db:
-                    if final_messages and len(final_messages) > history_len:
-                        # Save all new messages generated during the graph run
-                        new_msgs_to_save = final_messages[history_len:]
-                        for m in new_msgs_to_save:
-                            role = getattr(m, "type", "assistant")
-                            if role == "ai":
-                                role_str = "assistant"
-                            elif role == "human":
-                                role_str = "user"
-                            elif role == "tool":
-                                role_str = "tool"
-                            elif role == "system":
-                                role_str = "system"
-                            else:
-                                role_str = str(role)
-                                
-                            meta = {}
-                            if hasattr(m, "tool_calls") and m.tool_calls:
-                                meta["tool_calls"] = m.tool_calls
-                            if role == "tool":
-                                meta["name"] = getattr(m, "name", "")
-                                meta["tool_call_id"] = getattr(m, "tool_call_id", "")
-                                
-                            meta_json = json.dumps(meta) if meta else None
-                            
-                            new_db_msg = Message(
-                                conversation_id=conversation_id,
-                                role=role_str,
-                                content=str(m.content),
-                                metadata_json=meta_json
-                            )
-                            db.add(new_db_msg)
-                        await db.commit()
-                    elif full_ai_response:
-                        # Fallback to save just the final response if graph run didn't finish normally
-                        new_ai_msg = Message(
+                    final_assistant_content = ""
+                    if final_messages:
+                        for m in reversed(final_messages):
+                            if getattr(m, "type", "") == "ai" or m.__class__.__name__ == "AIMessage":
+                                final_assistant_content = str(m.content)
+                                break
+                    if not final_assistant_content:
+                        final_assistant_content = full_ai_response
+                    
+                    if final_assistant_content:
+                        meta = {
+                            "tool_calls": tool_runs,
+                            "thought_log": thought_log
+                        }
+                        new_db_msg = Message(
                             conversation_id=conversation_id,
                             role="assistant",
-                            content=full_ai_response
+                            content=final_assistant_content,
+                            metadata_json=json.dumps(meta)
                         )
-                        db.add(new_ai_msg)
+                        db.add(new_db_msg)
                         await db.commit()
                     
-                # Send final telemetry
-                initial_state["telemetry"]["latencies"]["total"] = time.perf_counter() - request_start
-                initial_state["telemetry"]["is_short_process"] = initial_state.get("is_short_process", False)
-                if full_ai_response:
-                    # Use utility for token estimation if not provided by model
-                    initial_state["telemetry"]["usage"]["output"] = estimate_tokens(full_ai_response)
-                    initial_state["telemetry"]["total_tokens"] = initial_state["telemetry"]["usage"]["input"] + initial_state["telemetry"]["usage"]["output"]
+            # Send final telemetry
+            initial_state["telemetry"]["latencies"]["total"] = time.perf_counter() - request_start
+            initial_state["telemetry"]["is_short_process"] = initial_state.get("is_short_process", False)
+            if full_ai_response:
+                # Use utility for token estimation if not provided by model
+                initial_state["telemetry"]["usage"]["output"] = estimate_tokens(full_ai_response)
+                initial_state["telemetry"]["total_tokens"] = initial_state["telemetry"]["usage"]["input"] + initial_state["telemetry"]["usage"]["output"]
 
-                await websocket.send_json({
-                    "type": "telemetry",
-                    "data": initial_state["telemetry"]
-                })
-                
-                # Reset status in UI
-                await websocket.send_json({
-                    "type": "status",
-                    "status": "Ready",
-                    "node": "idle"
-                })
+            await websocket.send_json({
+                "type": "telemetry",
+                "data": initial_state["telemetry"]
+            })
+            
+            # Reset status in UI
+            await websocket.send_json({
+                "type": "status",
+                "status": "Ready",
+                "node": "idle"
+            })
             
             await websocket.send_json({"type": "done"})
 

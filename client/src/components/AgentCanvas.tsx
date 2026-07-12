@@ -6,6 +6,7 @@ import ArtifactView from './canvas/ArtifactView';
 import GraphView from './canvas/GraphView';
 import ModuleTree from './canvas/ModuleTree';
 import DependencyMinimap from './canvas/DependencyMinimap';
+import { config, getApiUrl } from '../config';
 
 interface AgentCanvasProps {
   isOpen: boolean;
@@ -145,6 +146,60 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
     }
   };
 
+  const handleCreateFile = async (path: string) => {
+    if (!conversationId) return;
+    try {
+      const baseUrl = getApiUrl(isPremiumSpace);
+      await fetch(`${baseUrl}${config.API_V1_STR}/workspace/${conversationId}/file`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          ...(isPremiumSpace && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
+        },
+        body: JSON.stringify({ path, content: '' })
+      });
+      window.dispatchEvent(new CustomEvent('workspace-update'));
+    } catch (e) { console.error(e); }
+  };
+
+  const handleCreateFolder = async (path: string) => {
+    if (!conversationId) return;
+    try {
+      const baseUrl = getApiUrl(isPremiumSpace);
+      await fetch(`${baseUrl}${config.API_V1_STR}/workspace/${conversationId}/folder`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          ...(isPremiumSpace && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
+        },
+        body: JSON.stringify({ path })
+      });
+      window.dispatchEvent(new CustomEvent('workspace-update'));
+    } catch (e) { console.error(e); }
+  };
+
+  const handleDelete = async (path: string) => {
+    if (!conversationId) return;
+    try {
+      const baseUrl = getApiUrl(isPremiumSpace);
+      await fetch(`${baseUrl}${config.API_V1_STR}/workspace/${conversationId}/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          ...(isPremiumSpace && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
+        },
+        body: JSON.stringify({ path })
+      });
+      window.dispatchEvent(new CustomEvent('workspace-update'));
+      if (selectedId && path && selectedId.includes(path)) {
+        setSelectedId(null);
+      }
+    } catch (e) { console.error(e); }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -238,6 +293,9 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
                     artifacts={filteredArtifacts}
                     selectedId={selectedId}
                     onSelect={setSelectedId}
+                    onCreateFile={handleCreateFile}
+                    onCreateFolder={handleCreateFolder}
+                    onDelete={handleDelete}
                   />
                 </div>
 

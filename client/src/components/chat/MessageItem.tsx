@@ -13,6 +13,7 @@ import { useAI } from "../../contexts/AIContext";
 interface MessageItemProps {
   msg: Message;
   isLastUserMsg: boolean;
+  nextMsg?: Message;
   loading: boolean;
   thoughtLog: ThoughtLogEntry[];
   thoughtStartTime: number | null;
@@ -145,6 +146,7 @@ const PROVIDER_MODELS: Record<string, string[]> = {
 const MessageItem: React.FC<MessageItemProps> = ({
   msg,
   isLastUserMsg,
+  nextMsg,
   loading,
   thoughtLog,
   thoughtStartTime,
@@ -382,11 +384,22 @@ const MessageItem: React.FC<MessageItemProps> = ({
           </div>
         </div>
       ) : (
-        <div className="flex justify-start animate-in fade-in slide-in-from-left-4">
-          <div className="flex flex-col items-start gap-1.5 max-w-[85%]">
-            <span className="text-[9px] font-bold text-[#fd3b12] uppercase tracking-widest bg-[#fd3b12]/10 px-2 py-0.5 rounded-md border border-[#fd3b12]/20 backdrop-blur-sm ml-0.5">
-              Agent
-            </span>
+        <div className="space-y-4 w-full">
+          {/* Persisted Neural Trace */}
+          {(msg.metadata?.thought_log?.length > 0 || msg.metadata?.tool_calls?.length > 0) && (
+            <ThinkingTrace
+              loading={false}
+              thoughtLog={msg.metadata.thought_log || []}
+              thoughtStartTime={msg.metadata.thought_log?.[0]?.timestamp || null}
+              currentToolCalls={msg.metadata.tool_calls || []}
+              currentContext={[]}
+            />
+          )}
+          <div className="flex justify-start animate-in fade-in slide-in-from-left-4">
+            <div className="flex flex-col items-start gap-1.5 max-w-[85%]">
+              <span className="text-[9px] font-bold text-[#fd3b12] uppercase tracking-widest bg-[#fd3b12]/10 px-2 py-0.5 rounded-md border border-[#fd3b12]/20 backdrop-blur-sm ml-0.5">
+                Agent
+              </span>
             <div className="bg-white border border-black/[0.04] p-5 rounded-2xl rounded-tl-none rounded-br-none shadow-sm relative group bot-corner-glow w-full">
               {/* Secondary corner glow decorator */}
               <div className="absolute inset-0 pointer-events-none bot-corner-glow-secondary rounded-2xl rounded-tl-none rounded-br-none overflow-hidden"></div>
@@ -734,10 +747,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* Thinking Process — Appear BELOW the user message but ABOVE the bot message if possible */}
-      {isLastUserMsg && (
+      {isLastUserMsg && (!nextMsg || nextMsg.sender !== "bot" || nextMsg.status === "typing") && (
         <ThinkingTrace
           loading={loading}
           thoughtLog={thoughtLog}

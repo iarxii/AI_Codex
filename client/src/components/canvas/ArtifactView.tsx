@@ -6,15 +6,32 @@ import SpiritBird from './SpiritBird';
 
 interface ArtifactViewProps {
   artifact: Artifact;
+  onSave?: (path: string, content: string) => void;
 }
 
-const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact }) => {
+const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact, onSave }) => {
   const [copied, setCopied] = React.useState(false);
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editContent, setEditContent] = React.useState(artifact.content);
+
+  // Sync content when artifact changes if not editing
+  React.useEffect(() => {
+    if (!isEditing) {
+      setEditContent(artifact.content);
+    }
+  }, [artifact.content, isEditing]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(artifact.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSave = () => {
+    if (onSave && (artifact.filePath || artifact.title)) {
+      onSave(artifact.filePath || artifact.title, editContent);
+    }
+    setIsEditing(false);
   };
 
   const lines = artifact.type === 'code' ? artifact.content.split('\n') : [];
@@ -62,46 +79,71 @@ const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact }) => {
           </div>
         </div>
         
-        {/* Copy button with animation */}
-        <button 
-          onClick={handleCopy}
-          className={`p-2 rounded-xl transition-all ${
-            copied 
-              ? 'bg-green-500/10 text-green-500 scale-95' 
-              : 'hover:bg-black/[0.05] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-          }`}
-          title="Copy content"
-        >
-          {copied ? (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-          ) : (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+        <div className="flex items-center gap-2">
+          {onSave && artifact.type === 'code' && (
+            isEditing ? (
+              <>
+                <button onClick={() => { setIsEditing(false); setEditContent(artifact.content); }} className="px-2 py-1 hover:bg-black/[0.05] rounded text-[9px] font-bold text-[var(--text-muted)] uppercase">Cancel</button>
+                <button onClick={handleSave} className="px-3 py-1 bg-[var(--accent)] text-white rounded text-[9px] font-bold uppercase shadow-[0_0_8px_rgba(255,102,0,0.3)]">Save</button>
+              </>
+            ) : (
+              <button onClick={() => setIsEditing(true)} className="px-3 py-1 hover:bg-black/[0.05] rounded text-[9px] font-bold text-[var(--text-muted)] hover:text-[var(--accent)] uppercase flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                Edit
+              </button>
+            )
           )}
-        </button>
+          
+          {/* Copy button with animation */}
+          <button 
+            onClick={handleCopy}
+            className={`p-2 rounded-xl transition-all ${
+              copied 
+                ? 'bg-green-500/10 text-green-500 scale-95' 
+                : 'hover:bg-black/[0.05] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            }`}
+            title="Copy content"
+          >
+            {copied ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Content Area */}
       <div className="flex-1 overflow-auto scrollbar-hide">
         {artifact.type === 'code' ? (
           /* Dark-themed code view with line numbers */
-          <div className="bg-[#0F172A] text-slate-200 p-0 min-h-full">
-            <div className="font-mono text-[12px] leading-[1.7]">
-              {lines.map((line, i) => (
-                <div 
-                  key={i} 
-                  className="flex hover:bg-white/[0.03] transition-colors"
-                >
-                  {/* Line number gutter */}
-                  <span className="select-none w-12 shrink-0 text-right pr-4 text-slate-500/60 text-[11px] leading-[1.7] border-r border-slate-700/30">
-                    {i + 1}
-                  </span>
-                  {/* Code content */}
-                  <span className="pl-4 pr-5 whitespace-pre-wrap break-all flex-1">
-                    {line || '\u00A0'}
-                  </span>
-                </div>
-              ))}
-            </div>
+          <div className="bg-[#0F172A] text-slate-200 p-0 min-h-full flex">
+            {isEditing ? (
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="w-full bg-transparent text-[12px] font-mono leading-[1.7] p-4 text-slate-200 outline-none resize-none min-h-[300px]"
+                spellCheck="false"
+              />
+            ) : (
+              <div className="font-mono text-[12px] leading-[1.7] w-full">
+                {lines.map((line, i) => (
+                  <div 
+                    key={i} 
+                    className="flex hover:bg-white/[0.03] transition-colors"
+                  >
+                    {/* Line number gutter */}
+                    <span className="select-none w-12 shrink-0 text-right pr-4 text-slate-500/60 text-[11px] leading-[1.7] border-r border-slate-700/30">
+                      {i + 1}
+                    </span>
+                    {/* Code content */}
+                    <span className="pl-4 pr-5 whitespace-pre-wrap break-all flex-1">
+                      {line || '\u00A0'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           /* Markdown documentation/research view */

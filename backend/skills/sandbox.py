@@ -10,7 +10,22 @@ class SandboxResult(SkillResult):
     """
     return_code: Optional[int] = None
 
-async def execute_sandboxed(command: str, cwd: str = ".") -> SandboxResult:
+ACTIVE_PROCESSES = {}
+
+async def kill_active_process(conversation_id: str) -> bool:
+    """Terminates an active subprocess for a given conversation."""
+    proc = ACTIVE_PROCESSES.get(conversation_id)
+    if proc:
+        try:
+            # On Windows, proc.kill() sends TerminateProcess.
+            proc.kill()
+            del ACTIVE_PROCESSES[conversation_id]
+            return True
+        except Exception:
+            pass
+    return False
+
+async def execute_sandboxed(command: str, cwd: str = ".", conversation_id: Optional[str] = None) -> SandboxResult:
     """
     Executes a shell command in a sandboxed subprocess.
     Enforces allowlist, timeout, and captures output.
@@ -43,6 +58,9 @@ async def execute_sandboxed(command: str, cwd: str = ".") -> SandboxResult:
             stderr=PIPE
         )
         
+        if conversation_id:
+            ACTIVE_PROCESSES[conversation_id] = proc
+            
         try:
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(),
@@ -54,6 +72,15 @@ async def execute_sandboxed(command: str, cwd: str = ".") -> SandboxResult:
             except:
                 pass
             return SandboxResult(success=False, error=f"Execution timed out after {settings.MAX_EXECUTION_TIME}s")
+        except asyncio.CancelledError:
+            try:
+                proc.kill()
+            except:
+                pass
+            return SandboxResult(success=False, error="Execution cancelled by user")
+        finally:
+            if conversation_id and conversation_id in ACTIVE_PROCESSES:
+                del ACTIVE_PROCESSES[conversation_id]
 
         stdout_str = stdout.decode(errors="replace").strip()
         stderr_str = stderr.decode(errors="replace").strip()

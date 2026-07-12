@@ -309,6 +309,13 @@ const Chat: React.FC = () => {
         );
         setCurrentToolCalls(updated);
         currentToolCallsRef.current = updated;
+        
+        // Auto-refresh workspace files if a filesystem tool just finished
+        const tc = updated.find(t => t.id === data.tool_call_id);
+        if (tc && ['workspace_writer', 'workspace_patcher', 'shell_exec', 'delete_file', 'create_folder'].includes(tc.name)) {
+          window.dispatchEvent(new CustomEvent('workspace-update'));
+        }
+
         setThoughtLog(prev => {
           if (prev.length === 0) return prev;
           const updated = [...prev];
@@ -509,12 +516,23 @@ const Chat: React.FC = () => {
         const data = await response.json();
         const mappedMsgs: Message[] = data.messages
           .filter((m: any) => m.role === 'user' || m.role === 'assistant')
-          .map((m: any) => ({
-            id: m.id.toString(),
-            sender: m.role === 'user' ? 'user' : 'bot',
-            content: m.content,
-            status: 'done'
-          }));
+          .map((m: any) => {
+            let parsedMeta = null;
+            if (m.metadata_json) {
+              try {
+                parsedMeta = typeof m.metadata_json === 'string' ? JSON.parse(m.metadata_json) : m.metadata_json;
+              } catch (e) {
+                console.error("Failed to parse metadata_json:", e);
+              }
+            }
+            return {
+              id: m.id.toString(),
+              sender: m.role === 'user' ? 'user' : 'bot',
+              content: m.content,
+              status: 'done',
+              metadata: parsedMeta || m.metadata
+            };
+          });
         setMessages(mappedMsgs);
         
         // Update active space context based on conversation space_type
@@ -537,7 +555,12 @@ const Chat: React.FC = () => {
           setTimeout(() => setSpaceNote(null), 5000);
         }
         
-        // Re-parse artifacts from history
+        // Load actual files from workspace disk to replace/augment parsed artifacts
+        await loadWorkspaceFiles(id);
+        
+        // Optionally re-parse artifacts from history if we want to merge them,
+        // but since we are moving to an IDE style, the disk files are the source of truth.
+        // We'll still parse them to keep backward compatibility for non-file artifacts (like 'research' text blocks).
         const allArtifacts: Artifact[] = [];
         data.messages.forEach((m: any) => {
           if (m.role === 'assistant') {
@@ -549,7 +572,17 @@ const Chat: React.FC = () => {
             });
           }
         });
-        setArtifacts(allArtifacts);
+        
+        // Only add parsed artifacts that don't conflict with disk files (based on title/path)
+        setArtifacts(prev => {
+          const merged = [...prev];
+          allArtifacts.forEach(parsed => {
+            if (!merged.find(a => (a.filePath || a.title) === (parsed.filePath || parsed.title))) {
+              merged.push(parsed);
+            }
+          });
+          return merged;
+        });
       }
     } catch (error) {
       console.error('Failed to load history:', error);
@@ -557,6 +590,45 @@ const Chat: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const loadWorkspaceFiles = async (id: number) => {
+    try {
+      const baseUrl = getApiUrl(isPremiumSpace);
+      const response = await fetch(`${baseUrl}${config.API_V1_STR}/workspace/${id}/files`, {
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          ...(isPremiumSpace && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
+        }
+      });
+      if (response.ok) {
+        const files = await response.json();
+        const mappedArtifacts: Artifact[] = files.map((file: any) => ({
+          id: `fs-${file.path.replace(/[/\\.]/g, '-')}`,
+          type: file.type || 'code',
+          title: file.name,
+          content: file.content || '',
+          language: file.language || 'text',
+          filePath: file.path,
+          timestamp: file.timestamp || Date.now(),
+          module: file.path.includes('/') ? file.path.split('/')[0] : undefined
+        }));
+        setArtifacts(mappedArtifacts);
+      }
+    } catch (err) {
+      console.error('Failed to load workspace files:', err);
+    }
+  };
+
+  // Listen for custom workspace updates from Canvas
+  useEffect(() => {
+    const handleWorkspaceUpdate = () => {
+      if (currentConvId) {
+        loadWorkspaceFiles(currentConvId);
+      }
+    };
+    window.addEventListener('workspace-update', handleWorkspaceUpdate);
+    return () => window.removeEventListener('workspace-update', handleWorkspaceUpdate);
+  }, [currentConvId, isPremiumSpace]);
 
   const handleNewChat = async () => {
     try {

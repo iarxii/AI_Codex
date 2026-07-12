@@ -430,6 +430,7 @@ const MessageList: React.FC<MessageListProps> = ({
               lastUserIndex !== -1 &&
               index === messages.length - 1 - lastUserIndex
             }
+            nextMsg={messages[index + 1]}
             loading={loading}
             thoughtLog={thoughtLog}
             thoughtStartTime={thoughtStartTime}

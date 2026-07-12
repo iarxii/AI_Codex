@@ -44,7 +44,7 @@ def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = Non
     Filters by allowed_skills if provided, and strictly filters by client_type capability.
     """
     # Client Capability Mapping
-    DELEGATED_TOOLS = {"workspace_writer", "workspace_patcher", "workspace_reader", "shell_exec"}
+    FILESYSTEM_TOOLS = {"workspace_writer", "workspace_patcher", "workspace_reader", "shell_exec"}
     can_delegate = client_type in ("vscode", "aidock")
     
     # Ensure skills are discovered
@@ -57,7 +57,7 @@ def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = Non
         if allowed_skills and "all" not in allowed_skills and skill.name not in allowed_skills:
             continue
             
-        if skill.name in DELEGATED_TOOLS and not can_delegate:
+        if skill.name in FILESYSTEM_TOOLS and client_type not in ("vscode", "aidock", "web"):
             continue
 
         try:

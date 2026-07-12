@@ -5,6 +5,9 @@ interface ModuleTreeProps {
   artifacts: Artifact[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onCreateFile?: (path: string) => void;
+  onCreateFolder?: (path: string) => void;
+  onDelete?: (path: string) => void;
 }
 
 interface TreeNode {
@@ -85,8 +88,13 @@ const DirNode: React.FC<{
   depth: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
-}> = ({ node, depth, selectedId, onSelect }) => {
+  onCreateFile?: (path: string) => void;
+  onCreateFolder?: (path: string) => void;
+  onDelete?: (path: string) => void;
+  parentPath?: string;
+}> = ({ node, depth, selectedId, onSelect, onCreateFile, onCreateFolder, onDelete, parentPath = '' }) => {
   const [expanded, setExpanded] = useState(true);
+  const currentPath = depth === 0 ? '' : parentPath ? `${parentPath}/${node.name}` : node.name;
 
   return (
     <div>
@@ -111,9 +119,37 @@ const DirNode: React.FC<{
           <span className="text-[9px] font-bold text-[var(--text-secondary)] uppercase tracking-wider truncate">
             {node.name}
           </span>
-          <span className="text-[7px] text-[var(--text-muted)] font-mono ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-            {node.artifacts.length + node.children.size}
-          </span>
+          
+          {/* Action buttons on hover */}
+          <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity" onClick={e => e.stopPropagation()}>
+            {onCreateFile && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); const name = prompt('File name:'); if (name) onCreateFile(`${currentPath}/${name}`); }}
+                className="p-1 hover:bg-black/[0.05] rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                title="New File"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
+              </button>
+            )}
+            {onCreateFolder && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); const name = prompt('Folder name:'); if (name) onCreateFolder(`${currentPath}/${name}`); }}
+                className="p-1 hover:bg-black/[0.05] rounded text-[var(--text-muted)] hover:text-yellow-600"
+                title="New Folder"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+              </button>
+            )}
+            {onDelete && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); if (confirm(`Delete folder ${node.name}?`)) onDelete(currentPath); }}
+                className="p-1 hover:bg-red-500/10 rounded text-[var(--text-muted)] hover:text-red-500"
+                title="Delete Folder"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            )}
+          </div>
         </button>
       )}
 
@@ -128,6 +164,10 @@ const DirNode: React.FC<{
               depth={depth + 1}
               selectedId={selectedId}
               onSelect={onSelect}
+              onCreateFile={onCreateFile}
+              onCreateFolder={onCreateFolder}
+              onDelete={onDelete}
+              parentPath={currentPath}
             />
           ))}
 
@@ -153,8 +193,19 @@ const DirNode: React.FC<{
                   )}
                 </span>
               </div>
+              
+              {onDelete && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); if (confirm(`Delete file ${art.title}?`)) onDelete(art.filePath || art.title); }}
+                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/10 rounded text-[var(--text-muted)] hover:text-red-500 transition-opacity shrink-0"
+                  title="Delete File"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              )}
+
               {selectedId === art.id && (
-                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_6px_rgba(255,102,0,0.5)] shrink-0"></div>
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_6px_rgba(255,102,0,0.5)] shrink-0 ml-1"></div>
               )}
             </button>
           ))}
@@ -164,7 +215,7 @@ const DirNode: React.FC<{
   );
 };
 
-const ModuleTree: React.FC<ModuleTreeProps> = ({ artifacts, selectedId, onSelect }) => {
+const ModuleTree: React.FC<ModuleTreeProps> = ({ artifacts, selectedId, onSelect, onCreateFile, onCreateFolder, onDelete }) => {
   // Group by module first, then build trees within each module
   const modules = new Map<string, Artifact[]>();
   const ungrouped: Artifact[] = [];
@@ -193,8 +244,17 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({ artifacts, selectedId, onSelect
               <span className="text-[7px] text-[var(--text-muted)] font-mono">
                 ({arts.length} file{arts.length !== 1 ? 's' : ''})
               </span>
+              
+              <div className="ml-auto flex items-center gap-1">
+                {onCreateFile && (
+                  <button onClick={() => { const name = prompt('File name:'); if (name) onCreateFile(name); }} className="p-1 hover:bg-black/[0.05] rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg></button>
+                )}
+                {onCreateFolder && (
+                  <button onClick={() => { const name = prompt('Folder name:'); if (name) onCreateFolder(name); }} className="p-1 hover:bg-black/[0.05] rounded text-[var(--text-muted)] hover:text-yellow-600"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></button>
+                )}
+              </div>
             </div>
-            <DirNode node={tree} depth={0} selectedId={selectedId} onSelect={onSelect} />
+            <DirNode node={tree} depth={0} selectedId={selectedId} onSelect={onSelect} onCreateFile={onCreateFile} onCreateFolder={onCreateFolder} onDelete={onDelete} />
           </div>
         );
       })}
