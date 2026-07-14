@@ -17,6 +17,7 @@ import MetricsStrip from '../components/chat/MetricsStrip';
 import ModelTelemetryHUD from '../components/chat/ModelTelemetryHUD';
 import { SpiritBirdHarness } from '../components/chat/SpiritBirdHarness';
 import { GemmaSandboxHarness } from '../components/chat/GemmaSandboxHarness';
+import { MicrosoftAgentHarness } from '../components/chat/MicrosoftAgentHarness';
 import { SpiritBirdChatHarness } from '../components/chat/SpiritBirdChatHarness';
 import SpacesCatalog from 'codex_spaces/client/src/components/SpacesCatalog';
 import TradingSpaceHeader from '../components/spaces/trading/TradingSpaceHeader';
@@ -902,7 +903,7 @@ const Chat: React.FC = () => {
               </div>
 
               {/* Contextual Interaction Harnesses for spaces */}
-              {activeSpace && ['trading-space', 'code-lab', 'spirit-book'].includes(activeSpace.slug) && (
+              {activeSpace && ['trading-space', 'code-lab', 'spirit-book', 'health-tech', 'microsoft-agent-lab'].includes(activeSpace.slug) && (
                 <>
                   {/* Mobile Right Slide-Over Side Drawer */}
                   {isHarnessOpen && (
@@ -913,8 +914,8 @@ const Chat: React.FC = () => {
                       >
                         <div className="flex items-center justify-between p-4 border-b border-white/5 safe-area-top">
                           <div>
-                            <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${activeSpace.slug === 'code-lab' ? 'text-[#446EFF]' : activeSpace.slug === 'spirit-book' ? 'text-[#6366f1]' : 'text-[#fd3b12]'}`}>
-                              {activeSpace.slug === 'code-lab' ? 'Gemma Code Lab' : activeSpace.slug === 'spirit-book' ? 'SpiritBook Helper' : 'Spirit Bird Interaction'}
+                            <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${['code-lab', 'health-tech'].includes(activeSpace.slug) ? 'text-[#446EFF]' : activeSpace.slug === 'microsoft-agent-lab' ? 'text-[#0078D4]' : activeSpace.slug === 'spirit-book' ? 'text-[#6366f1]' : 'text-[#fd3b12]'}`}>
+                              {activeSpace.slug === 'code-lab' ? 'Gemma Code Lab' : activeSpace.slug === 'health-tech' ? 'MedGemma Soft Lab' : activeSpace.slug === 'microsoft-agent-lab' ? 'Microsoft Code Lab' : activeSpace.slug === 'spirit-book' ? 'SpiritBook Helper' : 'Spirit Bird Interaction'}
                             </h3>
                             <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">Agent UI Projection Space</p>
                           </div>
@@ -924,7 +925,8 @@ const Chat: React.FC = () => {
                         </div>
                         <div className="flex-1 overflow-y-auto safe-area-bottom">
                           {activeSpace.slug === 'trading-space' && <SpiritBirdHarness spaceName={activeSpace.name} />}
-                          {activeSpace.slug === 'code-lab' && <GemmaSandboxHarness thoughtLog={thoughtLog} telemetry={telemetry} />}
+                          {['code-lab', 'health-tech'].includes(activeSpace.slug) && <GemmaSandboxHarness thoughtLog={thoughtLog} telemetry={telemetry} />}
+                          {activeSpace.slug === 'microsoft-agent-lab' && <MicrosoftAgentHarness />}
                           {activeSpace.slug === 'spirit-book' && <SpiritBirdChatHarness />}
                         </div>
                       </div>
@@ -956,13 +958,25 @@ const Chat: React.FC = () => {
                                 <span className="text-[10px] font-black font-mono">📈</span>
                               </div>
                             </>
-                          ) : activeSpace.slug === 'code-lab' ? (
+                          ) : ['code-lab', 'health-tech'].includes(activeSpace.slug) ? (
                             <>
                               <div className="w-8 h-8 rounded-lg bg-[#446EFF]/10 flex items-center justify-center border border-[#446EFF]/20 text-[#446EFF] cursor-pointer" onClick={() => setIsHarnessCollapsed(false)} title="Sandbox Code">
                                 <span className="text-[10px] font-black font-mono">💻</span>
                               </div>
                               <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center border border-purple-500/20 text-purple-400 cursor-pointer" onClick={() => setIsHarnessCollapsed(false)} title="MTP Simulator">
                                 <span className="text-[10px] font-black font-mono">⚡</span>
+                              </div>
+                            </>
+                          ) : activeSpace.slug === 'microsoft-agent-lab' ? (
+                            <>
+                              <div className="w-8 h-8 rounded-lg bg-[#0078D4]/10 flex items-center justify-center border border-[#0078D4]/20 text-[#0078D4] cursor-pointer" onClick={() => setIsHarnessCollapsed(false)} title="Office Data">
+                                <span className="text-[10px] font-black font-mono">📊</span>
+                              </div>
+                              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 text-indigo-400 cursor-pointer" onClick={() => setIsHarnessCollapsed(false)} title="Power Automate">
+                                <span className="text-[10px] font-black font-mono">⚡</span>
+                              </div>
+                              <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center border border-purple-500/20 text-purple-400 cursor-pointer" onClick={() => setIsHarnessCollapsed(false)} title="PowerApps">
+                                <span className="text-[10px] font-black font-mono">📱</span>
                               </div>
                             </>
                           ) : (
@@ -977,15 +991,15 @@ const Chat: React.FC = () => {
                           )}
                         </div>
                         <div className="text-[9px] text-slate-600 font-mono tracking-[0.25em] font-black uppercase [writing-mode:vertical-lr] rotate-180 py-4 select-none">
-                          {activeSpace.slug === 'code-lab' ? 'GEMMA LAB' : activeSpace.slug === 'spirit-book' ? 'SPIRIT BOOK' : 'SPIRIT BIRD'}
+                          {['code-lab', 'health-tech'].includes(activeSpace.slug) ? 'GEMMA LAB' : activeSpace.slug === 'microsoft-agent-lab' ? 'MS CODE LAB' : activeSpace.slug === 'spirit-book' ? 'SPIRIT BOOK' : 'SPIRIT BIRD'}
                         </div>
                       </div>
                     ) : (
                       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
                         <div className="p-4 border-b border-white/5 sticky top-0 bg-[#090A0E]/80 backdrop-blur-md flex items-center justify-between z-10">
                           <div>
-                            <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${activeSpace.slug === 'code-lab' ? 'text-[#446EFF]' : activeSpace.slug === 'spirit-book' ? 'text-[#6366f1]' : 'text-[#fd3b12]'}`}>
-                              {activeSpace.slug === 'code-lab' ? 'Gemma Code Lab (Gemma 4)' : activeSpace.slug === 'spirit-book' ? 'SpiritBook Helper' : `Spirit Bird Interaction (${activeSpace.name})`}
+                            <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${['code-lab', 'health-tech'].includes(activeSpace.slug) ? 'text-[#446EFF]' : activeSpace.slug === 'microsoft-agent-lab' ? 'text-[#0078D4]' : activeSpace.slug === 'spirit-book' ? 'text-[#6366f1]' : 'text-[#fd3b12]'}`}>
+                              {activeSpace.slug === 'code-lab' ? 'Gemma Code Lab (Gemma 4)' : activeSpace.slug === 'health-tech' ? 'MedGemma Soft Lab' : activeSpace.slug === 'microsoft-agent-lab' ? 'Microsoft Code Lab' : activeSpace.slug === 'spirit-book' ? 'SpiritBook Helper' : `Spirit Bird Interaction (${activeSpace.name})`}
                             </h3>
                             <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">Agent UI Projection Space</p>
                           </div>
@@ -999,7 +1013,8 @@ const Chat: React.FC = () => {
                         </div>
                         <div className="flex-1 overflow-y-auto flex flex-col">
                           {activeSpace.slug === 'trading-space' && <SpiritBirdHarness spaceName={activeSpace.name} />}
-                          {activeSpace.slug === 'code-lab' && <GemmaSandboxHarness thoughtLog={thoughtLog} telemetry={telemetry} />}
+                          {['code-lab', 'health-tech'].includes(activeSpace.slug) && <GemmaSandboxHarness thoughtLog={thoughtLog} telemetry={telemetry} />}
+                          {activeSpace.slug === 'microsoft-agent-lab' && <MicrosoftAgentHarness />}
                           {activeSpace.slug === 'spirit-book' && <SpiritBirdChatHarness />}
                         </div>
                       </div>

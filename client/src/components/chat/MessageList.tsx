@@ -163,6 +163,16 @@ const MessageList: React.FC<MessageListProps> = ({
               icon: "/media/brand-icons/gemma.svg",
               desc: "High-performance agentic coding environment powered by Google's Gemma 4.",
             },
+            'health-tech': {
+              label: "MedGemma Soft Lab",
+              icon: "/media/brand-icons/gemma.svg",
+              desc: "Specialized medical and clinical AI assistant utilizing MedGemma models.",
+            },
+            'microsoft-agent-lab': {
+              label: "Microsoft Agentic Code Lab",
+              icon: null,
+              desc: "Automate enterprise workflows with Power Platform and Office Graph integrations.",
+            },
             'spirit-book': {
               label: "SpiritBook",
               icon: "/media/aicodex-spirit-bird-white.png",

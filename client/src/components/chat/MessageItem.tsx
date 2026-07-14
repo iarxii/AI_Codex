@@ -164,7 +164,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
   const allowedProviders = React.useMemo(() => {
     return PROVIDERS.filter((p) => {
-      if (activeSpace && ["code-lab", "gpt-oss"].includes(activeSpace.slug)) {
+      if (activeSpace && ["code-lab", "gpt-oss", "health-tech", "microsoft-agent-lab"].includes(activeSpace.slug)) {
         if (p.id === "groq") return false;
       }
       return true;
@@ -173,7 +173,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
   const getFilteredModelsForProvider = React.useCallback((prov: ProviderId) => {
     const allModels = PROVIDER_MODELS[prov] || [];
-    if (activeSpace?.slug === "code-lab") {
+    if (activeSpace && ["code-lab", "health-tech"].includes(activeSpace.slug)) {
       return allModels.filter(m => m.toLowerCase().includes("gemma"));
     }
     if (activeSpace?.slug === "gpt-oss") {
@@ -187,7 +187,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
   const [selectedProvider, setSelectedProvider] = React.useState<ProviderId>(() => {
     const prov = (localStorage.getItem("ai_provider") as ProviderId) || "local";
-    if (activeSpace && ["code-lab", "gpt-oss"].includes(activeSpace.slug) && prov === "groq") {
+    if (activeSpace && ["code-lab", "gpt-oss", "health-tech", "microsoft-agent-lab"].includes(activeSpace.slug) && prov === "groq") {
       return "local";
     }
     return prov;
@@ -195,7 +195,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
 
   const [selectedModel, setSelectedModel] = React.useState<string>(() => {
     const prov = (localStorage.getItem("ai_provider") as ProviderId) || "local";
-    const activeProv = (activeSpace && ["code-lab", "gpt-oss"].includes(activeSpace.slug) && prov === "groq") ? "local" : prov;
+    const activeProv = (activeSpace && ["code-lab", "gpt-oss", "health-tech", "microsoft-agent-lab"].includes(activeSpace.slug) && prov === "groq") ? "local" : prov;
     const models = getFilteredModelsForProvider(activeProv);
     const persisted = localStorage.getItem(`ai_model_${activeProv}`);
     if (persisted && models.includes(persisted)) {

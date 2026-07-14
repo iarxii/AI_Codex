@@ -41,6 +41,12 @@ const P5Background: React.FC<P5BackgroundProps> = ({
     'code-lab': {
       still: '/media/gemma_wallpaper.jpg',
     },
+    'health-tech': {
+      still: '/media/gemma_wallpaper.jpg',
+    },
+    'microsoft-agent-lab': {
+      still: '/media/aicodex_vector_wallpaper.png',
+    },
     'spirit-book': {
       still: '/media/aicodex_spirit_bird_wallpaper.png',
     }
