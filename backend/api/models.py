@@ -251,6 +251,14 @@ async def list_models(
             or "google" in m["id"].lower()
         ]
         
+    if x_space_slug == "health-tech":
+        # Only MedGemma models
+        return [
+            m for m in models
+            if "medgemma" in m["id"].lower()
+            or "medgemma" in m["name"].lower()
+        ]
+        
     if x_space_slug == "gpt-oss":
         if provider == "gemini":
             return [

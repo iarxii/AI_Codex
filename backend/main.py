@@ -13,9 +13,31 @@ from backend.utils.logger import mask_uvicorn_logs
 # Ensure logging is masked on startup
 mask_uvicorn_logs()
 
+# Global process handle for the Microsoft Agentic Code Lab Go sidecar
+sidecar_proc = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("[LIFESPAN] Starting initialization...")
+    
+    # Start Go Sidecar if binary is present
+    import subprocess
+    global sidecar_proc
+    sidecar_bin = None
+    if os.path.exists("/app/ms_agent"):
+        sidecar_bin = "/app/ms_agent"
+    elif os.path.exists("codex_spaces/sidecar/ms_agent"):
+        sidecar_bin = "codex_spaces/sidecar/ms_agent"
+    elif os.path.exists("codex_spaces/sidecar/ms_agent.exe"):
+        sidecar_bin = "codex_spaces/sidecar/ms_agent.exe"
+
+    if sidecar_bin:
+        print(f"[LIFESPAN] Starting Go Sidecar: {sidecar_bin}")
+        try:
+            sidecar_proc = subprocess.Popen([sidecar_bin])
+            print(f"[LIFESPAN] Go Sidecar started (PID {sidecar_proc.pid})")
+        except Exception as e:
+            print(f"[LIFESPAN] Error starting Go Sidecar: {e}")
     # Sync SQLite from GCS if in Cloud Run
     is_cloud_run = os.getenv("K_SERVICE") is not None
     force_restart = os.getenv("FORCE_RESTART") == "1" or os.getenv("FORCE_RESTART") == "true"
@@ -112,6 +134,16 @@ async def lifespan(app: FastAPI):
     
     # Shutdown logic
     print("[LIFESPAN] Shutting down...")
+    if sidecar_proc:
+        print(f"[LIFESPAN] Terminating Go Sidecar (PID {sidecar_proc.pid})...")
+        sidecar_proc.terminate()
+        try:
+            sidecar_proc.wait(timeout=5)
+            print("[LIFESPAN] Go Sidecar terminated.")
+        except subprocess.TimeoutExpired:
+            sidecar_proc.kill()
+            print("[LIFESPAN] Go Sidecar killed.")
+
     if is_cloud_run and settings.DB_TYPE == "sqlite":
         print("[LIFESPAN] Cloud Run detected, uploading DB to GCS before shutdown...")
         from backend.utils.storage import upload_db_to_gcs
@@ -226,13 +258,15 @@ async def health_check():
 
 # Include routers
 from backend.api import auth, chat, metrics, rag, skills, conversations, models, workspace, profile, admin, market, arcade, portal
-from codex_spaces.backend.api import spaces, bridge
+from codex_spaces.backend.api import spaces, bridge, a2a_google, a2a_microsoft
 app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
 app.include_router(profile.router, prefix=settings.API_V1_STR + "/profile", tags=["profile"])
 app.include_router(admin.router, prefix=settings.API_V1_STR + "/admin", tags=["admin"])
 app.include_router(conversations.router, prefix=settings.API_V1_STR + "/conversations", tags=["conversations"])
 app.include_router(spaces.router, prefix=settings.API_V1_STR + "/spaces", tags=["spaces"])
 app.include_router(bridge.router, prefix=settings.API_V1_STR + "/spaces/bridge", tags=["bridge"])
+app.include_router(a2a_google.router, prefix="/a2a/code-lab", tags=["A2A - Code Lab"])
+app.include_router(a2a_microsoft.router, prefix="/a2a/microsoft-agent-lab", tags=["A2A - Microsoft Agentic Lab"])
 app.include_router(chat.router, prefix=settings.API_V1_STR + "/chat", tags=["chat"])
 app.include_router(workspace.router, prefix=settings.API_V1_STR + "/workspace", tags=["workspace"])
 app.include_router(metrics.router, prefix=settings.API_V1_STR + "/metrics", tags=["metrics"])

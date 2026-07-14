@@ -1,4 +1,10 @@
-# Use python 3.10 slim
+# Stage 1: Build the Go sidecar
+FROM golang:1.23-alpine AS sidecar-builder
+WORKDIR /app
+COPY ./codex_spaces_local/sidecar /app
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ms_agent .
+
+# Stage 2: Main Python runtime
 FROM python:3.10-slim
 
 # Install system dependencies
@@ -19,22 +25,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app/backend
 
 # Copy OllamaOpt (sibling directory)
-# NOTE: This requires the build context to be at the level where both AI_Codex and OllamaOpt are visible
-# Or we can copy it manually if we are building via a script.
-# For now, let's assume we copy it into the backend folder temporarily or handle it in the build command.
 COPY ./OllamaOpt_local /app/OllamaOpt
 COPY ./codex_spaces_local /app/codex_spaces
 COPY ./skills_local /app/skills
 
+# Copy compiled Go sidecar from stage 1
+COPY --from=sidecar-builder /app/ms_agent /app/ms_agent
+
 # Set PYTHONPATH
-# We need /app to find 'backend' package and /app/OllamaOpt to find 'cli'
 ENV PYTHONPATH=/app:/app/OllamaOpt
 
 # Expose port (Cloud Run uses 8080 by default)
 EXPOSE 8080
 
-# Set the working directory to the project root (where 'backend' folder is)
-# This allows 'import backend.main' to work correctly
 WORKDIR /app
 
 # Run the application

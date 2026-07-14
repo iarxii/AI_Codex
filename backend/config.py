@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "AICodex"
     VERSION: str = "0.1.0"
     API_V1_STR: str = "/api"
+    BACKEND_URL: str = "http://localhost:8080"
     
     # Auth
     SECRET_KEY: str  # Required - no default for security
