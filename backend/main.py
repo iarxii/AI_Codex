@@ -34,8 +34,12 @@ async def lifespan(app: FastAPI):
     if sidecar_bin:
         print(f"[LIFESPAN] Starting Go Sidecar: {sidecar_bin}")
         try:
-            sidecar_proc = subprocess.Popen([sidecar_bin])
-            print(f"[LIFESPAN] Go Sidecar started (PID {sidecar_proc.pid})")
+            # Overriding PORT to 5005 for the sidecar process to prevent it from inheriting 
+            # Cloud Run's default PORT=8080 and causing a port conflict with FastAPI.
+            env = os.environ.copy()
+            env["PORT"] = "5005"
+            sidecar_proc = subprocess.Popen([sidecar_bin], env=env)
+            print(f"[LIFESPAN] Go Sidecar started (PID {sidecar_proc.pid}) on internal port 5005")
         except Exception as e:
             print(f"[LIFESPAN] Error starting Go Sidecar: {e}")
     # Sync SQLite from GCS if in Cloud Run
