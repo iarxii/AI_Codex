@@ -9,6 +9,21 @@ pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 engine = create_async_engine(settings.async_database_url)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
+# SQLite pragmas for performance and robustness against locked/full disk errors
+from sqlalchemy import event
+@event.listens_for(engine.sync_engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if settings.DB_TYPE == "sqlite":
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA temp_store=MEMORY")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+        except Exception as e:
+            print(f"[DB] Failed to set SQLite pragmas: {e}")
+        finally:
+            cursor.close()
+
 async def migrate_db(conn):
     """Simple migration to add missing columns to users table for SQLite."""
     if settings.DB_TYPE != "sqlite":

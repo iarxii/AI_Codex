@@ -47,6 +47,7 @@ const Chat: React.FC = () => {
   const isProcessing = useRef(false);
   const isCanvasOpenRef = useRef(false);
   const currentToolCallsRef = useRef<any[]>([]);
+  const thoughtLogRef = useRef<ThoughtLogEntry[]>([]);
   const [telemetry, setTelemetry] = useState<ModelTelemetry | null>(null);
   const [metrics, setMetrics] = useState<any>({ cpu: 0, ram: 0, npu: 0, npu_available: false, igpu: 0, igpu_available: false, latency: '0ms' });
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
@@ -289,19 +290,46 @@ const Chat: React.FC = () => {
             }
           }
           updated[updated.length - 1] = lastLog;
+          thoughtLogRef.current = updated;
           return updated;
         });
       } else if (data.type === 'status') {
-        setThoughtLog(prev => [...prev, { text: data.status, timestamp: Date.now(), type: data.node }]);
+        setThoughtLog(prev => {
+          const updated = [...prev, { text: data.status, timestamp: Date.now(), type: data.node }];
+          thoughtLogRef.current = updated;
+          return updated;
+        });
       } else if (data.type === 'tool_call') {
-        setCurrentToolCalls(data.tool_calls);
-        currentToolCallsRef.current = data.tool_calls;
+        const incoming = Array.isArray(data.tool_calls) ? data.tool_calls : [data.tool_calls];
+        setCurrentToolCalls(prevTools => {
+          const merged = [...prevTools];
+          incoming.forEach((tc: any) => {
+            const existingIdx = merged.findIndex((t: any) => t.id === tc.id);
+            if (existingIdx >= 0) {
+              merged[existingIdx] = {
+                ...merged[existingIdx],
+                name: tc.name || merged[existingIdx].name,
+                args: tc.args || merged[existingIdx].args
+              };
+            } else {
+              merged.push({
+                id: tc.id,
+                name: tc.name,
+                args: tc.args,
+                result: null
+              });
+            }
+          });
+          currentToolCallsRef.current = merged;
+          return merged;
+        });
         setThoughtLog(prev => {
           if (prev.length === 0) return prev;
           const updated = [...prev];
           const lastLog = { ...updated[updated.length - 1] };
-          lastLog.details = JSON.stringify(data.tool_calls, null, 2);
+          lastLog.details = JSON.stringify(currentToolCallsRef.current, null, 2);
           updated[updated.length - 1] = lastLog;
+          thoughtLogRef.current = updated;
           return updated;
         });
       } else if (data.type === 'tool_result') {
@@ -324,6 +352,7 @@ const Chat: React.FC = () => {
           const resText = typeof data.content === 'string' ? data.content : JSON.stringify(data.content);
           lastLog.details = (lastLog.details ? lastLog.details + '\n\n' : '') + `Result:\n${resText}`;
           updated[updated.length - 1] = lastLog;
+          thoughtLogRef.current = updated;
           return updated;
         });
       } else if (data.type === 'done') {
@@ -344,7 +373,9 @@ const Chat: React.FC = () => {
                 ...lastMsg.metadata,
                 latency: data.duration || lastMsg.metadata?.latency,
                 tokens: data.tokens || lastMsg.metadata?.tokens,
-                timestamp: lastMsg.metadata?.timestamp || Date.now()
+                timestamp: lastMsg.metadata?.timestamp || Date.now(),
+                thought_log: thoughtLogRef.current,
+                tool_calls: currentToolCallsRef.current
               }
             };
 
@@ -358,32 +389,42 @@ const Chat: React.FC = () => {
 
             // Extract artifacts from tool calls (multi-modular aware)
             const toolArtifacts: Artifact[] = [];
-            currentToolCallsRef.current.forEach(tc => {
-              if (tc.name === 'workspace_writer' && tc.args) {
-                let argsObj = tc.args;
+            currentToolCallsRef.current.forEach((tc: any) => {
+              let argsObj = tc.args;
+              if (argsObj) {
                 if (typeof argsObj === 'string') {
                   try { argsObj = JSON.parse(argsObj); } catch (e) { argsObj = {}; }
                 }
-                const type = (argsObj.type || 'code').toLowerCase();
-                const typeNormMap: Record<string, Artifact['type']> = { 'code': 'code', 'docs': 'docs', 'doc': 'docs', 'research': 'research' };
-                const artifactType = typeNormMap[type] || 'docs';
-                const title = argsObj.filename || 'scratchpad';
                 
-                // Detect file extension for language
-                const extMatch = title.match(/\.([a-zA-Z0-9]+)$/);
-                const detectedLang = extMatch ? extMatch[1].toLowerCase() : (artifactType === 'code' ? 'text' : undefined);
+                // Dynamic check: must have content/code/patch AND filename/path/filePath/dest
+                const contentVal = argsObj.content || argsObj.patch || argsObj.code || argsObj.ReplacementContent || argsObj.CodeContent;
+                const pathVal = argsObj.filename || argsObj.path || argsObj.filePath || argsObj.file_path || argsObj.dest || argsObj.destination || argsObj.TargetFile || argsObj.targetFile;
 
-                toolArtifacts.push({
-                  id: `${artifactType}-${title.replace(/\s+/g, '-').toLowerCase()}`,
-                  type: artifactType,
-                  title: title,
-                  content: argsObj.content || '',
-                  language: detectedLang,
-                  timestamp: Date.now(),
-                  messageId: lastMsg.id,
-                  filePath: argsObj.filename || undefined,
-                  tutorExplanation: argsObj.tutor_explanation || undefined,
-                });
+                if (contentVal && pathVal && typeof contentVal === 'string' && typeof pathVal === 'string') {
+                  const type = (argsObj.type || 'code').toLowerCase();
+                  const typeNormMap: Record<string, Artifact['type']> = { 'code': 'code', 'docs': 'docs', 'doc': 'docs', 'research': 'research' };
+                  const artifactType = typeNormMap[type] || 'docs';
+                  
+                  // Extract only the filename from the path for the title if it is a full path
+                  const filename = pathVal.split(/[/\\]/).pop() || pathVal;
+                  const title = filename || 'scratchpad';
+
+                  // Detect file extension for language
+                  const extMatch = title.match(/\.([a-zA-Z0-9]+)$/);
+                  const detectedLang = extMatch ? extMatch[1].toLowerCase() : (artifactType === 'code' ? 'text' : undefined);
+
+                  toolArtifacts.push({
+                    id: `${artifactType}-${title.replace(/\s+/g, '-').toLowerCase()}`,
+                    type: artifactType,
+                    title: title,
+                    content: contentVal,
+                    language: detectedLang,
+                    timestamp: Date.now(),
+                    messageId: lastMsg.id,
+                    filePath: pathVal,
+                    tutorExplanation: argsObj.tutor_explanation || undefined,
+                  });
+                }
               }
             });
 
@@ -725,6 +766,7 @@ const Chat: React.FC = () => {
     currentToolCallsRef.current = [];
     setThoughtStartTime(Date.now());
     setThoughtLog([]);
+    thoughtLogRef.current = [];
     setTelemetry(null); // Reset telemetry for new request
     
     const apiKey = getApiKey(activeProvider) || '';
@@ -818,6 +860,7 @@ const Chat: React.FC = () => {
     currentToolCallsRef.current = [];
     setThoughtStartTime(Date.now());
     setThoughtLog([]);
+    thoughtLogRef.current = [];
     setTelemetry(null);
 
     const apiKey = getApiKey(providerToUse) || '';
