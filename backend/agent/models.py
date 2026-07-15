@@ -19,7 +19,7 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
         elif provider == "colab_bridge":
             model_name = "gemma-4-E4B_q4_0-it"
         elif provider == "ollama_cloud":
-            model_name = "llama3"
+            model_name = settings.DEFAULT_MODEL  # e.g. llama3.2:3b from config
         elif provider == "openrouter":
             model_name = "meta-llama/llama-3-8b-instruct"
         elif provider == "groq":
@@ -71,7 +71,8 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
         )
         
     elif provider == "ollama_cloud":
-        base_url = "https://ollama.com"
+        # Use the user-configured cloud Ollama URL (set via OLLAMA_CLOUD_URL env var in frontend settings)
+        base_url = getattr(settings, "OLLAMA_CLOUD_BASE_URL", None) or "http://localhost:11434"
         if not base_url.endswith("/v1"):
             base_url = f"{base_url.rstrip('/')}/v1"
         return ChatOpenAI(
@@ -90,10 +91,10 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
         )
         
     else:
-        # Default fallback
-        logger.warning(f"Unknown provider {provider}, falling back to local llama3")
+        # Default fallback — use the configured DEFAULT_MODEL
+        logger.warning(f"Unknown provider {provider}, falling back to local ollama with {settings.DEFAULT_MODEL}")
         return ChatOllama(
-            model="llama3",
+            model=settings.DEFAULT_MODEL,
             base_url=settings.OLLAMA_BASE_URL,
             temperature=temperature
         )
@@ -130,7 +131,7 @@ def get_llm_for_tier(
         if provider == "gemini":
             resolved_model = "gemini-1.5-pro"
         elif provider == "openrouter":
-            resolved_model = "anthropic/claude-3.5-sonnet"
+            resolved_model = "anthropic/claude-sonnet-4"  # claude-3.5-sonnet deprecated Jul 2025
         elif provider == "groq":
             resolved_model = "llama-3.3-70b-versatile"
         elif provider == "local":

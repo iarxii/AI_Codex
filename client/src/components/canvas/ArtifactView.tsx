@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Artifact } from '../../types/chat';
 import SpiritBird from './SpiritBird';
+import { A2UIRenderer } from 'codex_spaces/client/src/components/A2UIRenderer';
 
 interface ArtifactViewProps {
   artifact: Artifact;
@@ -36,6 +37,19 @@ const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact, onSave }) => {
 
   const lines = artifact.type === 'code' ? artifact.content.split('\n') : [];
 
+  let parsedA2UIDecl: any = null;
+  const looksLikeJson = artifact.language === 'a2ui' || artifact.language === 'json' || artifact.filePath?.endsWith('.a2ui.json') || artifact.content.trim().startsWith('{');
+  if (looksLikeJson) {
+    try {
+      const parsed = JSON.parse(artifact.content);
+      if (parsed && parsed.a2ui_version && parsed.root) {
+        parsedA2UIDecl = parsed;
+      }
+    } catch (e) {
+      // Not valid A2UI JSON — render normally
+    }
+  }
+
   return (
     <div className="flex flex-col h-full bg-[var(--bg-elevated)] rounded-2xl border border-black/[0.05] overflow-hidden shadow-sm">
       {/* Header with macOS window controls */}
@@ -49,20 +63,27 @@ const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact, onSave }) => {
           </div>
           {/* File type badge */}
           <div className={`p-1.5 rounded-lg ${
+            parsedA2UIDecl ? 'bg-emerald-500/10 text-emerald-600 animate-glow' :
             artifact.type === 'code' ? 'bg-blue-500/10 text-blue-600' :
             artifact.type === 'docs' ? 'bg-orange-500/10 text-orange-600' :
             'bg-purple-500/10 text-purple-600'
           }`}>
-            {artifact.type === 'code' && <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>}
-            {artifact.type === 'docs' && <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
-            {artifact.type === 'research' && <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+            {parsedA2UIDecl ? (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+            ) : artifact.type === 'code' ? (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+            ) : artifact.type === 'docs' ? (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            )}
           </div>
           <div>
             <h4 className="text-[11px] font-bold text-[var(--text-primary)] truncate max-w-[220px]">
               {artifact.filePath ? artifact.filePath.split('/').pop() : artifact.title}
             </h4>
             <p className="text-[9px] text-[var(--text-muted)] font-mono uppercase tracking-tighter flex items-center gap-1.5">
-              <span>{artifact.type}</span>
+              <span>{parsedA2UIDecl ? 'generative ui' : artifact.type}</span>
               {artifact.language && (
                 <>
                   <span className="opacity-30">•</span>
@@ -80,7 +101,7 @@ const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact, onSave }) => {
         </div>
         
         <div className="flex items-center gap-2">
-          {onSave && artifact.type === 'code' && (
+          {onSave && artifact.type === 'code' && !parsedA2UIDecl && (
             isEditing ? (
               <>
                 <button onClick={() => { setIsEditing(false); setEditContent(artifact.content); }} className="px-2 py-1 hover:bg-black/[0.05] rounded text-[9px] font-bold text-[var(--text-muted)] uppercase">Cancel</button>
@@ -115,7 +136,11 @@ const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact, onSave }) => {
 
       {/* Content Area */}
       <div className="flex-1 overflow-auto scrollbar-hide">
-        {artifact.type === 'code' ? (
+        {parsedA2UIDecl ? (
+          <div className="p-5 bg-slate-950/40 min-h-full">
+            <A2UIRenderer declaration={parsedA2UIDecl} />
+          </div>
+        ) : artifact.type === 'code' ? (
           /* Dark-themed code view with line numbers */
           <div className="bg-[#0F172A] text-slate-200 p-0 min-h-full flex">
             {isEditing ? (
@@ -154,14 +179,14 @@ const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact, onSave }) => {
 
         {/* Spirit Bird Tutor Section */}
         {artifact.tutorExplanation && (
-          <div className={`mt-8 ${artifact.type === 'code' ? 'bg-[#0F172A] px-5 pb-5' : 'px-5 pb-5'}`}>
+          <div className={`mt-8 ${artifact.type === 'code' && !parsedA2UIDecl ? 'bg-[#0F172A] px-5 pb-5' : 'px-5 pb-5'}`}>
             <div className="flex items-center gap-4 mb-6">
-              <div className={`h-[1px] flex-1 ${artifact.type === 'code' ? 'bg-slate-700/30' : 'bg-black/[0.05]'}`}></div>
+              <div className={`h-[1px] flex-1 ${artifact.type === 'code' && !parsedA2UIDecl ? 'bg-slate-700/30' : 'bg-black/[0.05]'}`}></div>
               <div className="flex items-center gap-2">
                 <svg className="w-3 h-3 text-[var(--accent)]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-                <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${artifact.type === 'code' ? 'text-slate-400' : 'text-[var(--text-muted)]'}`}>Neural Insights</span>
+                <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${artifact.type === 'code' && !parsedA2UIDecl ? 'text-slate-400' : 'text-[var(--text-muted)]'}`}>Neural Insights</span>
               </div>
-              <div className={`h-[1px] flex-1 ${artifact.type === 'code' ? 'bg-slate-700/30' : 'bg-black/[0.05]'}`}></div>
+              <div className={`h-[1px] flex-1 ${artifact.type === 'code' && !parsedA2UIDecl ? 'bg-slate-700/30' : 'bg-black/[0.05]'}`}></div>
             </div>
             <SpiritBird explanation={artifact.tutorExplanation} />
           </div>
@@ -170,7 +195,7 @@ const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact, onSave }) => {
       
       {/* Footer */}
       <div className="h-8 px-4 flex items-center justify-between border-t border-black/[0.03] bg-black/[0.01] text-[8px] font-mono text-[var(--text-muted)] uppercase tracking-widest">
-        <span>{artifact.type === 'code' ? `${lines.length} lines` : 'Ready for export'}</span>
+        <span>{parsedA2UIDecl ? 'interactive canvas' : artifact.type === 'code' ? `${lines.length} lines` : 'Ready for export'}</span>
         <span>{new Date(artifact.timestamp).toLocaleTimeString()}</span>
       </div>
     </div>

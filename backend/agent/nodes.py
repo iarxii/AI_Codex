@@ -50,12 +50,12 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier:
         elif provider == "groq":
             model = "llama-3.1-8b-instant"
         elif provider == "local":
-            model = "llama3"
+            model = "llama3.2:3b"
     elif tier in ("reasoning", "coder"):
         if provider == "gemini":
             model = "gemini-1.5-pro"
         elif provider == "openrouter":
-            model = "anthropic/claude-3.5-sonnet"
+            model = "anthropic/claude-sonnet-4"  # claude-3.5-sonnet deprecated Jul 2025
         elif provider == "groq":
             model = "llama-3.3-70b-versatile"
         elif provider == "local":

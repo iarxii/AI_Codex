@@ -631,6 +631,31 @@ const Chat: React.FC = () => {
     return () => window.removeEventListener('workspace-update', handleWorkspaceUpdate);
   }, [currentConvId, isPremiumSpace]);
 
+  // Listen for A2UI artifacts dispatched by MicrosoftAgentHarness
+  useEffect(() => {
+    const handleA2UIArtifact = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id: string; title: string; content: string; language: string };
+      if (!detail) return;
+      const newArtifact: Artifact = {
+        id: detail.id,
+        type: 'code',
+        title: detail.title,
+        content: detail.content,
+        language: detail.language,
+        timestamp: Date.now(),
+      };
+      setArtifacts(prev => {
+        const idx = prev.findIndex(a => a.id === newArtifact.id);
+        if (idx >= 0) { const next = [...prev]; next[idx] = newArtifact; return next; }
+        return [...prev, newArtifact];
+      });
+      setSelectedArtifactId(newArtifact.id);
+      setIsCanvasOpen(true);
+    };
+    window.addEventListener('a2ui-artifact', handleA2UIArtifact);
+    return () => window.removeEventListener('a2ui-artifact', handleA2UIArtifact);
+  }, []);
+
   const handleNewChat = async () => {
     try {
       let endpoint = `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/conversations/`;
@@ -926,7 +951,7 @@ const Chat: React.FC = () => {
                         <div className="flex-1 overflow-y-auto safe-area-bottom">
                           {activeSpace.slug === 'trading-space' && <SpiritBirdHarness spaceName={activeSpace.name} />}
                           {['code-lab', 'health-tech'].includes(activeSpace.slug) && <GemmaSandboxHarness thoughtLog={thoughtLog} telemetry={telemetry} />}
-                          {activeSpace.slug === 'microsoft-agent-lab' && <MicrosoftAgentHarness />}
+                          {activeSpace.slug === 'microsoft-agent-lab' && <MicrosoftAgentHarness onArtifactReady={(art) => window.dispatchEvent(new CustomEvent('a2ui-artifact', { detail: art }))} />}
                           {activeSpace.slug === 'spirit-book' && <SpiritBirdChatHarness />}
                         </div>
                       </div>
@@ -1014,7 +1039,7 @@ const Chat: React.FC = () => {
                         <div className="flex-1 overflow-y-auto flex flex-col">
                           {activeSpace.slug === 'trading-space' && <SpiritBirdHarness spaceName={activeSpace.name} />}
                           {['code-lab', 'health-tech'].includes(activeSpace.slug) && <GemmaSandboxHarness thoughtLog={thoughtLog} telemetry={telemetry} />}
-                          {activeSpace.slug === 'microsoft-agent-lab' && <MicrosoftAgentHarness />}
+                          {activeSpace.slug === 'microsoft-agent-lab' && <MicrosoftAgentHarness onArtifactReady={(art) => window.dispatchEvent(new CustomEvent('a2ui-artifact', { detail: art }))} />}
                           {activeSpace.slug === 'spirit-book' && <SpiritBirdChatHarness />}
                         </div>
                       </div>

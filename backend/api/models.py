@@ -257,6 +257,8 @@ async def list_models(
             m for m in models
             if "medgemma" in m["id"].lower()
             or "medgemma" in m["name"].lower()
+            or "medgamma" in m["id"].lower()
+            or "medgamma" in m["name"].lower()
         ]
         
     if x_space_slug == "gpt-oss":

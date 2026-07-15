@@ -48,7 +48,7 @@ class ShellExecSkill(BaseSkill):
             abs_cwd.mkdir(parents=True, exist_ok=True)
 
             # Execute via sandbox
-            result = await execute_sandboxed(command, cwd=str(abs_cwd))
+            result = await execute_sandboxed(command, cwd=str(abs_cwd), conversation_id=conversation_id)
             return result
             
         except Exception as e:

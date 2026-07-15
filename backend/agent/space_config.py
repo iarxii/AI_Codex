@@ -42,8 +42,8 @@ SPACE_CONFIGS: Dict[str, Dict[str, Any]] = {
         "system_prompt_prefix": TRADING_SPACE_SYSTEM_PROMPT,
         "graph_type": "trading",
         "skills": ["memory_skill", "url_reader", "github_search"],
-        "recommended_provider": "openrouter",
-        "recommended_model": "deepseek/deepseek-r1",
+        "recommended_provider": "ollama_cloud",
+        "recommended_model": "deepseek-r1:7b",
         "constraints": {
             "max_rounds": 3,
             "require_confirmation": True
@@ -61,24 +61,36 @@ SPACE_CONFIGS: Dict[str, Dict[str, Any]] = {
         "system_prompt_prefix": HEALTH_TECH_SYSTEM_PROMPT,
         "graph_type": "default",
         "skills": ["memory_skill", "url_reader"],
-        "recommended_provider": "groq",
-        "recommended_model": "llama-3.3-70b-specdec",
+        "recommended_provider": "ollama_cloud",
+        "recommended_model": "gemma4:31b",
         "constraints": {}
     },
     "art-gen": {
         "system_prompt_prefix": ART_GEN_SYSTEM_PROMPT,
         "graph_type": "default",
         "skills": ["all"],
-        "recommended_provider": "openrouter",
-        "recommended_model": "anthropic/claude-3.5-sonnet",
+        "recommended_provider": "ollama_cloud",
+        "recommended_model": "gemma3:27b",
         "constraints": {}
     },
     "spirit-book": {
         "system_prompt_prefix": SPIRIT_BOOK_SYSTEM_PROMPT,
         "graph_type": "default",
         "skills": ["all"],
-        "recommended_provider": "gemini",
-        "recommended_model": "gemini-2.0-flash-exp",
+        "recommended_provider": "ollama_cloud",
+        "recommended_model": "gemma3:27b",
+        "constraints": {}
+    },
+    "microsoft-agent-lab": {
+        "system_prompt_prefix": (
+            "You are a Microsoft Power Platform specialist agent. "
+            "Generate Canvas App YAML, trigger Power Automate flows, and produce A2UI v0.9 component declarations. "
+            "Return structured, executable Power Platform artifacts."
+        ),
+        "graph_type": "default",
+        "skills": ["all"],
+        "recommended_provider": "ollama_cloud",
+        "recommended_model": "qwen2.5-coder:32b",
         "constraints": {}
     }
 }

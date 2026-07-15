@@ -6,6 +6,11 @@
 echo "Starting Docker containers (PostgreSQL + pgvector)..."
 docker-compose up -d
 
+# Explicitly export paths for gcloud and go for local development
+export GCLOUD_PATH="${GCLOUD_PATH:-/c/Users/28523971/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin}"
+export GO_PATH="${GO_PATH:-/c/Program Files/Go/bin}"
+export PATH="$GCLOUD_PATH:$GO_PATH:$PATH"
+
 # Start backend service
 echo "Starting FastAPI Backend on port 9000..."
 export PYTHONPATH=.
