@@ -42,9 +42,10 @@ async def update_scratchpad(
 import shutil
 from pathlib import Path
 
+from backend.config import WORKSPACES_DIR
+
 def _get_workspace_root(conversation_id: str) -> Path:
-    root = Path(__file__).resolve().parents[2]
-    return (root / "data" / "workspaces" / str(conversation_id) / "scratch").resolve()
+    return (WORKSPACES_DIR / str(conversation_id) / "scratch").resolve()
 
 def _safe_resolve(base_dir: Path, rel_path: str) -> Path:
     # Ensure path contains no traversal outside the base_dir

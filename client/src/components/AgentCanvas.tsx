@@ -41,9 +41,23 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({ isOpen, onClose, artifacts, e
   // Sync with external selection
   useEffect(() => {
     if (externalSelectedId) {
-      const art = artifacts.find(a => a.id === externalSelectedId);
+      let art = artifacts.find(a => a.id === externalSelectedId);
+      
+      // Fuzzy fallback: strip type prefixes (code-, docs-, fs-) and normalize
+      // to match across message-parsed IDs and filesystem-derived IDs
+      if (!art) {
+        const normalize = (s: string) =>
+          s.replace(/^(code|docs|doc|research|fs)-/, '').toLowerCase().replace(/[/\\._-]/g, '');
+        const target = normalize(externalSelectedId);
+        art = artifacts.find(a =>
+          normalize(a.id) === target ||
+          (a.filePath && normalize(a.filePath) === target) ||
+          (a.title && normalize(a.title) === target)
+        );
+      }
+
       if (art) {
-        setSelectedId(externalSelectedId);
+        setSelectedId(art.id);
         if (art.type === 'code') setActiveTab('Code');
         else if (art.type === 'docs') setActiveTab('Docs');
         else if (art.type === 'research') setActiveTab('Research');

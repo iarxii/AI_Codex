@@ -36,8 +36,9 @@ class GraphifySkill(BaseSkill):
         if not conversation_id:
             return SkillResult(success=False, error="No active conversation ID provided.")
 
-        workspace_dir = Path(f"data/workspaces/{conversation_id}/scratch")
-        output_dir = Path(f"data/workspaces/{conversation_id}/graphify-out")
+        from backend.config import WORKSPACES_DIR
+        workspace_dir = WORKSPACES_DIR / conversation_id / "scratch"
+        output_dir = WORKSPACES_DIR / conversation_id / "graphify-out"
         
         # Ensure directories exist
         workspace_dir.mkdir(parents=True, exist_ok=True)

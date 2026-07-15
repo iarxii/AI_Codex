@@ -19,8 +19,10 @@ from langchain_core.messages import BaseMessage
 
 logger = logging.getLogger(__name__)
 
+from backend.config import WORKSPACES_DIR
+
 def get_status_file(conversation_id: str) -> Path:
-    return Path(f"./data/workspaces/{conversation_id}/workspace_status.md")
+    return WORKSPACES_DIR / conversation_id / "workspace_status.md"
 
 # How often (in conversation turns) to trigger a status update
 SENTINEL_INTERVAL = 5

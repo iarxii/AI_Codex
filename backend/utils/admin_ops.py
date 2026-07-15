@@ -6,13 +6,15 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
+from backend.config import WORKSPACES_DIR, DATA_DIR
+
 def generate_global_knowledge_map():
     """
     Aggregates all workspace graphs into a single global knowledge map.
     Uses 'graphify merge-graphs' to combine all graph.json files found in workspaces.
     """
-    workspaces_root = Path("data/workspaces")
-    output_dir = Path("data/admin/global-graph")
+    workspaces_root = WORKSPACES_DIR
+    output_dir = DATA_DIR / "admin" / "global-graph"
     output_dir.mkdir(parents=True, exist_ok=True)
     
     if not workspaces_root.exists():

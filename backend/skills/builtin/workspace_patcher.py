@@ -37,12 +37,11 @@ class WorkspacePatcherSkill(BaseSkill):
 
     async def execute(self, filename: str, search_string: str, replace_string: str, tutor_explanation: Optional[str] = None, conversation_id: Optional[str] = None) -> SkillResult:
         try:
-            from pathlib import Path
-            root = Path(__file__).resolve().parents[3]
+            from backend.config import PROJECT_ROOT, WORKSPACES_DIR
             if conversation_id:
-                base_dir = (root / "data" / "workspaces" / conversation_id / "scratch").resolve()
+                base_dir = (WORKSPACES_DIR / conversation_id / "scratch").resolve()
             else:
-                base_dir = root.resolve()
+                base_dir = PROJECT_ROOT.resolve()
                 
             abs_path = (base_dir / filename).resolve()
             

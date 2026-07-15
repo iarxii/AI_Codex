@@ -105,9 +105,10 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier:
         elif provider == "ollama_cloud":
             from langchain_openai import ChatOpenAI
             target_model = model or "llama3"
-            base_url = config.get("configurable", {}).get("base_url") or "https://ollama.com"
+            base_url = config.get("configurable", {}).get("base_url") or getattr(settings, "OLLAMA_CLOUD_BASE_URL", None) or "http://localhost:11434"
             if not base_url.endswith("/v1"):
                 base_url = f"{base_url.rstrip('/')}/v1"
+            logger.info(f"Initializing Ollama Cloud: model={target_model}, base_url={base_url}")
             llm = ChatOpenAI(model=target_model, base_url=base_url, api_key=api_key or "sk-ollama", temperature=temp, max_tokens=max_toks, streaming=True)
         elif provider == "openrouter":
             from langchain_openai import ChatOpenAI

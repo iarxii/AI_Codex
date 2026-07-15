@@ -7,7 +7,7 @@ from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
-def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Optional[str] = None):
+def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Optional[str] = None, base_url: Optional[str] = None):
     """
     Unified LLM factory for AICodex Agent.
     """
@@ -29,7 +29,7 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
         else:
             model_name = "llama3"
 
-    logger.info(f"Initializing LLM: provider={provider}, model={model_name}, temperature={temperature}")
+    logger.info(f"Initializing LLM: provider={provider}, model={model_name}, temperature={temperature}, base_url={base_url}")
     
     if provider == "local":
         if settings.LOCAL_BACKEND_MODE == "ollama":
@@ -71,14 +71,15 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
         )
         
     elif provider == "ollama_cloud":
-        # Use the user-configured cloud Ollama URL (set via OLLAMA_CLOUD_URL env var in frontend settings)
-        base_url = getattr(settings, "OLLAMA_CLOUD_BASE_URL", None) or "http://localhost:11434"
-        if not base_url.endswith("/v1"):
-            base_url = f"{base_url.rstrip('/')}/v1"
+        # Resolve base URL: 1. dynamic base_url argument, 2. settings, 3. localhost fallback
+        resolved_base_url = base_url or getattr(settings, "OLLAMA_CLOUD_BASE_URL", None) or "http://localhost:11434"
+        if not resolved_base_url.endswith("/v1"):
+            resolved_base_url = f"{resolved_base_url.rstrip('/')}/v1"
+        logger.info(f"Ollama Cloud resolved base_url: {resolved_base_url}")
         return ChatOpenAI(
             model=model_name,
             openai_api_key=api_key or "sk-ollama",
-            openai_api_base=base_url,
+            openai_api_base=resolved_base_url,
             temperature=temperature
         )
         
@@ -106,7 +107,8 @@ def get_llm_for_tier(
     model: str, 
     temperature: float = 0.7, 
     api_key: Optional[str] = None, 
-    api_keys: Optional[dict] = None
+    api_keys: Optional[dict] = None,
+    base_url: Optional[str] = None
 ):
     """
     Tiered LLM factory for routing, guardrails, and coding reasoning.
@@ -141,4 +143,4 @@ def get_llm_for_tier(
     if api_keys and resolved_provider in api_keys:
         resolved_api_key = api_keys[resolved_provider]
         
-    return get_llm(resolved_provider, resolved_model, temperature, resolved_api_key)
+    return get_llm(resolved_provider, resolved_model, temperature, resolved_api_key, base_url=base_url)

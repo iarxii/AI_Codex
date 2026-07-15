@@ -507,12 +507,16 @@ const Chat: React.FC = () => {
 
     try {
       const baseUrl = getApiUrl(isPremiumSpace);
-      const response = await fetch(`${baseUrl}${config.API_V1_STR}/conversations/${id}`, {
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          ...(isPremiumSpace && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
-        }
-      });
+      const headers = { 
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        ...(isPremiumSpace && config.COLAB_SECRET ? { 'X-Codex-Premium-Key': config.COLAB_SECRET } : {})
+      };
+      
+      const [response, filesResponse] = await Promise.all([
+        fetch(`${baseUrl}${config.API_V1_STR}/conversations/${id}`, { headers }),
+        fetch(`${baseUrl}${config.API_V1_STR}/workspace/${id}/files`, { headers }).catch(() => null)
+      ]);
+      
       if (response.ok) {
         const data = await response.json();
         const mappedMsgs: Message[] = data.messages
@@ -555,13 +559,23 @@ const Chat: React.FC = () => {
           setSpaceNote(`Codex: Applied recommended settings for ${space.name}`);
           setTimeout(() => setSpaceNote(null), 5000);
         }
+        // Process workspace files from the parallel response
+        let diskFiles: Artifact[] = [];
+        if (filesResponse?.ok) {
+          const files = await filesResponse.json();
+          diskFiles = files.map((file: any) => ({
+            id: `fs-${file.path.replace(/[/\\.]/g, '-')}`,
+            type: file.type || 'code',
+            title: file.name,
+            content: file.content || '',
+            language: file.language || 'text',
+            filePath: file.path,
+            timestamp: file.timestamp || Date.now(),
+            module: file.path.includes('/') ? file.path.split('/')[0] : undefined
+          }));
+        }
         
-        // Load actual files from workspace disk to replace/augment parsed artifacts
-        await loadWorkspaceFiles(id);
-        
-        // Optionally re-parse artifacts from history if we want to merge them,
-        // but since we are moving to an IDE style, the disk files are the source of truth.
-        // We'll still parse them to keep backward compatibility for non-file artifacts (like 'research' text blocks).
+        // Parse artifacts from history
         const allArtifacts: Artifact[] = [];
         data.messages.forEach((m: any) => {
           if (m.role === 'assistant') {
@@ -574,9 +588,9 @@ const Chat: React.FC = () => {
           }
         });
         
-        // Only add parsed artifacts that don't conflict with disk files (based on title/path)
-        setArtifacts(prev => {
-          const merged = [...prev];
+        // Merge disk files (source of truth) with non-conflicting parsed artifacts
+        setArtifacts(() => {
+          const merged = [...diskFiles];
           allArtifacts.forEach(parsed => {
             if (!merged.find(a => (a.filePath || a.title) === (parsed.filePath || parsed.title))) {
               merged.push(parsed);
@@ -613,7 +627,15 @@ const Chat: React.FC = () => {
           timestamp: file.timestamp || Date.now(),
           module: file.path.includes('/') ? file.path.split('/')[0] : undefined
         }));
-        setArtifacts(mappedArtifacts);
+        setArtifacts(prev => {
+          const merged = [...mappedArtifacts];
+          prev.forEach(art => {
+            if (!art.filePath && !merged.find(m => m.id === art.id || m.title === art.title)) {
+              merged.push(art);
+            }
+          });
+          return merged;
+        });
       }
     } catch (err) {
       console.error('Failed to load workspace files:', err);
@@ -1024,7 +1046,7 @@ const Chat: React.FC = () => {
                         <div className="p-4 border-b border-white/5 sticky top-0 bg-[#090A0E]/80 backdrop-blur-md flex items-center justify-between z-10">
                           <div>
                             <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${['code-lab', 'health-tech'].includes(activeSpace.slug) ? 'text-[#446EFF]' : activeSpace.slug === 'microsoft-agent-lab' ? 'text-[#0078D4]' : activeSpace.slug === 'spirit-book' ? 'text-[#6366f1]' : 'text-[#fd3b12]'}`}>
-                              {activeSpace.slug === 'code-lab' ? 'Gemma Code Lab (Gemma 4)' : activeSpace.slug === 'health-tech' ? 'MedGemma Soft Lab' : activeSpace.slug === 'microsoft-agent-lab' ? 'Microsoft Code Lab' : activeSpace.slug === 'spirit-book' ? 'SpiritBook Helper' : `Spirit Bird Interaction (${activeSpace.name})`}
+                              {activeSpace.slug === 'code-lab' ? 'Gemma Code Lab' : activeSpace.slug === 'health-tech' ? 'MedGemma Soft Lab' : activeSpace.slug === 'microsoft-agent-lab' ? 'Microsoft Code Lab' : activeSpace.slug === 'spirit-book' ? 'SpiritBook Helper' : `Spirit Bird Interaction (${activeSpace.name})`}
                             </h3>
                             <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">Agent UI Projection Space</p>
                           </div>

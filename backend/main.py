@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from sqlalchemy import select, update
-from backend.config import settings
+from backend.config import settings, DATA_DIR, WORKSPACES_DIR
 from backend.db.session import init_db
 from backend.utils.logger import mask_uvicorn_logs
 
@@ -233,7 +233,7 @@ async def root():
     return {"message": f"Welcome to {settings.PROJECT_NAME} API", "status": "running"}
 
 # Static Mounts for Knowledge Graphs
-admin_graph_dir = Path("data/admin/global-graph")
+admin_graph_dir = DATA_DIR / "admin" / "global-graph"
 admin_graph_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/admin/graph", StaticFiles(directory=str(admin_graph_dir), html=True), name="admin-graph")
 
@@ -245,14 +245,13 @@ app.mount("/admin/graph", StaticFiles(directory=str(admin_graph_dir), html=True)
 async def get_workspace_graph(session_id: str):
     from fastapi.responses import FileResponse
     from fastapi import HTTPException
-    path = Path(f"data/workspaces/{session_id}/graphify-out/graph.html")
+    path = WORKSPACES_DIR / session_id / "graphify-out" / "graph.html"
     if path.exists():
         return FileResponse(path)
     raise HTTPException(status_code=404, detail="Graph not found")
 
 # Ensure static directories exist before mounting
-Path("data/workspaces").mkdir(parents=True, exist_ok=True)
-app.mount("/graph", StaticFiles(directory="data/workspaces", html=True), name="workspace-graphs")
+app.mount("/graph", StaticFiles(directory=str(WORKSPACES_DIR), html=True), name="workspace-graphs")
 
 @app.get("/api/healthz")
 @app.get("/healthz")

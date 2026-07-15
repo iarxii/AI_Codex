@@ -1,7 +1,7 @@
 import os
 import shutil
 from google.cloud import storage
-from backend.config import settings
+from backend.config import settings, WORKSPACES_DIR
 
 def download_db_from_gcs():
     """Downloads the SQLite database from GCS on startup."""
@@ -52,7 +52,7 @@ def save_scratchpad_file(session_id: str, filename: str, content: str):
     Supports relative subdirectories safely by preventing directory traversal.
     """
     # Resolve the absolute workspace directory
-    workspace_dir = os.path.abspath(os.path.join("data", "workspaces", session_id, "scratch"))
+    workspace_dir = str((WORKSPACES_DIR / session_id / "scratch").resolve())
     
     # Resolve the target path absolutely
     target_path = os.path.abspath(os.path.join(workspace_dir, filename))

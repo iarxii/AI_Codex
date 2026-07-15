@@ -71,8 +71,13 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Ensure data directory exists
-DATA_DIR = Path("./data")
+# ── Canonical Directory Constants ──
+# All workspace/data paths in the project MUST import from here.
+# Resolved once at import time from config.py's location (backend/config.py -> project root).
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR = DATA_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+WORKSPACES_DIR = DATA_DIR / "workspaces"
+WORKSPACES_DIR.mkdir(parents=True, exist_ok=True)

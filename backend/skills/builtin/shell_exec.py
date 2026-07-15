@@ -29,14 +29,13 @@ class ShellExecSkill(BaseSkill):
 
     async def execute(self, command: str, cwd: str = ".", conversation_id: str = None) -> SkillResult:
         try:
-            # Resolve absolute CWD
-            root = Path(__file__).resolve().parents[3]
+            from backend.config import PROJECT_ROOT, WORKSPACES_DIR
             
             if conversation_id:
                 # Resolve relative to the conversation scratchpad
-                base_dir = (root / "data" / "workspaces" / conversation_id / "scratch").resolve()
+                base_dir = (WORKSPACES_DIR / conversation_id / "scratch").resolve()
             else:
-                base_dir = root.resolve()
+                base_dir = PROJECT_ROOT.resolve()
 
             abs_cwd = (base_dir / cwd).resolve()
             

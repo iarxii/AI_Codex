@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from backend.config import PROJECT_ROOT, WORKSPACES_DIR
 from typing import Any, Dict, List, Optional
 from ..base import BaseSkill, SkillResult
 
@@ -38,11 +39,10 @@ class WorkspaceReaderSkill(BaseSkill):
     }
 
     def _get_abs_path(self, rel_path: str, conversation_id: Optional[str] = None) -> Path:
-        root = Path(__file__).resolve().parents[3]
         if conversation_id:
-            base_dir = (root / "data" / "workspaces" / conversation_id / "scratch").resolve()
+            base_dir = (WORKSPACES_DIR / conversation_id / "scratch").resolve()
         else:
-            base_dir = root.resolve()
+            base_dir = PROJECT_ROOT.resolve()
             
         abs_path = (base_dir / rel_path).resolve()
         # Security: Ensure path is within base_dir

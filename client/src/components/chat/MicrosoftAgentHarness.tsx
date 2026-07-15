@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Network, Calendar, FolderOpen, Zap, Cloud, Activity, CheckCircle2, Server, FileText, Database, Play, Square, Send, ChevronDown, Terminal } from 'lucide-react';
+import { Network, Calendar, FolderOpen, Zap, Cloud, Activity, CheckCircle2, Server, FileText, Database, Play, Square, Send, Terminal } from 'lucide-react';
 import { config, getApiUrl } from '../../config';
 
 // ---------------------------------------------------------------------------
