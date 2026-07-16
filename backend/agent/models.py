@@ -64,11 +64,25 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
         )
         
     elif provider == "gemini":
-        return ChatGoogleGenerativeAI(
-            model=model_name,
-            google_api_key=api_key or "dummy",
-            temperature=temperature
-        )
+        if api_key and api_key.startswith("vertex_adc"):
+            parts = api_key.split(":")
+            project = parts[1] if len(parts) > 1 and parts[1] else settings.GCP_PROJECT_ID
+            location = parts[2] if len(parts) > 2 and parts[2] else settings.GCP_REGION
+            # pyrefly: ignore [missing-import]
+            from langchain_google_vertexai import ChatVertexAI
+            logger.info(f"Initializing ChatVertexAI (ADC) with model={model_name}, project={project}, location={location}")
+            return ChatVertexAI(
+                model=model_name,
+                project=project,
+                location=location,
+                temperature=temperature
+            )
+        else:
+            return ChatGoogleGenerativeAI(
+                model=model_name,
+                google_api_key=api_key or "dummy",
+                temperature=temperature
+            )
         
     elif provider == "ollama_cloud":
         # Resolve base URL: 1. dynamic base_url argument, 2. settings, 3. localhost fallback

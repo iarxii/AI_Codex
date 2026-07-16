@@ -164,6 +164,15 @@ async def _list_models_raw(
         elif provider == "gemini":
             if not actual_key:
                 return []
+            if actual_key.startswith("vertex_adc"):
+                return [
+                    {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash (Vertex AI)"},
+                    {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro (Vertex AI)"},
+                    {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash (Vertex AI)"},
+                    {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro (Vertex AI)"},
+                    {"id": "gemini-2.0-flash-exp", "name": "Gemini 2.0 Flash Exp (Vertex AI)"},
+                    {"id": "gemini-2.0-pro-exp", "name": "Gemini 2.0 Pro Exp (Vertex AI)"},
+                ]
             try:
                 # Gemini list models is currently best via their SDK which handles auth/retry logic
                 from google import genai

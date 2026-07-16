@@ -8,7 +8,7 @@ We have successfully migrated the `Gemma Code Lab` and `MedGemma Soft Lab` (`hea
 In [backend/.env](file:///c:/AppDev/My_Linkdin/projects/iarxii/AI_Codex/backend/.env), configured GCP variables targeting the correct region and project:
 ```ini
 GCP_PROJECT_ID=aicodex-lab
-GCP_REGION=us-central1
+GCP_REGION=us-west1
 ```
 
 ### 2. revised LLM Wrapper & Factory
