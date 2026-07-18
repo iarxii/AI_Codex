@@ -280,6 +280,9 @@ app.include_router(models.router, prefix=settings.API_V1_STR + "/models", tags=[
 app.include_router(arcade.router, prefix=settings.API_V1_STR + "/arcade", tags=["arcade"])
 app.include_router(portal.router, prefix=settings.API_V1_STR + "/portal", tags=["portal"])
 
+from backend.api import invoicing
+app.include_router(invoicing.router, prefix=settings.API_V1_STR + "/invoicing", tags=["invoicing"])
+
 
 @app.websocket("/ws/debug")
 async def debug_websocket(websocket: WebSocket):

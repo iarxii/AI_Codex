@@ -21,11 +21,19 @@ If you can chat via the llama.cpp Web UI but AICodex is silent:
 
 ## 2. Google Gemini
 
-Highly recommended for high-speed, large-context reasoning.
+Highly recommended for high-speed, large-context reasoning and enterprise workflows. Supports two authentication methods:
 
+### Method A: Google AI Studio (API Key)
 - **Setup**: Get an API key from [Google AI Studio](https://aistudio.google.com/).
 - **Model Format**: `gemini-1.5-flash` or `gemini-1.5-pro`.
 - **Note**: AICodex handles the `models/` prefix automatically. You can just enter the model name.
+
+### Method B: Vertex AI / Gemini Agent Platform (ADC)
+- **Setup**: Authenticates using **Application Default Credentials (ADC)** on the host running the backend.
+  1. Install the Google Cloud CLI.
+  2. Run `gcloud auth application-default login` on your host.
+  3. Optionally specify the GCP Project ID and Region in the **Settings** modal, or set `GCP_PROJECT_ID` and `GCP_REGION` in the backend's `.env`.
+- **Models**: Maps to the Vertex AI Model Garden versions: `gemini-1.5-flash`, `gemini-1.5-pro`, `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.0-flash-exp`, and `gemini-2.0-pro-exp`.
 
 ---
 

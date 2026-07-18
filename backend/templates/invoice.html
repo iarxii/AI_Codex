@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ invoice.invoice_number }}</title>
+  <style>
+    /* ------------------------------------------------------------------ */
+    /* Reset & Base                                                          */
+    /* ------------------------------------------------------------------ */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Poppins', Arial, sans-serif;
+      font-size: 10pt;
+      color: #1a1a1a;
+      background: #ffffff;
+      padding: 40px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Header                                                               */
+    /* ------------------------------------------------------------------ */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 3px solid #fd3b12;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+
+    .brand-name {
+      font-size: 22pt;
+      font-weight: 700;
+      color: #fd3b12;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-sub {
+      font-size: 8pt;
+      color: #777;
+      margin-top: 2px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .invoice-meta {
+      text-align: right;
+    }
+
+    .invoice-number {
+      font-size: 16pt;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 8pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 5px;
+    }
+
+    .status-draft    { background: #f5f5f5; color: #888; }
+    .status-sent     { background: #e8f4fd; color: #1a73e8; }
+    .status-viewed   { background: #e8f4fd; color: #1a73e8; }
+    .status-paid     { background: #e6f9f0; color: #1e7e45; }
+    .status-overdue  { background: #fef0e8; color: #d44000; }
+    .status-void     { background: #f5f5f5; color: #aaa;    text-decoration: line-through; }
+
+    /* ------------------------------------------------------------------ */
+    /* Addresses                                                            */
+    /* ------------------------------------------------------------------ */
+    .addresses {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 30px;
+    }
+
+    .address-block {
+      width: 48%;
+    }
+
+    .address-block h3 {
+      font-size: 7pt;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #fd3b12;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .address-block p {
+      font-size: 9pt;
+      line-height: 1.6;
+      color: #333;
+    }
+
+    .address-block .company-name {
+      font-weight: 600;
+      font-size: 10pt;
+      color: #1a1a1a;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Dates row                                                            */
+    /* ------------------------------------------------------------------ */
+    .dates-row {
+      display: flex;
+      gap: 30px;
+      background: #fafafa;
+      border: 1px solid #ebebeb;
+      border-radius: 8px;
+      padding: 14px 20px;
+      margin-bottom: 28px;
+    }
+
+    .date-item label {
+      display: block;
+      font-size: 7pt;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #999;
+      margin-bottom: 3px;
+    }
+
+    .date-item span {
+      font-size: 9pt;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Line items table                                                     */
+    /* ------------------------------------------------------------------ */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+    }
+
+    thead th {
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 8pt;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    thead th:last-child { text-align: right; }
+    thead th:nth-child(2),
+    thead th:nth-child(3) { text-align: right; }
+
+    tbody tr:nth-child(even) { background: #fafafa; }
+
+    tbody td {
+      padding: 10px 12px;
+      font-size: 9pt;
+      color: #333;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: top;
+    }
+
+    tbody td:nth-child(2),
+    tbody td:nth-child(3),
+    tbody td:nth-child(4) { text-align: right; }
+
+    /* ------------------------------------------------------------------ */
+    /* Totals                                                               */
+    /* ------------------------------------------------------------------ */
+    .totals-wrapper {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 30px;
+    }
+
+    .totals-table {
+      width: 260px;
+    }
+
+    .totals-table tr td {
+      padding: 5px 8px;
+      font-size: 9pt;
+      border-bottom: none;
+    }
+
+    .totals-table .label { color: #777; }
+    .totals-table .value { text-align: right; font-weight: 500; }
+
+    .totals-table .total-row td {
+      border-top: 2px solid #fd3b12;
+      padding-top: 8px;
+      font-weight: 700;
+      font-size: 11pt;
+      color: #1a1a1a;
+    }
+
+    .totals-table .total-row td.value { color: #fd3b12; }
+
+    /* ------------------------------------------------------------------ */
+    /* Notes                                                                */
+    /* ------------------------------------------------------------------ */
+    .notes-section {
+      background: #fafafa;
+      border-left: 3px solid #fd3b12;
+      border-radius: 0 6px 6px 0;
+      padding: 14px 18px;
+      margin-bottom: 30px;
+    }
+
+    .notes-section h4 {
+      font-size: 8pt;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #fd3b12;
+      margin-bottom: 6px;
+    }
+
+    .notes-section p {
+      font-size: 9pt;
+      color: #444;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Footer                                                               */
+    /* ------------------------------------------------------------------ */
+    .footer {
+      border-top: 1px solid #ebebeb;
+      padding-top: 14px;
+      text-align: center;
+      font-size: 8pt;
+      color: #aaa;
+    }
+
+    .footer strong { color: #fd3b12; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">
+      <div class="brand-name">Adaptivconcept</div>
+      <div class="brand-sub">FL · Professional Services</div>
+    </div>
+    <div class="invoice-meta">
+      <div class="invoice-number">{{ invoice.invoice_number }}</div>
+      <div>
+        <span class="status-badge status-{{ invoice.status }}">{{ invoice.status }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Addresses -->
+  <div class="addresses">
+    <div class="address-block">
+      <h3>Invoice To</h3>
+      {% if client %}
+        <p class="company-name">{{ client.company or client.name }}</p>
+        {% if client.company %}<p>{{ client.name }}</p>{% endif %}
+        {% if client.billing_address %}<p>{{ client.billing_address }}</p>{% endif %}
+        {% if client.email %}<p>{{ client.email }}</p>{% endif %}
+        {% if client.phone %}<p>{{ client.phone }}</p>{% endif %}
+        {% if client.vat_number %}<p>VAT: {{ client.vat_number }}</p>{% endif %}
+      {% else %}
+        <p>Client information unavailable.</p>
+      {% endif %}
+    </div>
+    <div class="address-block" style="text-align:right">
+      <h3>From</h3>
+      <p class="company-name">Adaptivconcept FL</p>
+      <p>Thabang Mposula</p>
+      <p>thabang.mposula@outlook.com</p>
+    </div>
+  </div>
+
+  <!-- Dates -->
+  <div class="dates-row">
+    <div class="date-item">
+      <label>Issue Date</label>
+      <span>{{ invoice.issue_date.strftime('%d %b %Y') }}</span>
+    </div>
+    {% if invoice.due_date %}
+    <div class="date-item">
+      <label>Due Date</label>
+      <span>{{ invoice.due_date.strftime('%d %b %Y') }}</span>
+    </div>
+    {% endif %}
+    <div class="date-item">
+      <label>Currency</label>
+      <span>{{ invoice.currency }}</span>
+    </div>
+  </div>
+
+  <!-- Line items -->
+  <table>
+    <thead>
+      <tr>
+        <th style="width:50%">Description</th>
+        <th>Qty</th>
+        <th>Unit Price</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>{{ item.description }}</td>
+        <td>{{ item.quantity | int if item.quantity == (item.quantity | int) else "%.2f" | format(item.quantity) }}</td>
+        <td>{{ cents_to_display(item.unit_price_cents, invoice.currency) }}</td>
+        <td>{{ cents_to_display((item.quantity * item.unit_price_cents) | int, invoice.currency) }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4" style="text-align:center;color:#aaa;padding:20px">No line items.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Totals -->
+  <div class="totals-wrapper">
+    <table class="totals-table">
+      <tr>
+        <td class="label">Subtotal</td>
+        <td class="value">{{ cents_to_display(invoice.subtotal_cents, invoice.currency) }}</td>
+      </tr>
+      {% if invoice.tax_rate_bp > 0 %}
+      <tr>
+        <td class="label">Tax ({{ "%.2f" | format(invoice.tax_rate_bp / 100) }}%)</td>
+        <td class="value">{{ cents_to_display(invoice.tax_cents, invoice.currency) }}</td>
+      </tr>
+      {% endif %}
+      {% if invoice.discount_cents > 0 %}
+      <tr>
+        <td class="label">Discount</td>
+        <td class="value" style="color:#1e7e45">- {{ cents_to_display(invoice.discount_cents, invoice.currency) }}</td>
+      </tr>
+      {% endif %}
+      <tr class="total-row">
+        <td class="label">Total Due</td>
+        <td class="value">{{ cents_to_display(invoice.total_cents, invoice.currency) }}</td>
+      </tr>
+    </table>
+  </div>
+
+  {% if invoice.notes %}
+  <!-- Notes -->
+  <div class="notes-section">
+    <h4>Notes</h4>
+    <p>{{ invoice.notes }}</p>
+  </div>
+  {% endif %}
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>Generated {{ generated_at }} · <strong>Adaptivconcept FL</strong> · Thank you for your business.</p>
+  </div>
+
+</body>
+</html>

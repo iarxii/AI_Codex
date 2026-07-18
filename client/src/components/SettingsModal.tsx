@@ -25,6 +25,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const [groqKey, setGroqKey] = useState("");
   const [openRouterKey, setOpenRouterKey] = useState("");
   const [geminiKey, setGeminiKey] = useState("");
+  const [geminiAuthMethod, setGeminiAuthMethod] = useState<"api_key" | "vertex">("api_key");
+  const [geminiProjectId, setGeminiProjectId] = useState("");
+  const [geminiRegion, setGeminiRegion] = useState("");
   const [ollamaCloudKey, setOllamaCloudKey] = useState("");
   const [ollamaCloudUrl, setOllamaCloudUrl] = useState("");
   const [colabBridgeKey, setColabBridgeKey] = useState("");
@@ -44,7 +47,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
       setActiveProvider(provider);
       setGroqKey(localStorage.getItem("groq_api_key") || "");
       setOpenRouterKey(localStorage.getItem("openrouter_api_key") || "");
-      setGeminiKey(localStorage.getItem("gemini_api_key") || "");
+      const storedGeminiKey = localStorage.getItem("gemini_api_key") || "";
+      if (storedGeminiKey.startsWith("vertex_adc:")) {
+        setGeminiAuthMethod("vertex");
+        const parts = storedGeminiKey.split(":");
+        setGeminiProjectId(parts[1] || "");
+        setGeminiRegion(parts[2] || "");
+        setGeminiKey("");
+      } else {
+        setGeminiAuthMethod("api_key");
+        setGeminiKey(storedGeminiKey);
+        setGeminiProjectId("");
+        setGeminiRegion("");
+      }
       setOllamaCloudKey(localStorage.getItem("ollama_cloud_key") || "");
       setOllamaCloudUrl(
         localStorage.getItem("ollama_cloud_url") || "https://ollama.com",
@@ -150,7 +165,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
       
       localStorage.setItem("groq_api_key", (groqKey || "").trim());
       localStorage.setItem("openrouter_api_key", (openRouterKey || "").trim());
-      localStorage.setItem("gemini_api_key", (geminiKey || "").trim());
+      if (geminiAuthMethod === "vertex") {
+        const constructedKey = `vertex_adc:${(geminiProjectId || "").trim()}:${(geminiRegion || "").trim()}`;
+        localStorage.setItem("gemini_api_key", constructedKey);
+      } else {
+        localStorage.setItem("gemini_api_key", (geminiKey || "").trim());
+      }
       localStorage.setItem("ollama_cloud_key", (ollamaCloudKey || "").trim());
       localStorage.setItem("ollama_cloud_url", (ollamaCloudUrl || "").trim());
       localStorage.setItem("colab_bridge_key", (colabBridgeKey || "").trim());
@@ -451,17 +471,87 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                   )}
 
                   {activeProvider === "gemini" && (
-                    <div>
-                      <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                        Google Gemini API Key
-                      </label>
-                      <input
-                        type="password"
-                        value={geminiKey}
-                        onChange={(e) => setGeminiKey(e.target.value)}
-                        placeholder="AIza..."
-                        className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
-                      />
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-2">
+                          Authentication Method
+                        </label>
+                        <div className="grid grid-cols-2 gap-2 bg-[#D8DCE4] p-1 rounded-xl border border-black/[0.04]">
+                          <button
+                            type="button"
+                            onClick={() => setGeminiAuthMethod("api_key")}
+                            className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                              geminiAuthMethod === "api_key"
+                                ? "bg-[#1A1D2E] text-white shadow-sm"
+                                : "text-[#4A4D5E] hover:text-[#1A1D2E]"
+                            }`}
+                          >
+                            Google AI Studio
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGeminiAuthMethod("vertex")}
+                            className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                              geminiAuthMethod === "vertex"
+                                ? "bg-[#1A1D2E] text-white shadow-sm"
+                                : "text-[#4A4D5E] hover:text-[#1A1D2E]"
+                            }`}
+                          >
+                            Vertex AI (ADC)
+                          </button>
+                        </div>
+                      </div>
+
+                      {geminiAuthMethod === "api_key" ? (
+                        <div>
+                          <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                            Google Gemini API Key
+                          </label>
+                          <input
+                            type="password"
+                            value={geminiKey}
+                            onChange={(e) => setGeminiKey(e.target.value)}
+                            placeholder="AIza..."
+                            className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <div className="bg-[#1A1D2E]/[0.03] border border-[#1A1D2E]/[0.08] rounded-xl p-3.5 text-xs text-[#4A4D5E] leading-relaxed">
+                            💡 <strong>Application Default Credentials (ADC)</strong>
+                            <p className="mt-1">
+                              Uses the backend environment's credentials. Ensure you have run <code>gcloud auth application-default login</code> on your host.
+                            </p>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
+                                GCP Project ID
+                              </label>
+                              <input
+                                type="text"
+                                value={geminiProjectId}
+                                onChange={(e) => setGeminiProjectId(e.target.value)}
+                                placeholder="aicodex-lab (optional)"
+                                className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
+                                GCP Region
+                              </label>
+                              <input
+                                type="text"
+                                value={geminiRegion}
+                                onChange={(e) => setGeminiRegion(e.target.value)}
+                                placeholder="us-west1 (optional)"
+                                className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

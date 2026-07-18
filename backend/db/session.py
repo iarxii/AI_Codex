@@ -69,6 +69,45 @@ async def migrate_db(conn):
         except Exception:
             pass
 
+    # -- Invoicing tables (create_all handles new tables; migrate any missing cols here) --
+    for inv_table, inv_cols in {
+        "invoice_clients": {
+            "owner_id": "INTEGER",
+            "name": "VARCHAR(150)",
+            "company": "VARCHAR(150)",
+            "email": "VARCHAR(150)",
+            "phone": "VARCHAR(50)",
+            "billing_address": "TEXT",
+            "vat_number": "VARCHAR(50)",
+            "is_deleted": "BOOLEAN DEFAULT 0",
+            "created_at": "DATETIME",
+        },
+        "invoices": {
+            "share_token": "VARCHAR(64)",
+            "paid_at": "DATETIME",
+            "notes": "TEXT",
+        },
+        "invoice_items": {
+            "sort_order": "INTEGER DEFAULT 0",
+        },
+        "invoice_payments": {
+            "reference": "VARCHAR(120)",
+        },
+    }.items():
+        try:
+            result = await conn.execute(text(f"PRAGMA table_info({inv_table})"))
+            rows = result.fetchall()
+            if not rows:
+                # Table doesn't exist yet — create_all will handle it on next run
+                continue
+            existing_inv_cols = {row[1] for row in rows}
+            for col, col_def in inv_cols.items():
+                if col not in existing_inv_cols:
+                    print(f"[MIGRATION] Adding column {col} to {inv_table}...")
+                    await conn.execute(text(f"ALTER TABLE {inv_table} ADD COLUMN {col} {col_def}"))
+        except Exception as e:
+            print(f"[MIGRATION] Warning: invoicing migration for {inv_table}: {e}")
+
 async def init_db():
     try:
         async with engine.begin() as conn:

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Integer, Index
+from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Integer, Float, Index
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 from backend.config import settings
@@ -93,6 +93,88 @@ class DocumentChunk(Base):
 # CodexSpaces models are isolated in the private codex_spaces submodule.
 # Re-exported here to maintain backward compatibility with all existing imports.
 from codex_spaces.backend.db.space_models import CodexSpace, CodexSpaceAccess, BridgeSession  # noqa: F401
+
+# ---------------------------------------------------------------------------
+# Invoicing Models (Adaptivconcept-FL business invoicing module)
+# ---------------------------------------------------------------------------
+
+class InvoiceClient(Base):
+    __tablename__ = "invoice_clients"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(150))
+    company: Mapped[Optional[str]] = mapped_column(String(150))
+    email: Mapped[Optional[str]] = mapped_column(String(150))
+    phone: Mapped[Optional[str]] = mapped_column(String(50))
+    billing_address: Mapped[Optional[str]] = mapped_column(Text)
+    vat_number: Mapped[Optional[str]] = mapped_column(String(50))
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    invoices: Mapped[List["Invoice"]] = relationship(back_populates="client")
+
+
+class Invoice(Base):
+    __tablename__ = "invoices"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("invoice_clients.id"), index=True)
+    # e.g. INV-2026-0001 — generated server-side
+    invoice_number: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    # draft | sent | viewed | paid | overdue | void
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    currency: Mapped[str] = mapped_column(String(6), default="ZAR")
+    issue_date: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    # All monetary values stored as integer cents to avoid floating-point issues
+    subtotal_cents: Mapped[int] = mapped_column(Integer, default=0)
+    # Tax rate in basis points: 1500 == 15.00%
+    tax_rate_bp: Mapped[int] = mapped_column(Integer, default=0)
+    tax_cents: Mapped[int] = mapped_column(Integer, default=0)
+    discount_cents: Mapped[int] = mapped_column(Integer, default=0)
+    total_cents: Mapped[int] = mapped_column(Integer, default=0)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    # Opaque token for unauthenticated client-facing share link
+    share_token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    client: Mapped["InvoiceClient"] = relationship(back_populates="invoices")
+    items: Mapped[List["InvoiceItem"]] = relationship(back_populates="invoice", cascade="all, delete-orphan", order_by="InvoiceItem.sort_order")
+    payments: Mapped[List["InvoicePayment"]] = relationship(back_populates="invoice", cascade="all, delete-orphan")
+
+
+class InvoiceItem(Base):
+    __tablename__ = "invoice_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"), index=True)
+    description: Mapped[str] = mapped_column(String(300))
+    quantity: Mapped[float] = mapped_column(default=1.0)
+    unit_price_cents: Mapped[int] = mapped_column(Integer, default=0)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    invoice: Mapped["Invoice"] = relationship(back_populates="items")
+
+
+class InvoicePayment(Base):
+    __tablename__ = "invoice_payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"), index=True)
+    amount_cents: Mapped[int] = mapped_column(Integer)
+    # manual | eft | card | other
+    method: Mapped[str] = mapped_column(String(30), default="manual")
+    reference: Mapped[Optional[str]] = mapped_column(String(120))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    invoice: Mapped["Invoice"] = relationship(back_populates="payments")
+
+
+# ---------------------------------------------------------------------------
 
 class ArcadeScore(Base):
     __tablename__ = "arcade_scores"

@@ -41,3 +41,7 @@ a2ui-agent-sdk
 # Multi-agent orchestration (Code Lab CrewAI pipeline + SSE streaming)
 crewai
 sse-starlette
+
+# Invoicing — PDF generation + templating
+weasyprint
+jinja2
