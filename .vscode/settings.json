@@ -20,13 +20,12 @@
   "typescript.tsdk": "node_modules/typescript/lib",
 
   // Python import resolution paths
-  "python.analysis.extraPaths": [
-    "./"
-  ],
-  "python.autoComplete.extraPaths": [
-    "./"
-  ],
+  "python.analysis.extraPaths": ["./"],
+  "python.autoComplete.extraPaths": ["./"],
   "[html]": {
     "editor.defaultFormatter": "vscode.html-language-features"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
   }
 }

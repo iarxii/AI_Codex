@@ -13,6 +13,7 @@ from backend.skills.registry import registry
 from backend.integrations.ollamaopt_bridge import get_context_builder, get_retriever
 from .profile import build_system_prompt
 from .local_client import NativeLocalClient, detect_template
+from backend.agent.skill_routing import resolve_client_capabilities
 
 logger = logging.getLogger(__name__)
 
@@ -567,7 +568,16 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     
     # Initialize tools and binding logic
     client_type = state.get("client_type", config.get("configurable", {}).get("client_type", "web"))
-    tools = get_agent_tools(conversation_id, allowed_skills, client_type=client_type)
+    client_capabilities = resolve_client_capabilities(
+        client_type,
+        config.get("configurable", {}).get("client_capabilities"),
+    )
+    tools = get_agent_tools(
+        conversation_id,
+        allowed_skills,
+        client_type=client_type,
+        client_capabilities=client_capabilities,
+    )
     
     # Dynamically bind client-side MCP tools from scratchpad
     scratchpad_data = state.get("scratchpad") or {}
@@ -651,7 +661,13 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         }
     
     # Build system prompt AFTER tool binding so we can inject tool-binding status (Layer 3)
-    system_prompt = build_system_prompt(conversation_id, allowed_skills, tool_binding_status)
+    system_prompt = build_system_prompt(
+        conversation_id,
+        allowed_skills,
+        tool_binding_status,
+        client_type=client_type,
+        client_capabilities=client_capabilities,
+    )
     
     consideration = state.get("consideration_vector")
     if consideration:
@@ -857,7 +873,17 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
         return {"messages": [], "current_tool_calls": []}
 
     conversation_id = config.get("configurable", {}).get("conversation_id")
-    tools = get_agent_tools(conversation_id)
+    client_type = state.get("client_type", config.get("configurable", {}).get("client_type", "web"))
+    from backend.agent.skill_routing import resolve_client_capabilities
+    client_capabilities = resolve_client_capabilities(
+        client_type,
+        config.get("configurable", {}).get("client_capabilities"),
+    )
+    tools = get_agent_tools(
+        conversation_id,
+        client_type=client_type,
+        client_capabilities=client_capabilities,
+    )
     
     # Dynamically bind client-side MCP tools from scratchpad
     scratchpad_data = state.get("scratchpad") or {}
@@ -883,7 +909,6 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
             
     tool_map = {t.name: t for t in tools}
 
-    client_type = state.get("client_type", config.get("configurable", {}).get("client_type", "web"))
     websocket = config.get("configurable", {}).get("websocket")
     client_tool_responses = config.get("configurable", {}).get("client_tool_responses")
 

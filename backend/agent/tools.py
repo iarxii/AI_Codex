@@ -3,6 +3,7 @@ from typing import List
 from langchain_core.tools import StructuredTool
 from backend.skills.registry import registry
 from backend.skills.base import BaseSkill
+from backend.agent.skill_routing import resolve_client_capabilities
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +39,23 @@ def make_wrapped_workspace_reader(skill: BaseSkill, conversation_id: str):
         return await skill.execute(action=action, path=path, query=query, recursive=recursive, conversation_id=conversation_id)
     return wrapped_workspace_reader
 
-def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = None, client_type: str = "web") -> List[StructuredTool]:
+def get_agent_tools(
+    conversation_id: str = None,
+    allowed_skills: List[str] = None,
+    client_type: str = "web",
+    client_capabilities=None,
+) -> List[StructuredTool]:
     """
     Discovers all skills and returns them as a list of LangChain tools.
     Filters by allowed_skills if provided, and strictly filters by client_type capability.
     """
-    # Client Capability Mapping
-    FILESYSTEM_TOOLS = {"workspace_writer", "workspace_patcher", "workspace_reader", "shell_exec"}
-    can_delegate = client_type in ("vscode", "aidock")
+    resolved_capabilities = resolve_client_capabilities(client_type, client_capabilities)
+    skill_capabilities = {
+        "workspace_writer": "workspace.write",
+        "workspace_patcher": "workspace.write",
+        "workspace_reader": "workspace.read",
+        "shell_exec": "shell.execute",
+    }
     
     # Ensure skills are discovered
     registry.discover_builtin_skills()
@@ -57,7 +67,8 @@ def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = Non
         if allowed_skills and "all" not in allowed_skills and skill.name not in allowed_skills:
             continue
             
-        if skill.name in FILESYSTEM_TOOLS and client_type not in ("vscode", "aidock", "web"):
+        required_capability = skill_capabilities.get(skill.name)
+        if required_capability and required_capability not in resolved_capabilities:
             continue
 
         try:
@@ -103,10 +114,10 @@ def get_agent_tools(conversation_id: str = None, allowed_skills: List[str] = Non
             logger.error(f"Failed to convert skill {skill.name} to tool: {e}")
             
     # Add native agent tools based on capabilities
-    if can_delegate:
+    if "codebase.search" in resolved_capabilities:
         tools.append(codebase_search)
         
-    if client_type == "vscode":
+    if "vscode.webview" in resolved_capabilities:
         tools.append(get_terminal_viewport)
         
     tools.append(mt5_dispatch_signal)

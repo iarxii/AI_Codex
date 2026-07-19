@@ -19,6 +19,7 @@ mcp
 httpx
 qdrant-client
 python-dotenv
+PyYAML
 psutil
 requests
 GPUtil

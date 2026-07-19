@@ -2,7 +2,13 @@ import os
 from pathlib import Path
 import logging
 import re
-from typing import List
+from typing import Iterable, List, Optional
+
+from backend.agent.skill_routing import (
+    format_prompt_skills,
+    load_prompt_skills,
+    select_prompt_skills,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,48 +32,43 @@ def load_profile_file(filename: str, fallback: str) -> str:
         logger.warning(f"Persona file not found: {path}. Using fallback.")
     return fallback
 
-def load_mandatory_skills() -> str:
-    mandatory_dir = SKILLS_DIR / "mendatory"
-    if not mandatory_dir.exists():
-        return ""
-    
-    skills_content = []
-    try:
-        for path in sorted(mandatory_dir.glob("*.md")):
-            try:
-                content = path.read_text(encoding="utf-8")
-                skills_content.append(f"\n--- SKILL: {path.stem.upper()} ---\n{content}")
-                logger.info(f"Loaded mandatory skill from {path.name}")
-            except Exception as e:
-                logger.error(f"Failed to read mandatory skill {path.name}: {e}")
-    except Exception as e:
-        logger.error(f"Error reading mandatory skills directory: {e}")
-        
-    return "\n".join(skills_content)
+def load_prompt_skill_block(
+    kind: str,
+    client_type: str = "web",
+    client_capabilities: Optional[Iterable[str]] = None,
+    allowed_skills: Optional[List[str]] = None,
+) -> str:
+    skills, diagnostics = load_prompt_skills(SKILLS_DIR, kind)
+    for diagnostic in diagnostics:
+        logger.warning("Skipping prompt skill %s: %s", diagnostic.source_path.name, diagnostic.message)
 
-def load_situational_skills(allowed_skills: List[str] = None) -> str:
-    if not allowed_skills:
-        return ""
-    
-    situational_dir = SKILLS_DIR / "situational"
-    if not situational_dir.exists():
-        return ""
-        
-    skills_content = []
-    try:
-        for path in sorted(situational_dir.glob("*.md")):
-            skill_name = path.stem
-            if skill_name in allowed_skills or "all" in allowed_skills:
-                try:
-                    content = path.read_text(encoding="utf-8")
-                    skills_content.append(f"\n--- SITUATIONAL SKILL: {skill_name.upper()} ---\n{content}")
-                    logger.info(f"Loaded situational skill from {path.name}")
-                except Exception as e:
-                    logger.error(f"Failed to read situational skill {path.name}: {e}")
-    except Exception as e:
-        logger.error(f"Error reading situational skills directory: {e}")
-        
-    return "\n".join(skills_content)
+    selected_skills = select_prompt_skills(
+        skills,
+        kind,
+        client_type,
+        client_capabilities,
+        allowed_skills,
+    )
+    for skill in selected_skills:
+        logger.info("Loaded %s prompt skill %s for client %s", kind, skill.manifest.name, client_type)
+
+    label = "SKILL" if kind == "mandatory" else "SITUATIONAL SKILL"
+    return format_prompt_skills(selected_skills, label)
+
+
+def load_mandatory_skills(
+    client_type: str = "web",
+    client_capabilities: Optional[Iterable[str]] = None,
+) -> str:
+    return load_prompt_skill_block("mandatory", client_type, client_capabilities)
+
+
+def load_situational_skills(
+    allowed_skills: Optional[List[str]] = None,
+    client_type: str = "web",
+    client_capabilities: Optional[Iterable[str]] = None,
+) -> str:
+    return load_prompt_skill_block("situational", client_type, client_capabilities, allowed_skills)
 
 def compress_markdown(text: str) -> str:
     """Removes excess whitespace, newlines, and compresses markdown to reduce token count."""
@@ -78,7 +79,13 @@ def compress_markdown(text: str) -> str:
     text = re.sub(r' {2,}', ' ', text)
     return text.strip()
 
-def build_system_prompt(conversation_id: str = "default", allowed_skills: List[str] = None, tool_binding_status: str = "") -> str:
+def build_system_prompt(
+    conversation_id: str = "default",
+    allowed_skills: Optional[List[str]] = None,
+    tool_binding_status: str = "",
+    client_type: str = "web",
+    client_capabilities: Optional[Iterable[str]] = None,
+) -> str:
     """
     Assembles the System Prompt from modular markdown files (SOUL, USER, MEMORY, AGENTS).
     Applies programmatic compression to strike a balance between load and performance.
@@ -98,10 +105,12 @@ def build_system_prompt(conversation_id: str = "default", allowed_skills: List[s
     status_block = f"\n[STATUS]\n{workspace_status}" if workspace_status else ""
     
     # Load prompt-based skills
-    mandatory_skills = compress_markdown(load_mandatory_skills())
+    mandatory_skills = compress_markdown(load_mandatory_skills(client_type, client_capabilities))
     mandatory_skills_block = f"\n[MANDATORY SKILLS]\n{mandatory_skills}" if mandatory_skills else ""
     
-    situational_skills = compress_markdown(load_situational_skills(allowed_skills))
+    situational_skills = compress_markdown(
+        load_situational_skills(allowed_skills, client_type, client_capabilities)
+    )
     situational_skills_block = f"\n[SITUATIONAL SKILLS]\n{situational_skills}" if situational_skills else ""
     
     # Tool-binding telemetry injection (Layer 3)

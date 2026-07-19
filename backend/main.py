@@ -191,10 +191,15 @@ lab_origin = "https://aicodex-lab-1096425756328.us-central1.run.app"
 if lab_origin not in effective_origins:
     effective_origins.append(lab_origin)
 
+# Add Netlify production domain explicitly
+netlify_prod = "https://adaptivconceptfl.netlify.app"
+if netlify_prod not in effective_origins:
+    effective_origins.append(netlify_prod)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=effective_origins if effective_origins else [lab_origin],
-    allow_origin_regex="https://.*\.a\.run\.app|http://localhost:\d+|http://127.0.0.1:\d+",
+    allow_origin_regex="https://.*\.a\.run\.app|https://.*\.netlify\.app|http://localhost:\d+|http://127.0.0.1:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
