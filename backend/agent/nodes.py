@@ -836,6 +836,128 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         "recent_actions_fingerprint": fingerprints
     }
 
+def compress_tool_output(output: str, max_chars: int = 4000) -> str:
+    """
+    Intelligently compresses tool output to fit within token boundaries while preserving
+    important execution details, errors, warnings, stack traces, and top-level summary information.
+    """
+    if len(output) <= max_chars:
+        return output
+
+    lines = output.splitlines()
+    error_keywords = {"fail", "error", "exception", "traceback", "warning", "failed", "unhandled"}
+    
+    preserved_indices = set()
+    
+    # 1. Scan and flag lines containing error keywords + context window of 2 lines before and after
+    for idx, line in enumerate(lines):
+        line_lower = line.lower()
+        if any(kw in line_lower for kw in error_keywords):
+            for window_idx in range(max(0, idx - 2), min(len(lines), idx + 3)):
+                preserved_indices.add(window_idx)
+                
+    # 2. Always preserve the first 15 lines and the last 15 lines of the output
+    for idx in range(min(15, len(lines))):
+        preserved_indices.add(idx)
+    for idx in range(max(0, len(lines) - 15), len(lines)):
+        preserved_indices.add(idx)
+        
+    sorted_indices = sorted(list(preserved_indices))
+    
+    # 3. Build compressed output with omission indicators
+    compressed_lines = []
+    last_idx = -1
+    for idx in sorted_indices:
+        if last_idx != -1 and idx > last_idx + 1:
+            omitted_count = idx - last_idx - 1
+            compressed_lines.append(
+                f"\n... [OMITTED {omitted_count} LINES OF VERBOSE LOGS. "
+                "Call 'read_full_tool_output' to view the complete unpruned log output] ...\n"
+            )
+        compressed_lines.append(lines[idx])
+        last_idx = idx
+        
+    # Safeguard: if the compressed output is still too large, hard truncate
+    result = "\n".join(compressed_lines)
+    if len(result) > max_chars * 1.5:
+        result = result[:max_chars] + f"\n\n... [TRUNCATED DUE TO EXTREME LENGTH. Call 'read_full_tool_output' for complete details] ..."
+        
+    return result
+
+
+async def planner_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Planner Node (Layer 1 Conductor). 
+    Creates a structured task plan in the scratchpad state on the first turn of a complex request.
+    Subsequent turns skip re-planning and proceed directly.
+    """
+    scratchpad = state.get("scratchpad") or {}
+    messages = state.get("messages", [])
+    
+    # Check if we already have a task plan or if this is a short process
+    if scratchpad.get("task_plan") or state.get("is_short_process"):
+        logger.info("PLANNER: Skipping planning (already planned or short process)")
+        return {}
+        
+    logger.info("PLANNER: Generating structured task plan")
+    try:
+        # Load LLM for planning
+        llm = await get_dynamic_llm(config, bind_tools=False, tier="reasoning")
+        
+        # Format history and user request for planner
+        user_request = messages[-1].content if messages else ""
+        
+        planner_prompt = (
+            "You are the AICodex Conductor (Planner). Your sole responsibility is to analyze the user request "
+            "and create a step-by-step implementation checklist. You must NOT write code or execute tools.\n\n"
+            f"User Request:\n{user_request}\n\n"
+            "Respond ONLY with a valid JSON array of objects representing the plan. Each object must have:\n"
+            '- "text": String description of the task\n'
+            '- "done": Boolean, initially false\n'
+            '- "success_criteria": String description of how to verify this step\n\n'
+            "Example format:\n"
+            "[\n"
+            '  {"text": "Analyze directory structures", "done": false, "success_criteria": "Find target config files"},\n'
+            '  {"text": "Implement standard endpoints", "done": false, "success_criteria": "Server starts without errors"}\n'
+            "]"
+        )
+        
+        response = await llm.ainvoke([HumanMessage(content=planner_prompt)])
+        content = response.content.strip()
+        
+        # Clean JSON markdown fences if present
+        if content.startswith("```"):
+            lines = content.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines[-1].startswith("```"):
+                lines = lines[:-1]
+            content = "\n".join(lines).strip()
+            
+        tasks = json.loads(content)
+        if not isinstance(tasks, list):
+            tasks = [{"text": "Solve user query", "done": False, "success_criteria": "Query answered"}]
+            
+        scratchpad["task_plan"] = tasks
+        logger.info(f"PLANNER: Successfully created task plan with {len(tasks)} steps.")
+        
+        # Broadcast the plan to the UI via a WebSocket status trace
+        websocket = config.get("configurable", {}).get("websocket")
+        if websocket:
+            await websocket.send_json({
+                "type": "status",
+                "status": f"Conductor: Task plan generated with {len(tasks)} steps.",
+                "node": "planner"
+            })
+            
+        return {"scratchpad": scratchpad}
+    except Exception as e:
+        logger.error(f"PLANNER ERROR: Failed to generate task plan: {e}")
+        # Graceful fallback: inject a single generic task
+        scratchpad["task_plan"] = [{"text": "Process user request", "done": False, "success_criteria": "Request complete"}]
+        return {"scratchpad": scratchpad}
+
+
 async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
     Tool execution node. Dispatches to the compiled LangChain tools or delegates to client-side.
@@ -984,6 +1106,49 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                     tool_result = f"Exception during tool execution: {str(e)}"
             else:
                 tool_result = f"Error: Tool '{tool_name}' not found."
+        # ─── Self-Healing Diagnostics & Log Compression ───
+        error_hints = {
+            "workspace_writer": (
+                "Ensure that any paths you specified are within the workspace directory, "
+                "that the parent directories exist, and that you are not trying to overwrite "
+                "an existing file unless necessary. Use absolute paths or correct relative paths."
+            ),
+            "workspace_patcher": (
+                "The search_string must EXACTLY match the target lines in the file, including "
+                "whitespace, indentation, and newlines. Read the file content first to obtain "
+                "the precise lines to replace."
+            ),
+            "shell_exec": (
+                "If command execution failed or command was not found, check that the environment "
+                "path is correct, the virtual environment is activated, or use absolute paths to executables. "
+                "Avoid interactive terminal commands that wait for input."
+            ),
+            "workspace_reader": (
+                "Check that the directory or file path is valid and within the workspace. "
+                "Use recursive search only if looking for nested files."
+            )
+        }
+        
+        is_error = False
+        if isinstance(tool_result, str):
+            lower_res = tool_result.lower()
+            if "exception during" in lower_res or "error" in lower_res or "failed" in lower_res or "rejected" in lower_res:
+                is_error = True
+                
+        if is_error and tool_name in error_hints:
+            tool_result = f"{tool_result}\n\n[AICodex Self-Healing Tip: {error_hints[tool_name]}]"
+
+        # Cache unpruned tool output to log file
+        try:
+            log_dir = Path("./logs")
+            log_dir.mkdir(parents=True, exist_ok=True)
+            with open(log_dir / "last_tool_output.log", "w", encoding="utf-8") as f:
+                f.write(str(tool_result))
+        except Exception as log_err:
+            logger.error(f"Failed to cache full tool output to log: {log_err}")
+            
+        # Compress output if it exceeds character threshold
+        tool_result = compress_tool_output(str(tool_result))
         
         tool_messages.append(
             ToolMessage(

@@ -123,6 +123,7 @@ def get_agent_tools(
     tools.append(mt5_dispatch_signal)
     tools.append(compact_context)
     tools.append(write_scratchpad)
+    tools.append(read_full_tool_output)
     
     return tools
 
@@ -260,6 +261,27 @@ async def write_scratchpad(task_list_json: str) -> str:
     Must pass a valid JSON string representing the checklist array of tasks, e.g. '[{"text": "Refactor router", "done": false}]'.
     """
     return "Scratchpad planning board updated."
+
+
+@StructuredTool.from_function
+async def read_full_tool_output() -> str:
+    """
+    Retrieves the complete, unpruned output of the most recent tool execution.
+    Use this if the output was compressed or truncated for token efficiency (indicated by [OMITTED] markers),
+    and you need to inspect the full contents (e.g. detailed compile logs, test stacks, or output listings).
+    """
+    import os
+    log_path = "./logs/last_tool_output.log"
+    if not os.path.exists(log_path):
+        return "No tool outputs have been captured yet, or the log file does not exist."
+    try:
+        with open(log_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        if not content:
+            return "The last tool execution produced no output."
+        return content
+    except Exception as e:
+        return f"Error reading full tool output log: {str(e)}"
 
 
 def bind_mcp_tools(

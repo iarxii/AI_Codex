@@ -3,7 +3,7 @@ from .state import AgentState
 from .nodes import (
     reason_node, execute_tool_node, init_node, guard_node,
     validate_response_node, verification_node, evaluate_turn_node,
-    final_report_node, handle_blocker_node
+    final_report_node, handle_blocker_node, planner_node
 )
 from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node
 
@@ -82,7 +82,7 @@ def route_after_init(state: AgentState):
     if slug == "trading-space":
         return "trading_debate"
     
-    return "reason"
+    return "planner"
 
 def after_validate(state: AgentState):
     """
@@ -111,6 +111,7 @@ def create_agent_graph():
     
     # Add nodes
     workflow.add_node("init", init_node)
+    workflow.add_node("planner", planner_node)
     workflow.add_node("guard", guard_node)
     workflow.add_node("reason", reason_node)
     workflow.add_node("execute_tool", execute_tool_node)
@@ -131,15 +132,18 @@ def create_agent_graph():
         route_after_init,
         {
             "trading_debate": "trading_debate",
-            "reason": "guard"
+            "planner": "planner"
         }
     )
     
     # Guard → Reason (guard validates context before LLM invocation)
     workflow.add_edge("guard", "reason")
     
-    # After debate, go to guard (then reason)
-    workflow.add_edge("trading_debate", "guard")
+    # After debate, go to planner (then guard)
+    workflow.add_edge("trading_debate", "planner")
+    
+    # Planner -> Guard
+    workflow.add_edge("planner", "guard")
     
     # Add conditional edges out of reason
     workflow.add_conditional_edges(
