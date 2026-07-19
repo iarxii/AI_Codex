@@ -35,8 +35,8 @@ websockets
 aiohttp
 
 # Google Agentic Stack (ADK augments LangChain — does not replace langchain-core)
-google-adk>=1.0
-a2a-sdk[fastapi]>=1.0
+google-adk>=2.5.0
+a2a-sdk[fastapi]>=1.1.1
 a2ui-agent-sdk
 
 # Multi-agent orchestration (Code Lab CrewAI pipeline + SSE streaming)
