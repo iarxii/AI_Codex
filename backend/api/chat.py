@@ -16,6 +16,7 @@ from backend.db.models import Conversation, Message, CodexSpace, CodexSpaceAcces
 from backend.agent.graph import create_agent_graph
 from codex_spaces.backend.agent.space_config import get_space_config
 from sqlalchemy import select, update
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -104,17 +105,17 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     if current_node_name not in ["idle", "starting"] and current_node_start_time > 0:
                         elapsed = time.time() - current_node_start_time
                         if elapsed > 15.0:
-                            print(f"[sleepy-ai-time-checker] Node '{current_node_name}' has been running for {elapsed:.1f}s. Sending heartbeat.")
+                            logger.debug(f"[HeartbeatMonitor] Node '{current_node_name}' has been running for {elapsed:.1f}s. Sending heartbeat.")
                             await websocket.send_json({
                                 "type": "status",
-                                "status": f"sleepy-ai-time-checker: Node '{current_node_name}' is active ({elapsed:.1f}s)",
+                                "status": f"Processing: Node '{current_node_name}' is active ({elapsed:.1f}s)",
                                 "node": current_node_name,
                                 "duration": time.perf_counter() - request_start
                             })
             except asyncio.CancelledError:
                 pass
             except Exception as e:
-                print(f"[sleepy-ai-time-checker] Error: {e}")
+                logger.debug(f"[HeartbeatMonitor] Error: {e}")
 
         conversation_id = payload_data.get("conversation_id")
         user_message = payload_data.get("message")
@@ -364,16 +365,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     "recursion_limit": 100
                 }
                 
-                # Early Auth Check for Cloud Providers
-                if provider in ["groq", "openrouter", "gemini", "ollama_cloud"]:
-                    api_key = config.get("configurable", {}).get("api_key")
-                    
-                    is_missing = not api_key or (provider == "ollama_cloud" and api_key == "sk-ollama")
-                    if is_missing:
-                        p_label = provider.capitalize() if provider != "ollama_cloud" else "Ollama Cloud"
-                        full_ai_response = f"❌ **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core."
-                        await websocket.send_json({"type": "token", "content": full_ai_response, "node": "auth_check", "provider": provider, "model": model, "duration": 0})
-                        return
+
 
                 # 3. Initial state for Graph
                 initial_messages = langchain_history.copy()
@@ -706,14 +698,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 # Heartbeat ping from client to keep connection alive
                 continue
             
-            # Sleepy AI Time Checker client interaction
+            # Active session status query client interaction
             if isinstance(payload, dict) and str(payload.get("message")).strip().lower() in ["status?", "status"]:
-                print(f"[sleepy-ai-time-checker] Client query '{payload.get('message')}' received. Current node: '{current_node_name}'")
+                logger.debug(f"[HeartbeatMonitor] Client query '{payload.get('message')}' received. Current node: '{current_node_name}'")
                 if current_node_name != "idle":
                     elapsed = time.time() - current_node_start_time if current_node_start_time > 0 else 0
                     await websocket.send_json({
                         "type": "status",
-                        "status": f"sleepy-ai-time-checker: Agent is awake. Node '{current_node_name}' is active ({elapsed:.1f}s)...",
+                        "status": f"Agent active: Node '{current_node_name}' is processing ({elapsed:.1f}s)...",
                         "node": current_node_name
                     })
                 else:

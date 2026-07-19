@@ -1,5 +1,6 @@
 import logging
 import time
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
@@ -7,7 +8,7 @@ from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage, BaseMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from .state import AgentState
-from .tools import get_agent_tools
+from .tools import get_agent_tools, bind_mcp_tools
 from backend.config import settings
 from backend.skills.registry import registry
 from backend.integrations.ollamaopt_bridge import get_context_builder, get_retriever
@@ -252,9 +253,8 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier:
                 logger.warning(f"WARNING: Provider {provider} does not support tool binding: {e}. Proceeding with plain LLM.")
                 return llm
         return llm
-
     except Exception as e:
-        print(f"ERROR: Failed to initialize LLM for provider {provider}: {e}")
+        logger.error(f"ERROR: Failed to initialize LLM for provider {provider}: {e}")
         raise e
 
 async def init_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -343,7 +343,6 @@ async def guard_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any
             break
         if hasattr(m, "tool_calls") and m.tool_calls:
             for tc in m.tool_calls:
-                import json
                 try:
                     args_str = json.dumps(tc.get("args", {}), sort_keys=True)
                 except Exception:
@@ -583,35 +582,13 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     scratchpad_data = state.get("scratchpad") or {}
     mcp_tools_list = scratchpad_data.get("mcp_tools") or []
     if mcp_tools_list:
-        from langchain_core.tools import StructuredTool
-        for mcp_t in mcp_tools_list:
-            tool_name = mcp_t.get("name")
-            
-            # Smart Routing Heuristics for Sequential Thinking
-            if tool_name == "mcp__reasoning__sequentialthinking":
-                # 1. Skip if it's a short/repetitive process
-                if state.get("is_short_process", False):
-                    logger.info("PIPELINE: Skipping sequential-thinking tool (Short Process)")
-                    continue
-                # 2. Skip if the model natively supports reasoning
-                if any(kw in model.lower() for kw in ["o1", "o3", "thinking"]):
-                    logger.info(f"PIPELINE: Skipping sequential-thinking tool (Native reasoning model: {model})")
-                    continue
-                    
-            if any(t.name == tool_name for t in tools):
-                continue
-            
-            async def dummy_coroutine(**kwargs):
-                return "Delegated to client"
-                
-            mcp_wrapped = StructuredTool(
-                name=tool_name,
-                description=mcp_t.get("description") or f"Client-side MCP tool: {tool_name}",
-                func=lambda *args, **kwargs: "Delegated to client",
-                coroutine=dummy_coroutine,
-                args_schema=mcp_t.get("inputSchema") or {}
-            )
-            tools.append(mcp_wrapped)
+        tools = bind_mcp_tools(
+            tools=tools,
+            mcp_tools_list=mcp_tools_list,
+            model=model,
+            is_short_process=state.get("is_short_process", False),
+            apply_heuristics=True
+        )
     
     # Use the dynamic LLM with tools bound
     try:
@@ -844,7 +821,6 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     # Record recent tool actions fingerprint
     fingerprints = state.get("recent_actions_fingerprint") or []
     for tc in tool_calls:
-        import json
         try:
             args_str = json.dumps(tc.get("args", {}), sort_keys=True)
         except Exception:
@@ -889,23 +865,11 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
     scratchpad_data = state.get("scratchpad") or {}
     mcp_tools_list = scratchpad_data.get("mcp_tools") or []
     if mcp_tools_list:
-        from langchain_core.tools import StructuredTool
-        for mcp_t in mcp_tools_list:
-            tool_name = mcp_t.get("name")
-            if any(t.name == tool_name for t in tools):
-                continue
-            
-            async def dummy_coroutine(**kwargs):
-                return "Delegated to client"
-                
-            mcp_wrapped = StructuredTool(
-                name=tool_name,
-                description=mcp_t.get("description") or f"Client-side MCP tool: {tool_name}",
-                func=lambda *args, **kwargs: "Delegated to client",
-                coroutine=dummy_coroutine,
-                args_schema=mcp_t.get("inputSchema") or {}
-            )
-            tools.append(mcp_wrapped)
+        tools = bind_mcp_tools(
+            tools=tools,
+            mcp_tools_list=mcp_tools_list,
+            apply_heuristics=False
+        )
             
     tool_map = {t.name: t for t in tools}
 

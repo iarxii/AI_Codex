@@ -260,3 +260,46 @@ async def write_scratchpad(task_list_json: str) -> str:
     Must pass a valid JSON string representing the checklist array of tasks, e.g. '[{"text": "Refactor router", "done": false}]'.
     """
     return "Scratchpad planning board updated."
+
+
+def bind_mcp_tools(
+    tools: List[StructuredTool],
+    mcp_tools_list: List[dict],
+    model: str = "default",
+    is_short_process: bool = False,
+    apply_heuristics: bool = False,
+) -> List[StructuredTool]:
+    """
+    Dynamically appends client-side MCP tools to the provided tool list.
+    If apply_heuristics is True, applies smart routing heuristics for sequential thinking.
+    """
+    for mcp_t in mcp_tools_list:
+        tool_name = mcp_t.get("name")
+        if not tool_name:
+            continue
+            
+        if apply_heuristics and tool_name == "mcp__reasoning__sequentialthinking":
+            # 1. Skip if it's a short/repetitive process
+            if is_short_process:
+                logger.info("PIPELINE: Skipping sequential-thinking tool (Short Process)")
+                continue
+            # 2. Skip if the model natively supports reasoning
+            if model and any(kw in model.lower() for kw in ["o1", "o3", "thinking"]):
+                logger.info(f"PIPELINE: Skipping sequential-thinking tool (Native reasoning model: {model})")
+                continue
+                
+        if any(t.name == tool_name for t in tools):
+            continue
+            
+        async def dummy_coroutine(**kwargs):
+            return "Delegated to client"
+            
+        mcp_wrapped = StructuredTool(
+            name=tool_name,
+            description=mcp_t.get("description") or f"Client-side MCP tool: {tool_name}",
+            func=lambda *args, **kwargs: "Delegated to client",
+            coroutine=dummy_coroutine,
+            args_schema=mcp_t.get("inputSchema") or {}
+        )
+        tools.append(mcp_wrapped)
+    return tools

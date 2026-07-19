@@ -102,5 +102,4 @@ async def mql5_execution_enforcer_node(state: AgentState) -> Dict[str, Any]:
                 "error": "MQL5_GATE_LOCKED",
                 "messages": [SystemMessage(content=veto_msg)]
             }
-            
-    return state
+    return {}

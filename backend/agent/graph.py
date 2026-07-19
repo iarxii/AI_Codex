@@ -5,11 +5,10 @@ from .nodes import (
     validate_response_node, verification_node, evaluate_turn_node,
     final_report_node, handle_blocker_node
 )
-from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node  # or INFO, WARN, ERROR …
+from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node
 
 import logging
 logger = logging.getLogger(__name__)   # automatically uses the configured root logger
-logger.info("Starting graph construction")
 
 
 def should_continue(state: AgentState):
@@ -17,7 +16,7 @@ def should_continue(state: AgentState):
     has_calls = hasattr(last_message, "tool_calls") and last_message.tool_calls
     content_preview = str(getattr(last_message, "content", ""))[:200]
     
-    logger.info(
+    logger.debug(
         f"ROUTER: tool_calls={len(last_message.tool_calls) if has_calls else 0} "
         f"| content_len={len(str(getattr(last_message, 'content', '')))} "
         f"| preview={content_preview!r}"
@@ -34,7 +33,7 @@ def should_continue(state: AgentState):
             return "mql5_enforcer"
         return "execute_tool"
         
-    return "evaluate_turn"
+    return "validate"
 
 
 def route_after_evaluation(state: AgentState):
@@ -87,25 +86,27 @@ def route_after_init(state: AgentState):
 
 def after_validate(state: AgentState):
     """
-    Route after validation: retry reasoning (via guard) or finish.
+    Route after validation: retry reasoning (via guard) or continue to evaluation.
     If the validator detected fabrication (is_complete=False), re-enter
-    through guard → reason for one retry. Otherwise, end.
+    through guard → reason for one retry. Otherwise, continue to evaluate_turn.
     """
     if state.get("is_complete", True):
-        return END
+        return "evaluate_turn"
     return "guard"
+
+def after_enforcer(state: AgentState):
+    """
+    After enforcer, if not vetoed (no error), go to execute tool. If vetoed, go back to reason.
+    """
+    if state.get("error") == "MQL5_GATE_LOCKED":
+        return "reason"
+    return "execute_tool"
 
 def create_agent_graph():
     """
     Creates and compiles the agent graph.
-    
-    Graph topology:
-      init → guard → reason → (tool calls?) → execute_tool → guard → reason → ...
-                                   ↓ (no tool calls)
-                               validate → (fabrication?) → guard → reason (max 1 retry)
-                                   ↓ (clean)
-                                  END
     """
+    logger.info("Starting graph construction")
     workflow = StateGraph(AgentState)
     
     # Add nodes
@@ -147,7 +148,7 @@ def create_agent_graph():
         {
             "mql5_enforcer": "mql5_enforcer",
             "execute_tool": "execute_tool",
-            "evaluate_turn": "evaluate_turn",
+            "validate": "validate",
             "final_report": "final_report",
             END: END
         }
@@ -167,22 +168,16 @@ def create_agent_graph():
     workflow.add_edge("final_report", END)
     workflow.add_edge("handle_blocker", END)
     
-    # Validator → END or retry via guard
+    # Validator → evaluate_turn or retry via guard
     workflow.add_conditional_edges(
         "validate",
         after_validate,
         {
             "guard": "guard",
-            END: END
+            "evaluate_turn": "evaluate_turn"
         }
     )
     
-    # After enforcer, if not vetoed (no error), go to execute tool. If vetoed, go back to reason.
-    def after_enforcer(state: AgentState):
-        if state.get("error") == "MQL5_GATE_LOCKED":
-            return "reason"
-        return "execute_tool"
-
     workflow.add_conditional_edges(
         "mql5_enforcer",
         after_enforcer,

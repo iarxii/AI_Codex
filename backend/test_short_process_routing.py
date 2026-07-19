@@ -78,14 +78,14 @@ def test_routing_logic():
     route_b = should_continue(state_b)
     assert route_b == "execute_tool", f"Long process with tools should route to execute_tool, got {route_b}"
 
-    # Case C: Long process, no tool calls -> should route to evaluate_turn
+    # Case C: Long process, no tool calls -> should route to validate
     state_c = {
         "messages": [mock_msg_no_tools],
         "is_short_process": False,
         "space_config": {}
     }
     route_c = should_continue(state_c)
-    assert route_c == "evaluate_turn", f"Long process without tools should route to evaluate_turn, got {route_c}"
+    assert route_c == "validate", f"Long process without tools should route to validate, got {route_c}"
 
     print("Routing tests passed successfully!")
 
