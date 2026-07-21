@@ -34,6 +34,11 @@ def make_wrapped_shell_exec(skill: BaseSkill, conversation_id: str):
         return await skill.execute(command=command, cwd=cwd, conversation_id=conversation_id)
     return wrapped_shell_exec
 
+def make_wrapped_harness_dispatch(skill: BaseSkill, conversation_id: str):
+    async def wrapped_harness_dispatch(prompt: str, space_slug: str = "gemma-code-lab", language: str = "python"):
+        return await skill.execute(prompt=prompt, space_slug=space_slug, language=language, conversation_id=conversation_id)
+    return wrapped_harness_dispatch
+
 def make_wrapped_workspace_reader(skill: BaseSkill, conversation_id: str):
     async def wrapped_workspace_reader(action: str, path: str, query: str = None, recursive: bool = False):
         return await skill.execute(action=action, path=path, query=query, recursive=recursive, conversation_id=conversation_id)
@@ -73,7 +78,6 @@ def get_agent_tools(
 
         try:
             # We must preserve the signature for StructuredTool.from_function to work.
-            # For the workspace_writer, we know its specific signature.
             if skill.name == "workspace_writer":
                 tool = StructuredTool.from_function(
                     coroutine=make_wrapped_workspace_writer(skill, conversation_id),
@@ -95,6 +99,12 @@ def get_agent_tools(
             elif skill.name == "workspace_reader":
                 tool = StructuredTool.from_function(
                     coroutine=make_wrapped_workspace_reader(skill, conversation_id),
+                    name=skill.name,
+                    description=skill.description,
+                )
+            elif skill.name == "harness_dispatch":
+                tool = StructuredTool.from_function(
+                    coroutine=make_wrapped_harness_dispatch(skill, conversation_id),
                     name=skill.name,
                     description=skill.description,
                 )

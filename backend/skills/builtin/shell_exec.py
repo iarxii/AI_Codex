@@ -1,4 +1,5 @@
 from pathlib import Path
+from backend.config import settings
 from ..base import BaseSkill, SkillResult
 from ..sandbox import execute_sandboxed
 
@@ -46,8 +47,13 @@ class ShellExecSkill(BaseSkill):
             # Ensure the directory exists
             abs_cwd.mkdir(parents=True, exist_ok=True)
 
-            # Execute via sandbox
-            result = await execute_sandboxed(command, cwd=str(abs_cwd), conversation_id=conversation_id)
+            # Execute via sandbox (CloudRun or Local based on settings)
+            if settings.SANDBOX_MODE == "cloudrun":
+                from ..cloudrun_sandbox import CloudRunSandboxExecutor
+                executor = CloudRunSandboxExecutor()
+                result = await executor.execute(command, cwd=str(abs_cwd), conversation_id=conversation_id)
+            else:
+                result = await execute_sandboxed(command, cwd=str(abs_cwd), conversation_id=conversation_id)
             return result
             
         except Exception as e:

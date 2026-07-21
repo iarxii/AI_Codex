@@ -55,9 +55,11 @@ class Settings(BaseSettings):
     # OllamaOpt Integration
     OLLAMAOPT_PATH: str = "../../OllamaOpt"
     
-    # GCP / Vertex AI Configuration
+    # GCP / Vertex AI / Cloud Run Configuration
     GCP_PROJECT_ID: str = "aicodex-lab"
     GCP_REGION: str = "us-west1"
+    SANDBOX_MODE: str = "local"  # "local" | "cloudrun"
+    CLOUDRUN_SERVICE_NAME: str = "codex-sandbox"
     
     model_config = SettingsConfigDict(
         env_file=env_path,

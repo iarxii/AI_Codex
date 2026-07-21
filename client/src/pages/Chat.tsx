@@ -355,6 +355,17 @@ const Chat: React.FC = () => {
           thoughtLogRef.current = updated;
           return updated;
         });
+      } else if (data.type === 'a2ui_artifact') {
+        if (data.declaration) {
+          window.dispatchEvent(new CustomEvent('a2ui-artifact', {
+            detail: {
+              id: `a2ui-${Date.now()}`,
+              title: `${data.space_slug ? data.space_slug.replace('-', ' ').toUpperCase() : 'CODEX'} A2UI Projection`,
+              content: typeof data.declaration === 'string' ? data.declaration : JSON.stringify(data.declaration, null, 2),
+              language: 'json'
+            }
+          }));
+        }
       } else if (data.type === 'done') {
         setLoading(false);
         isProcessing.current = false;

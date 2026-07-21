@@ -1100,6 +1100,16 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                         tool_result = result.output or result.error or "Success (no output)"
                         if not result.success and not result.error:
                             tool_result = f"Error: {tool_result}"
+                        if websocket and getattr(result, "data", None) and "a2ui_declaration" in result.data:
+                            try:
+                                await websocket.send_json({
+                                    "type": "a2ui_artifact",
+                                    "declaration": result.data["a2ui_declaration"],
+                                    "space_slug": result.data.get("space_slug", ""),
+                                    "harness_type": result.data.get("harness_type", "")
+                                })
+                            except Exception as ws_err:
+                                logger.error(f"Failed to send a2ui_artifact via WebSocket: {ws_err}")
                     else:
                         tool_result = str(result)
                 except Exception as e:
