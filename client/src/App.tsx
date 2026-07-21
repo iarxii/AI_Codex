@@ -4,6 +4,7 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
+import LiteChat from './pages/LiteChat';
 import AdminOverview from './pages/AdminOverview';
 import AdminDashboard from './pages/AdminDashboard';
 import { AIProvider, useAI } from './contexts/AIContext';
@@ -26,6 +27,7 @@ const AppContent: React.FC = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/lite-chat" element={<LiteChat />} />
           <Route path="/admin/overview" element={<AdminOverview />} />
           <Route path="/admin/users" element={<AdminDashboard />} />
           {/* Fallback to login */}
