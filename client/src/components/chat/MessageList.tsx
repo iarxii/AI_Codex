@@ -3,6 +3,7 @@ import { TrendingUpIcon, TrendingDownIcon, ActivityIcon } from "lucide-react";
 import MessageItem from "./MessageItem";
 import type { Message, ThoughtLogEntry } from "../../types/chat";
 import type { ProviderId, CodexSpace } from "../../contexts/AIContext";
+import { getIcon } from "../SpaceCard";
 
 interface MessageListProps {
   messages: Message[];
@@ -227,7 +228,9 @@ const MessageList: React.FC<MessageListProps> = ({
                   boxShadow: `0 20px 40px -12px ${activeSpace.color || 'var(--accent)'}60`
                 } : {}}
               >
-                {config.icon ? (
+                {activeSpace && activeSpace.icon ? (
+                  getIcon(activeSpace.icon, "w-12 h-12 text-white drop-shadow-md", "w-12 h-12 object-contain filter invert drop-shadow-md")
+                ) : config.icon ? (
                   <img
                     src={config.icon}
                     alt={config.label}

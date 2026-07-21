@@ -14,6 +14,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useAI } from "../contexts/AIContext";
 import { config, getApiUrl } from "../config";
+import PortalSwitcher from "./layout/PortalSwitcher";
 
 type Conversation = {
   id: number;
@@ -311,6 +312,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                   )}
                   {/* 👆 will be revised in future to offer "flavours" of agentic workflows for various purposes */}
                 </span>
+
+                {/* Portal Switch */}
+                <div className="flex items-center pr-2">
+                  <PortalSwitcher />
+                </div>
               </div>
             </div>
           </div>

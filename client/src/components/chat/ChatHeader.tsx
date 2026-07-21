@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import ProviderIcon from "../ProviderIcon";
 import { useAI } from "../../contexts/AIContext";
 import NeuralFunctionSwitch from "./NeuralFunctionSwitch";
-import PortalSwitcher from "../layout/PortalSwitcher";
 
 interface ChatHeaderProps {
   isSidebarOpen: boolean;
@@ -118,10 +117,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
       {/* items justified to the right */}
       <div className="flex items-center justify-end gap-3 shrink-0 h-full">
-        {/* Portal Switcher */}
-        <div className="flex items-center pr-2">
-          <PortalSwitcher />
-        </div>
+        
         {/* Spirit Bird Interaction Harness Toggle — only for trading space on < lg screens */}
         {activeSpace?.slug === "trading-space" && setIsHarnessOpen && (
           <button

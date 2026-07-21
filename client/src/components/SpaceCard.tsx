@@ -15,22 +15,22 @@ interface SpaceCardProps {
   onEnter: (space: CodexSpace) => void;
 }
 
-const getIcon = (iconName: string | null) => {
-  if (!iconName) return <GlobeAltIcon className="w-8 h-8" />;
+export const getIcon = (iconName: string | null, className: string = "w-8 h-8", imgClassName: string = "w-10 h-10 object-contain") => {
+  if (!iconName) return <GlobeAltIcon className={className} />;
   
   // Custom Brand Icons
   if (iconName.includes('.svg') || iconName.includes('.png')) {
-    return <img src={iconName} alt="Space Icon" className="w-10 h-10 object-contain" />;
+    return <img src={iconName} alt="Space Icon" className={imgClassName} />;
   }
 
   switch (iconName) {
-    case 'GlobeAltIcon': return <GlobeAltIcon className="w-8 h-8" />;
-    case 'CpuChipIcon': return <CpuChipIcon className="w-8 h-8" />;
-    case 'AcademicCapIcon': return <AcademicCapIcon className="w-8 h-8" />;
-    case 'ChartBarIcon': return <ChartBarIcon className="w-8 h-8" />;
-    case 'CodeBracketIcon': return <CodeBracketIcon className="w-8 h-8" />;
-    case 'SparklesIcon': return <SparklesIcon className="w-8 h-8" />;
-    default: return <GlobeAltIcon className="w-8 h-8" />;
+    case 'GlobeAltIcon': return <GlobeAltIcon className={className} />;
+    case 'CpuChipIcon': return <CpuChipIcon className={className} />;
+    case 'AcademicCapIcon': return <AcademicCapIcon className={className} />;
+    case 'ChartBarIcon': return <ChartBarIcon className={className} />;
+    case 'CodeBracketIcon': return <CodeBracketIcon className={className} />;
+    case 'SparklesIcon': return <SparklesIcon className={className} />;
+    default: return <GlobeAltIcon className={className} />;
   }
 };
 

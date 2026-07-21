@@ -39,7 +39,7 @@ export const PortalSwitcher: React.FC<PortalSwitcherProps> = ({ isDark = false }
               : 'text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5'
         }`}
       >
-        Chat (LiteRT)
+        Chat
       </button>
     </div>
   );
