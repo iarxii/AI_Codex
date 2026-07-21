@@ -7,3 +7,6 @@
 [submodule "vscode-extension"]
 	path = vscode-extension
 	url = https://github.com/iarxii/spirit-bird-vscodex.git
+[submodule "cli"]
+	path = cli
+	url = https://github.com/iarxii/pi_cli_aicodex.git
