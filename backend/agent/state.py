@@ -51,6 +51,9 @@ class AgentState(TypedDict):
     
     # --- Short-Process (Bypass) Routing ---
     is_short_process: Optional[bool]                 # Tracks if this is a short-circuit conversational run
+    raw_prompt: Optional[str]                         # User intent before workspace/context enrichment
+    routing_metadata: Optional[dict]                  # Structured classification and promotion metadata
 
     # --- Client Context ---
     client_type: Optional[str]                       # Identifier for the client (web, vscode, aidock, android)
+    context: Optional[dict]                           # Model context kept separate from raw user intent

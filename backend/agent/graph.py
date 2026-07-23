@@ -12,26 +12,50 @@ logger = logging.getLogger(__name__)   # automatically uses the configured root 
 
 
 def should_continue(state: AgentState):
-    last_message = state["messages"][-1]
-    has_calls = hasattr(last_message, "tool_calls") and last_message.tool_calls
+    last_message = state["messages"][-1] if state.get("messages") else None
+    tool_calls = getattr(last_message, "tool_calls", []) if last_message else []
+    has_calls = bool(tool_calls)
     content_preview = str(getattr(last_message, "content", ""))[:200]
     
     logger.debug(
-        f"ROUTER: tool_calls={len(last_message.tool_calls) if has_calls else 0} "
+        f"ROUTER: tool_calls={len(tool_calls)} "
         f"| content_len={len(str(getattr(last_message, 'content', '')))} "
         f"| preview={content_preview!r}"
     )
     
-    if state.get("is_short_process"):
-        logger.info("ROUTER: Short process detected. Fast-path routing to END.")
-        return END
-
     if has_calls:
+        if state.get("is_short_process"):
+            telemetry = state.get("telemetry") or {}
+            telemetry["tool_promotion"] = True
+            telemetry["process_mode"] = "long"
+            routing_metadata = dict(state.get("routing_metadata") or {})
+            routing_metadata["process_mode"] = "long"
+            routing_metadata["reason"] = "tool_call_promotion"
+            routing_metadata["tool_promotion"] = True
+            state["is_short_process"] = False
+            state["telemetry"] = telemetry
+            state["routing_metadata"] = routing_metadata
+            logger.info("ROUTER: Tool call overrides short classification; promoting to long process.")
+
         # Dynamically route to tool execution
         slug = state.get("space_config", {}).get("slug", "")
         if slug == "trading-space":
             return "mql5_enforcer"
         return "execute_tool"
+
+    if state.get("is_short_process"):
+        logger.info("ROUTER: Short process detected. Fast-path routing to END.")
+        return END
+
+    routing_metadata = state.get("routing_metadata")
+    if routing_metadata and not routing_metadata.get("action_indicators"):
+        has_tool_evidence = any(
+            getattr(message, "type", "") == "tool"
+            for message in state.get("messages", [])
+        )
+        if not has_tool_evidence and not state.get("execution_artifacts"):
+            logger.info("ROUTER: Clean non-tool response detected. Skipping quality nodes.")
+            return END
         
     return "validate"
 
@@ -68,7 +92,7 @@ def should_continue_verification(state: AgentState):
     Route verification: execute tools if verification emitted them, otherwise proceed to guard.
     """
     last_message = state["messages"][-1] if state["messages"] else None
-    if last_message and hasattr(last_message, "tool_calls") and last_message.tool_calls:
+    if last_message and getattr(last_message, "tool_calls", None):
         return "execute_tool"
     return "guard"
 
@@ -79,6 +103,9 @@ def route_after_init(state: AgentState):
     space_config = state.get("space_config", {})
     slug = space_config.get("slug", "")
     
+    if state.get("is_short_process"):
+        return "reason"
+
     if slug == "trading-space":
         return "trading_debate"
     
@@ -132,6 +159,7 @@ def create_agent_graph():
         route_after_init,
         {
             "trading_debate": "trading_debate",
+            "reason": "reason",
             "planner": "planner"
         }
     )

@@ -119,6 +119,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
         conversation_id = payload_data.get("conversation_id")
         user_message = payload_data.get("message")
+        raw_prompt = payload_data.get("raw_prompt") or user_message or ""
+        user_message = user_message or raw_prompt
+        request_context = payload_data.get("context") or {}
+        if not isinstance(request_context, dict):
+            request_context = {}
         provider = payload_data.get("provider")
         model = payload_data.get("model")
         api_key = payload_data.get("api_key")
@@ -345,6 +350,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     )
                     await db.commit()
                 
+                max_graph_iterations = min(max(int(payload_data.get("max_graph_iterations", 80)), 20), 120)
+                max_request_seconds = min(max(int(payload_data.get("max_request_seconds", 300)), 30), 900)
+
                 config = {
                     "configurable": {
                         "provider": provider, 
@@ -362,7 +370,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "websocket": websocket,
                         "client_tool_responses": client_tool_responses
                     },
-                    "recursion_limit": 200
+                    "recursion_limit": max_graph_iterations
                 }
                 
 
@@ -385,6 +393,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     "context_data": {},
                     "routing_decision": {},
                     "is_complete": False,
+                    "space_config": s_config,
+                    "scratchpad": payload_data.get("scratchpad") or {},
+                    "client_type": payload_data.get("client_type", "web"),
+                    "raw_prompt": str(raw_prompt),
+                    "context": request_context,
                     "telemetry": {
                         "request_id": str(datetime.utcnow().timestamp()),
                         "ttft": 0,
@@ -393,11 +406,12 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "latencies": {},
                         "capabilities": get_model_capabilities(provider, model),
                         "provider": provider,
-                        "model": model
-                    },
-                    "space_config": s_config,
-                    "scratchpad": payload_data.get("scratchpad") or {},
-                    "client_type": payload_data.get("client_type", "web")
+                        "model": model,
+                        "node_sequence": [],
+                        "llm_call_count": 0,
+                        "max_graph_iterations": max_graph_iterations,
+                        "max_request_seconds": max_request_seconds,
+                    }
                 }
                 
                 # 4. Execute graph with event streaming
@@ -442,6 +456,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             current_node_name = node_name
                             current_node_start_time = time.time()
                             node_stream_content = ""
+                            initial_state["telemetry"].setdefault("node_sequence", []).append(node_name)
                             
                             status_text = f"Agent working in node: {node_name}"
                             thought_log.append({
@@ -456,6 +471,12 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                 "duration": time.perf_counter() - request_start
                             })
                     
+                        if kind == "on_chat_model_start":
+                            initial_state["telemetry"]["llm_call_count"] = initial_state["telemetry"].get("llm_call_count", 0) + 1
+
+                        if time.perf_counter() - request_start > max_request_seconds:
+                            raise TimeoutError(f"Agent request exceeded {max_request_seconds} seconds")
+
                         if kind == "on_chat_model_stream":
                             content = event["data"]["chunk"].content
                             if content:
@@ -544,6 +565,16 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                         initial_state["messages"] = add_messages(initial_state["messages"], v)
                                     else:
                                         initial_state[k] = v
+
+                                if node_name == "init" and output.get("routing_metadata"):
+                                    routing = output["routing_metadata"]
+                                    await websocket.send_json({
+                                        "type": "routing",
+                                        "process_mode": routing.get("process_mode", "long"),
+                                        "reason": routing.get("reason", "unknown"),
+                                        "client_type": routing.get("client_type", initial_state.get("client_type", "web")),
+                                        "node": "init"
+                                    })
                                         
                                 # Stream context telemetry
                                 msgs = initial_state.get("messages", [])

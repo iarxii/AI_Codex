@@ -15,6 +15,7 @@ from backend.integrations.ollamaopt_bridge import get_context_builder, get_retri
 from .profile import build_system_prompt
 from .local_client import NativeLocalClient, detect_template
 from backend.agent.skill_routing import resolve_client_capabilities
+from .routing import classify_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -285,44 +286,27 @@ async def init_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]
     # For now, we'll just mark the init node duration
     telemetry["latencies"]["init_node"] = time.perf_counter() - start_time
     
-    # Short Process Heuristic Classification
+    # Classify the raw user intent before any workspace or retrieval context is considered.
     client_type = state.get("client_type", config.get("configurable", {}).get("client_type", "web"))
-    is_short_process = False
-    messages = state.get("messages", [])
-    if messages:
-        # Find the last HumanMessage
-        from langchain_core.messages import HumanMessage
-        last_human = None
-        for m in reversed(messages):
-            if isinstance(m, HumanMessage) or getattr(m, "type", "") == "human":
-                last_human = m
+    raw_prompt = str(state.get("raw_prompt") or "").strip()
+    if not raw_prompt:
+        for message in reversed(state.get("messages", [])):
+            if isinstance(message, HumanMessage) or getattr(message, "type", "") == "human":
+                raw_prompt = str(message.content or "").strip()
                 break
-        
-        if last_human and last_human.content:
-            query = str(last_human.content).strip().lower()
-            
-            # Common greetings and acknowledgments
-            greetings = {"hi", "hello", "hey", "hola", "greetings", "good morning", "good afternoon", "good evening", "yo"}
-            acknowledgments = {"thanks", "thank you", "ok", "okay", "yes", "no", "cool", "perfect", "bye", "goodbye", "awesome"}
-            
-            # Direct match or startswith check
-            is_greeting = query in greetings or any(query.startswith(g + " ") for g in greetings)
-            is_ack = query in acknowledgments or any(query.startswith(a + " ") for a in acknowledgments)
-            
-            if is_greeting or is_ack:
-                is_short_process = True
-            elif client_type in ("vscode", "aidock") and len(query) < 45:
-                # Check for technical actions and file extensions
-                action_words = {"create", "write", "run", "make", "build", "generate", "code", "modify", "implement", "add", "fix", "delete", "remove", "update"}
-                has_action = any(word in query for word in action_words)
-                
-                extensions = {".py", ".ts", ".js", ".html", ".css", ".json", ".yml", ".yaml", ".sh", ".bat", ".md"}
-                has_ext = any(ext in query for ext in extensions)
-                
-                if not has_action and not has_ext:
-                    is_short_process = True
 
-    return {"telemetry": telemetry, "is_short_process": is_short_process}
+    routing_metadata = classify_prompt(raw_prompt, client_type)
+    telemetry["routing"] = dict(routing_metadata)
+    telemetry["process_mode"] = routing_metadata["process_mode"]
+    telemetry["classification_reason"] = routing_metadata["reason"]
+
+    return {
+        "telemetry": telemetry,
+        "is_short_process": routing_metadata["process_mode"] == "short",
+        "raw_prompt": raw_prompt,
+        "routing_metadata": routing_metadata,
+        "routing_decision": routing_metadata,
+    }
 
 async def guard_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
@@ -828,13 +812,26 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         fingerprints.append(f"{tc.get('name')}:{args_str}")
     fingerprints = fingerprints[-10:]
 
-    return {
+    result = {
         "messages": [response],
         "current_tool_calls": tool_calls,
         "context_data": {"history_len": len(messages), "summarized": bool(summary)},
         "telemetry": telemetry,
         "recent_actions_fingerprint": fingerprints
     }
+    if tool_calls and state.get("is_short_process"):
+        routing_metadata = dict(state.get("routing_metadata") or {})
+        routing_metadata.update({
+            "process_mode": "long",
+            "reason": "tool_call_promotion",
+            "tool_promotion": True,
+        })
+        telemetry["process_mode"] = "long"
+        telemetry["tool_promotion"] = True
+        result["is_short_process"] = False
+        result["routing_metadata"] = routing_metadata
+
+    return result
 
 def compress_tool_output(output: str, max_chars: int = 4000) -> str:
     """
@@ -1173,7 +1170,13 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
     if "latencies" not in telemetry: telemetry["latencies"] = {}
     telemetry["latencies"]["tool_execution"] = time.perf_counter() - node_start
 
-    return {"messages": tool_messages, "current_tool_calls": [], "telemetry": telemetry, **state_updates}
+    return {
+        "messages": tool_messages,
+        "current_tool_calls": [],
+        "telemetry": telemetry,
+        "is_short_process": False,
+        **state_updates,
+    }
 
 async def validate_response_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
