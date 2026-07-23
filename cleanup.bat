@@ -34,11 +34,26 @@ if exist "debug.log" del /q "debug.log"
 if exist "client\debug.txt" del /q "client\debug.txt"
 if exist "client\npm-debug.log" del /q "client\npm-debug.log"
 
-:: 4. Git Optimization
+:: 4. Deployment staging cleanup
+echo [PROC] Removing failed deployment staging folders...
+if exist "backend\codex_spaces_local" (
+    echo - Removing backend\codex_spaces_local...
+    rd /s /q "backend\codex_spaces_local"
+)
+if exist "backend\skills_local" (
+    echo - Removing backend\skills_local...
+    rd /s /q "backend\skills_local"
+)
+if exist "client\codex_spaces_temp" (
+    echo - Removing client\codex_spaces_temp...
+    rd /s /q "client\codex_spaces_temp"
+)
+
+:: 5. Git Optimization
 echo [PROC] Optimizing Git repository (GC)...
 git gc --prune=now --aggressive
 
-:: 5. Conditional Heavy Cleanup
+:: 6. Conditional Heavy Cleanup
 if "%1"=="full" (
     echo [CRITICAL] Full Purge Mode: Removing node_modules...
     if exist "client\node_modules" (

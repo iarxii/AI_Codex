@@ -48,14 +48,23 @@ if "!COLAB_SECRET!" NEQ "" echo [DUAL BACKEND] Detected Colab Handshake Secret.
 if "%DEPLOY_BE%"=="true" (
     echo [1/4] Submitting Backend Build to Google Cloud...
     if exist backend\codex_spaces_local rd /S /Q backend\codex_spaces_local
-    echo \node_modules\ > exclude.txt
-    echo \.git\ >> exclude.txt
-    xcopy /E /I /Y /EXCLUDE:exclude.txt codex_spaces backend\codex_spaces_local
-    del exclude.txt
+    if exist backend\skills_local rd /S /Q backend\skills_local
+    rem Robocopy avoids traversing junctions/symlinks during staging.
+    robocopy codex_spaces backend\codex_spaces_local /E /XJ /XD node_modules .git /R:2 /W:2
+    if errorlevel 8 (
+        echo Backend source staging failed while copying codex_spaces.
+        exit /b 1
+    )
+    robocopy skills backend\skills_local /E /XJ /XD node_modules .git /R:2 /W:2
+    if errorlevel 8 (
+        echo Backend source staging failed while copying skills.
+        exit /b 1
+    )
     pushd backend
     call %GCLOUD% builds submit --tag %BACKEND_IMAGE% --project %PROJECT_ID%
     popd
     if exist backend\codex_spaces_local rd /S /Q backend\codex_spaces_local
+    if exist backend\skills_local rd /S /Q backend\skills_local
     if %ERRORLEVEL% NEQ 0 (
         echo Backend build failed. Exiting.
         exit /b %ERRORLEVEL%
@@ -117,8 +126,16 @@ if "%DEPLOY_FE%"=="true" (
     mkdir client\codex_spaces_temp\client
     mkdir client\codex_spaces_temp\client\src
     mkdir client\codex_spaces_temp\backend
-    xcopy /E /I /Y codex_spaces\client\src client\codex_spaces_temp\client\src
-    xcopy /E /I /Y codex_spaces\backend client\codex_spaces_temp\backend
+    robocopy codex_spaces\client\src client\codex_spaces_temp\client\src /E /XJ /R:2 /W:2
+    if errorlevel 8 (
+        echo Frontend source staging failed while copying client source.
+        exit /b 1
+    )
+    robocopy codex_spaces\backend client\codex_spaces_temp\backend /E /XJ /XD node_modules .git /R:2 /W:2
+    if errorlevel 8 (
+        echo Frontend source staging failed while copying backend source.
+        exit /b 1
+    )
     copy codex_spaces\README.md client\codex_spaces_temp\ >nul
     copy codex_spaces\.gitignore client\codex_spaces_temp\ >nul
     pushd client
