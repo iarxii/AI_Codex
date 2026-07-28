@@ -125,3 +125,9 @@ sequenceDiagram
 
 The remaining verification work is a deterministic authenticated WebSocket test for this event order and for timeout/error terminal behavior.
 
+## Note on Tutor Block Conditional Logic
+The `AgentState` now includes an `include_tutor: bool` flag (default `true`).
+- In `evaluate_turn_node`, this flag is set to `false` for simple conversational queries (no tool use) and `true` for tasks involving code changes or architectural decisions.
+- In `final_report_node`, the `[TUTOR]` section is included in the LLM prompt only if `include_tutor` is `true`.
+This ensures educational explanations appear only when relevant, reducing verbosity for simple interactions.
+

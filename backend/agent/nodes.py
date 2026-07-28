@@ -306,6 +306,7 @@ async def init_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]
         "raw_prompt": raw_prompt,
         "routing_metadata": routing_metadata,
         "routing_decision": routing_metadata,
+        "include_tutor": True,  # Default to including tutor block; can be overridden later
     }
 
 async def guard_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -1417,11 +1418,19 @@ async def evaluate_turn_node(state: AgentState, config: RunnableConfig) -> Dict[
         
     quality_history = state.get("quality_history") or []
     quality_history = list(quality_history) + [eval_report.get("quality_score", 1.0)]
-        
+    
+    # Determine if tutor block should be included based on task complexity
+    # For now, include tutor if goal was achieved and there were code changes
+    # This can be refined based on more sophisticated heuristics
+    goal_achieved = eval_report.get("goal_achieved", False)
+    lines_modified = artifacts.get("lines_added", 0) + artifacts.get("lines_deleted", 0)
+    include_tutor = goal_achieved and lines_modified > 0
+    
     return {
         "evaluation_report": eval_report,
         "quality_history": quality_history,
-        "consideration_vector": eval_report.get("consideration_vector", {})
+        "consideration_vector": eval_report.get("consideration_vector", {}),
+        "include_tutor": include_tutor
     }
 
 
@@ -1436,12 +1445,24 @@ async def final_report_node(state: AgentState, config: RunnableConfig) -> Dict[s
     internal_trail = []
     for msg in messages:
         if isinstance(msg, AIMessage) and msg.content:
-            internal_trail.append(f"- Agent: {msg.content[:200]}...")
+            # Increased truncation from 200 to 500 characters for more detail
+            internal_trail.append(f"- Agent: {msg.content[:500]}...")
         elif isinstance(msg, ToolMessage):
-            internal_trail.append(f"- Tool executed ({msg.name}): {str(msg.content)[:100]}")
+            # Increased truncation from 100 to 250 characters for more detail
+            internal_trail.append(f"- Tool executed ({msg.name}): {str(msg.content)[:250]}")
             
     trail_str = "\n".join(internal_trail)
     llm = await get_dynamic_llm(config, bind_tools=False, tier="reasoning")
+    
+    # Build the tutor section conditionally
+    tutor_section = ""
+    if state.get("include_tutor", True):
+        tutor_section = """
+    3. At the very end of your response, you MUST include an educational tutor explanation detailing the core concepts, design choices, or architectural patterns relevant to this task. This section MUST be wrapped strictly inside `[TUTOR]` and `[/TUTOR]` tags:
+    [TUTOR]
+    [Educational explanation of concepts, files modified, or system design decisions]
+    [/TUTOR]
+    """
     
     summary_prompt = f"""
     You are the Final Synthesis layer of AICodex. 
@@ -1456,15 +1477,11 @@ async def final_report_node(state: AgentState, config: RunnableConfig) -> Dict[s
     
     2. Then, provide the summary under these headings:
     ### 📋 Execution Summary
-    * [Concise breakdown of what was achieved]
+    * [Concise breakdown of what was achieved - include key decisions, tools used, and quantitative metrics like files modified or lines changed]
     
     ### 🚀 Recommended Next Steps
-    * [2-3 concrete actions the user can take now, e.g., tests to run, code reviews, deployment]
-    
-    3. At the very end of your response, you MUST include an educational tutor explanation detailing the core concepts, design choices, or architectural patterns relevant to this task. This section MUST be wrapped strictly inside `[TUTOR]` and `[/TUTOR]` tags:
-    [TUTOR]
-    [Educational explanation of concepts, files modified, or system design decisions]
-    [/TUTOR]
+    * [2-3 concrete actions the user can take now, e.g., tests to run, code reviews, deployment - be specific and actionable]
+    {tutor_section}
     """
     
     response = await llm.ainvoke([HumanMessage(content=summary_prompt)])
