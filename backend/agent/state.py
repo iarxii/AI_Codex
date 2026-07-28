@@ -23,7 +23,7 @@ class AgentState(TypedDict):
     
     # Error state if any
     error: Optional[str]
-
+    
     # Model Telemetry & Capability Data
     telemetry: dict
     
@@ -32,8 +32,11 @@ class AgentState(TypedDict):
     
     # Optional domain-specific states
     trading_context: Optional[dict]
-
+    
     # Client-injected workspace data and semantic context
+    
+    # Flag to control Tutor block inclusion in final report
+    include_tutor: bool
     scratchpad: Optional[dict]
 
     # --- Extended ReAct Loop State ---
@@ -57,3 +60,6 @@ class AgentState(TypedDict):
     # --- Client Context ---
     client_type: Optional[str]                       # Identifier for the client (web, vscode, aidock, android)
     context: Optional[dict]                           # Model context kept separate from raw user intent
+
+    # --- Tutor Block Control ---
+    include_tutor: Optional[bool]                     # Flag to conditionally include the [TUTOR] block in final report
