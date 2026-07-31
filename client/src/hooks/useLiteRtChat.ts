@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { liteRtService, type SystemCapabilities, type AcceleratorType, AVAILABLE_MODELS } from '../services/liteRtService';
 import { config, getApiUrl } from '../config';
-import { PROVIDERS } from '../components/providerMeta';
 import type { ProviderId } from '../components/providerMeta';
 import {
   createInitialDownloadState,

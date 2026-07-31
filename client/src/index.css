@@ -21,6 +21,146 @@
   --text-primary: #1A1D2E;
   --text-muted: #7A7D8E;
   --accent: #fd3b12;
+
+  /* LiteRT brand accents (secondary — orange remains primary) */
+  --litert: #8B5CF6;
+  --litert-deep: #6D28D9;
+  --litert-teal: #5bc6a0;
+  --litert-soft: rgba(139, 92, 246, 0.12);
+  --litert-border: rgba(139, 92, 246, 0.28);
+  --litert-teal-soft: rgba(91, 198, 160, 0.14);
+
+  /* Material elevation — subtle light theme */
+  --elev-1: 0 1px 2px rgba(26, 29, 46, 0.05), 0 1px 3px rgba(26, 29, 46, 0.06);
+  --elev-2: 0 2px 4px rgba(26, 29, 46, 0.06), 0 4px 12px rgba(26, 29, 46, 0.08);
+  --elev-3: 0 4px 8px rgba(26, 29, 46, 0.07), 0 10px 28px rgba(26, 29, 46, 0.1);
+  --elev-4: 0 8px 16px rgba(26, 29, 46, 0.08), 0 18px 44px rgba(26, 29, 46, 0.14);
+
+  /* Liquid motion easing */
+  --ease-liquid: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-material: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ============================================
+   LiteRT — Liquid Design Primitives (Material-rooted)
+   ============================================ */
+
+/* Frosted glass surface with a soft liquid sheen */
+.glass-surface {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.74), rgba(226, 230, 236, 0.5));
+  backdrop-filter: blur(24px) saturate(1.35);
+  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: var(--elev-2), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* Chat surface — glassmorphic panel layered with an AdaptivOrange gradient
+   so the animated P5 graphics behind remain visible */
+.chat-surface {
+  background:
+    radial-gradient(130% 120% at 8% 0%, rgba(253, 59, 18, 0.16) 0%, rgba(253, 59, 18, 0.04) 42%, transparent 70%),
+    radial-gradient(120% 130% at 100% 100%, rgba(255, 102, 0, 0.12) 0%, rgba(255, 102, 0, 0.04) 45%, transparent 68%),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.16) 55%, rgba(255, 255, 255, 0.3) 100%);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+/* Ambient liquid blob — slow morphing aurora */
+@keyframes liquid-morph {
+  0%, 100% {
+    border-radius: 42% 58% 60% 40% / 45% 45% 55% 55%;
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  33% {
+    border-radius: 58% 42% 38% 62% / 55% 60% 40% 45%;
+    transform: translate(4%, -3%) rotate(12deg) scale(1.06);
+  }
+  66% {
+    border-radius: 38% 62% 55% 45% / 60% 40% 58% 42%;
+    transform: translate(-3%, 4%) rotate(-8deg) scale(0.96);
+  }
+}
+.liquid-blob {
+  position: absolute;
+  filter: blur(60px);
+  pointer-events: none;
+  animation: liquid-morph 18s var(--ease-material) infinite;
+  will-change: transform, border-radius;
+}
+
+@keyframes liquid-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(3%, 2%) scale(1.08); }
+}
+.liquid-drift {
+  animation: liquid-drift 14s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* LiteRT brand text gradient */
+.text-gradient-litert {
+  background: linear-gradient(100deg, var(--litert) 10%, var(--litert-deep) 45%, var(--litert-teal) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Material state layer (hover/active ink overlay) */
+.material-state {
+  position: relative;
+  overflow: hidden;
+}
+.material-state::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.2s var(--ease-material);
+  pointer-events: none;
+}
+.material-state:hover::after { opacity: 0.06; }
+.material-state:active::after { opacity: 0.12; }
+
+/* Elevation helpers */
+.elev-1 { box-shadow: var(--elev-1); }
+.elev-2 { box-shadow: var(--elev-2); }
+.elev-3 { box-shadow: var(--elev-3); }
+.elev-4 { box-shadow: var(--elev-4); }
+
+.elev-hover {
+  transition: box-shadow 0.3s var(--ease-material), transform 0.3s var(--ease-material);
+}
+.elev-hover:hover { box-shadow: var(--elev-3); }
+
+.press-lift {
+  transition: transform 0.2s var(--ease-liquid), box-shadow 0.2s var(--ease-material);
+}
+.press-lift:active { transform: scale(0.97); }
+
+/* Floating composer pill with material focus lift */
+.composer {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(226, 230, 236, 0.62));
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid rgba(139, 92, 246, 0.16);
+  box-shadow: var(--elev-2), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition: box-shadow 0.3s var(--ease-material), border-color 0.3s var(--ease-material), transform 0.3s var(--ease-liquid);
+}
+.composer:focus-within {
+  border-color: rgba(253, 59, 18, 0.35);
+  box-shadow: var(--elev-3), 0 0 0 4px rgba(253, 59, 18, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transform: translateY(-1px);
+}
+
+/* Material chip for telemetry/status pills */
+.material-chip {
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: var(--elev-1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 body {
