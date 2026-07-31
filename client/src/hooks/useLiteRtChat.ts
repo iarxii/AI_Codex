@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { liteRtService, type SystemCapabilities, type AcceleratorType, AVAILABLE_MODELS } from '../services/liteRtService';
 import { config, getApiUrl } from '../config';
+import { PROVIDERS } from '../components/providerMeta';
+import type { ProviderId } from '../components/providerMeta';
 import {
   createInitialDownloadState,
   downloadArtifact,
@@ -19,6 +21,35 @@ export interface LiteMessage {
   tps?: number; // Tokens per second
 }
 
+const CLOUD_MODELS: Record<string, { id: string, name: string }[]> = {
+  ollama_cloud: [
+    { id: 'llama3', name: 'Llama 3' },
+    { id: 'gemma2', name: 'Gemma 2' },
+    { id: 'mistral', name: 'Mistral' },
+    { id: 'phi3', name: 'Phi 3' },
+  ],
+  groq: [
+    { id: 'llama3-70b-8192', name: 'Llama 3 70B' },
+    { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B' },
+  ],
+  openrouter: [
+    { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5' },
+    { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus' },
+  ],
+  gemini: [
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+  ],
+  anthropic: [
+    { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet' },
+    { id: 'claude-3-opus', name: 'Claude 3 Opus' },
+  ],
+  azure: [
+    { id: 'gpt-4o', name: 'GPT-4o' },
+    { id: 'gpt-35-turbo', name: 'GPT-3.5 Turbo' },
+  ],
+};
+
 export const useLiteRtChat = () => {
   const [messages, setMessages] = useState<LiteMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -28,6 +59,15 @@ export const useLiteRtChat = () => {
   const [downloadStates, setDownloadStates] = useState<ArtifactDownloadState[]>(createInitialDownloadState);
   const downloadAbortRef = useRef<AbortController | null>(null);
   const [engineMode, setEngineMode] = useState<'local' | 'cloud'>('cloud');
+  const [provider, setProvider] = useState<ProviderId>('ollama_cloud');
+
+  // Update model when provider changes (only for cloud)
+  useEffect(() => {
+    if (engineMode === 'cloud' && CLOUD_MODELS[provider]) {
+      const firstModel = CLOUD_MODELS[provider][0];
+      setActiveModelId(firstModel.id);
+    }
+  }, [provider, engineMode]);
 
   // Load capabilities on mount
   useEffect(() => {
@@ -151,7 +191,7 @@ export const useLiteRtChat = () => {
           body: JSON.stringify({
             system_context: 'You are the AICodex Chat assistant, a fast, friendly conversational agent embedded in the AICodex Chat (LiteRT) portal. Keep replies concise, clear, and helpful.',
             message: content,
-            provider: 'ollama_cloud',
+            provider: provider,
             model: activeModelId
           })
         });
@@ -188,7 +228,7 @@ export const useLiteRtChat = () => {
       // Local Mode: LiteRT.js Edge inference
       await runLocalInference(content, botMessageId, startTime);
     }
-  }, [loading, engineMode, capabilities, selectModel, activeModelId]);
+  }, [loading, engineMode, provider, capabilities, selectModel, activeModelId]);
 
   const runLocalInference = async (content: string, botMessageId: string, startTime: number) => {
     let tokenCount = 0;
@@ -238,5 +278,8 @@ export const useLiteRtChat = () => {
     downloadTotalBytes: LOCAL_ARTIFACT_TOTAL_BYTES,
     downloadLocalModels,
     cancelLocalModelDownload,
+    provider,
+    setProvider,
+    cloudModels: CLOUD_MODELS,
   };
 };

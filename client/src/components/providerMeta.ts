@@ -104,7 +104,7 @@ export const PROVIDERS: ProviderInfo[] = [
     label: 'LiteRT',
     description: 'On-device inference (WebGPU/WASM)',
     color: '#8B5CF6',
-    icon: '/media/brand-icons/Litert.svg',
+    icon: '/media/brand-icons/Litert_icon.svg',
     iconType: 'svg-file',
     class: 'standard',
   },

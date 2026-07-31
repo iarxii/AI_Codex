@@ -9,11 +9,14 @@ import {
   Info, 
   CheckCircle, 
   AlertTriangle,
-  HelpCircle
+  HelpCircle,
+  ChevronDown
 } from 'lucide-react';
 import { useLiteRtChat } from '../hooks/useLiteRtChat';
 import PortalSwitcher from '../components/layout/PortalSwitcher';
 import { LocalModelDownloadPanel } from '../components/chat/LocalModelDownloadPanel';
+import { PROVIDERS } from '../components/providerMeta';
+import type { ProviderId } from '../components/providerMeta';
 
 const LiteChat: React.FC = () => {
   const navigate = useNavigate();
@@ -36,6 +39,9 @@ const LiteChat: React.FC = () => {
     downloadTotalBytes,
     downloadLocalModels,
     cancelLocalModelDownload,
+    provider,
+    setProvider,
+    cloudModels,
   } = useLiteRtChat();
 
   // Auto scroll to bottom on new messages (skip when there are none, otherwise
@@ -292,6 +298,45 @@ const LiteChat: React.FC = () => {
                       </>
                     )}
                   </button>
+
+                  {/* Cloud Configuration Selectors */}
+                  {engineMode === 'cloud' && (
+                    <div className="hidden sm:flex items-center gap-2 mr-1 animate-in fade-in slide-in-from-right-2 duration-300">
+                      <div className="relative group">
+                        <select
+                          value={provider}
+                          onChange={(e) => setProvider(e.target.value as ProviderId)}
+                          className="appearance-none bg-white/50 hover:bg-white/80 border border-black/[0.08] rounded-xl pl-3 pr-8 py-1.5 text-xs font-semibold text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#fd3b12]/20 transition-all cursor-pointer shadow-sm"
+                        >
+                          {PROVIDERS.filter(p => p.id !== 'local' && p.id !== 'litert').map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.label}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)] pointer-events-none" />
+                      </div>
+
+                      <div className="relative group">
+                        <select
+                          value={activeModelId}
+                          onChange={(e) => selectModel(e.target.value)}
+                          className="appearance-none bg-white/50 hover:bg-white/80 border border-black/[0.08] rounded-xl pl-3 pr-8 py-1.5 text-xs font-semibold text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#fd3b12]/20 transition-all cursor-pointer shadow-sm"
+                        >
+                          {cloudModels[provider] ? (
+                            cloudModels[provider].map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.name}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="">No models available</option>
+                          )}
+                        </select>
+                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)] pointer-events-none" />
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     type="submit"
