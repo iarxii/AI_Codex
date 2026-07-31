@@ -31,11 +31,12 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   }, [provider, backendMode, bridgeModels]);
 
 
-
-
-
   const fetchModels = async () => {
     const colabUrl = localStorage.getItem("colab_bridge_url");
+    const cfGatewayUrl = localStorage.getItem("cloudflare_ai_gateway_url");
+    const cfGatewayAccountId = localStorage.getItem("cloudflare_ai_gateway_account_id");
+    const cfGatewayGatewayId = localStorage.getItem("cloudflare_ai_gateway_gateway_id");
+    const workersAiAccountId = localStorage.getItem("workers_ai_account_id");
     if (provider === "colab_bridge" && !colabUrl) {
       setLoading(true);
       const formattedModels = bridgeModels.map((m) => ({ id: m, name: m }));
@@ -66,6 +67,10 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       apiKey = localStorage.getItem("ollama_cloud_key") || "";
     else if (provider === "colab_bridge")
       apiKey = localStorage.getItem("colab_bridge_key") || "";
+    else if (provider === "cloudflare_ai_gateway")
+      apiKey = localStorage.getItem("cloudflare_ai_gateway_key") || "";
+    else if (provider === "workers_ai")
+      apiKey = localStorage.getItem("workers_ai_key") || "";
 
     try {
       const url = `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/models?provider=${provider}`;
@@ -87,6 +92,12 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         if (cloudUrl) headers["X-Base-Url"] = cloudUrl;
       } else if (provider === "colab_bridge") {
         if (colabUrl) headers["X-Base-Url"] = colabUrl;
+      } else if (provider === "cloudflare_ai_gateway") {
+        if (cfGatewayUrl) headers["X-Base-Url"] = cfGatewayUrl;
+        if (cfGatewayAccountId) headers["X-Account-Id"] = cfGatewayAccountId;
+        if (cfGatewayGatewayId) headers["X-Gateway-Id"] = cfGatewayGatewayId;
+      } else if (provider === "workers_ai") {
+        if (workersAiAccountId) headers["X-Account-Id"] = workersAiAccountId;
       }
 
       // Pass local backend mode so the API queries the correct server
@@ -176,6 +187,17 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
             >
               llama.cpp
             </button>
+            <button
+              type="button"
+              onClick={() => handleBackendModeChange("litert")}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all ${
+                backendMode === "litert"
+                  ? "bg-[#8B5CF6]/20 text-[#7C3AED] shadow-sm border border-[#8B5CF6]/30"
+                  : "text-[#7A7D8E] hover:text-[#4A4D5E]"
+              }`}
+            >
+              LiteRT
+            </button>
           </div>
         </div>
       )}
@@ -209,7 +231,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth="2"
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 002-2z"
             />
           </svg>
         </button>

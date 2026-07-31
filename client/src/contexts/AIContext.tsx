@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { config, getApiUrl } from '../config';
+import type { ProviderId } from '../components/providerMeta';
 
-export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud' | 'colab_bridge';
+export type { ProviderId };
 
 export interface UserProfile {
   title?: string;
@@ -113,6 +114,21 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     gemini: localStorage.getItem('ai_model_gemini') || '',
     ollama_cloud: localStorage.getItem('ai_model_ollama_cloud') || '',
     colab_bridge: localStorage.getItem('ai_model_colab_bridge') || '',
+    cloudflare_ai_gateway: localStorage.getItem('ai_model_cloudflare_ai_gateway') || '',
+    workers_ai: localStorage.getItem('ai_model_workers_ai') || '',
+    anthropic: localStorage.getItem('ai_model_anthropic') || '',
+    azure: localStorage.getItem('ai_model_azure') || '',
+    deepseek: localStorage.getItem('ai_model_deepseek') || '',
+    xai: localStorage.getItem('ai_model_xai') || '',
+    together: localStorage.getItem('ai_model_together') || '',
+    fireworks: localStorage.getItem('ai_model_fireworks') || '',
+    nvidia: localStorage.getItem('ai_model_nvidia') || '',
+    perplexity: localStorage.getItem('ai_model_perplexity') || '',
+    cohere: localStorage.getItem('ai_model_cohere') || '',
+    mistral: localStorage.getItem('ai_model_mistral') || '',
+    huggingface: localStorage.getItem('ai_model_huggingface') || '',
+    cerebras: localStorage.getItem('ai_model_cerebras') || '',
+    litert: localStorage.getItem('ai_model_litert') || '',
   });
 
   const [visualSettings, setVisualSettings] = useState<VisualSettings>(() => {
@@ -345,6 +361,20 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       case 'openrouter': return localStorage.getItem('openrouter_api_key');
       case 'gemini': return localStorage.getItem('gemini_api_key');
       case 'ollama_cloud': return localStorage.getItem('ollama_cloud_key');
+      case 'cloudflare_ai_gateway': return localStorage.getItem('cloudflare_ai_gateway_key');
+      case 'workers_ai': return localStorage.getItem('workers_ai_key');
+      case 'anthropic': return localStorage.getItem('anthropic_api_key');
+      case 'azure': return localStorage.getItem('azure_api_key');
+      case 'deepseek': return localStorage.getItem('deepseek_api_key');
+      case 'xai': return localStorage.getItem('xai_api_key');
+      case 'together': return localStorage.getItem('together_api_key');
+      case 'fireworks': return localStorage.getItem('fireworks_api_key');
+      case 'nvidia': return localStorage.getItem('nvidia_api_key');
+      case 'perplexity': return localStorage.getItem('perplexity_api_key');
+      case 'cohere': return localStorage.getItem('cohere_api_key');
+      case 'mistral': return localStorage.getItem('mistral_api_key');
+      case 'huggingface': return localStorage.getItem('huggingface_api_key');
+      case 'cerebras': return localStorage.getItem('cerebras_api_key');
       default: return null;
     }
   };
@@ -355,6 +385,20 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       openrouter: localStorage.getItem('openrouter_api_key'),
       gemini: localStorage.getItem('gemini_api_key'),
       ollama_cloud: localStorage.getItem('ollama_cloud_key'),
+      cloudflare_ai_gateway: localStorage.getItem('cloudflare_ai_gateway_key'),
+      workers_ai: localStorage.getItem('workers_ai_key'),
+      anthropic: localStorage.getItem('anthropic_api_key'),
+      azure: localStorage.getItem('azure_api_key'),
+      deepseek: localStorage.getItem('deepseek_api_key'),
+      xai: localStorage.getItem('xai_api_key'),
+      together: localStorage.getItem('together_api_key'),
+      fireworks: localStorage.getItem('fireworks_api_key'),
+      nvidia: localStorage.getItem('nvidia_api_key'),
+      perplexity: localStorage.getItem('perplexity_api_key'),
+      cohere: localStorage.getItem('cohere_api_key'),
+      mistral: localStorage.getItem('mistral_api_key'),
+      huggingface: localStorage.getItem('huggingface_api_key'),
+      cerebras: localStorage.getItem('cerebras_api_key'),
     };
   };
 

@@ -4,8 +4,8 @@
  */
 
 
-export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud' | 'colab_bridge';
-export type LocalBackendMode = 'ollama' | 'llamacpp';
+export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud' | 'colab_bridge' | 'cloudflare_ai_gateway' | 'workers_ai' | 'anthropic' | 'azure' | 'deepseek' | 'xai' | 'together' | 'fireworks' | 'nvidia' | 'perplexity' | 'cohere' | 'mistral' | 'huggingface' | 'cerebras' | 'litert';
+export type LocalBackendMode = 'ollama' | 'llamacpp' | 'litert';
 
 export interface ProviderInfo {
   id: ProviderId;
@@ -79,6 +79,35 @@ export const PROVIDERS: ProviderInfo[] = [
     brand: 'Gemini',
     class: 'pro',
   },
+  {
+    id: 'cloudflare_ai_gateway',
+    label: 'Cloudflare AI Gateway',
+    description: 'Unified AI gateway with logging, caching & routing',
+    color: '#F38020',
+    icon: '/media/brand-icons/cloudflare-color.svg',
+    iconType: 'svg-file',
+    brand: 'Cloudflare',
+    class: 'expert',
+  },
+  {
+    id: 'workers_ai',
+    label: 'Workers AI',
+    description: 'Cloudflare edge AI inference',
+    color: '#F38020',
+    icon: '/media/brand-icons/cloudflare-color.svg',
+    iconType: 'svg-file',
+    brand: 'Cloudflare',
+    class: 'pro',
+  },
+  {
+    id: 'litert',
+    label: 'LiteRT',
+    description: 'On-device inference (WebGPU/WASM)',
+    color: '#8B5CF6',
+    icon: '/media/brand-icons/Litert.svg',
+    iconType: 'svg-file',
+    class: 'standard',
+  },
 ];
 
 export const PROVIDER_MAP: Record<string, ProviderInfo> = Object.fromEntries(
@@ -105,4 +134,3 @@ export function getLocalBackendMode(): LocalBackendMode {
 export function setLocalBackendMode(mode: LocalBackendMode): void {
   localStorage.setItem('local_backend_mode', mode);
 }
-

@@ -8,8 +8,8 @@ Here is the strategic summary and execution plan tailored specifically to a code
 
 To achieve maximum performance and privacy without melting your local laptop hardware, you will adopt a **Split-Plane Observability Architecture**:
 
-* **The Control/Execution Plane (Local):** Your LangGraph code, local file manipulation, VSCode AST parsing, and state updates run completely on your local laptop for raw execution speed and filesystem access.
-* **The Telemetry Plane (Hybrid/Cloud):** Rather than hosting a heavy local ClickHouse/Redis stack, you stream asynchronous, non-blocking telemetry meta-data to the managed LangSmith web client to visually debug your graph loops.
+- **The Control/Execution Plane (Local):** Your LangGraph code, local file manipulation, VSCode AST parsing, and state updates run completely on your local laptop for raw execution speed and filesystem access.
+- **The Telemetry Plane (Hybrid/Cloud):** Rather than hosting a heavy local ClickHouse/Redis stack, you stream asynchronous, non-blocking telemetry meta-data to the managed LangSmith web client to visually debug your graph loops.
 
 ---
 
@@ -29,7 +29,7 @@ def configure_telemetry(benchmark_mode: bool = False, private_workspace: bool = 
     if benchmark_mode and not private_workspace:
         os.environ["LANGCHAIN_TRACING_V2"] = "true"
         os.environ["LANGCHAIN_API_KEY"] = "ls__your_api_key_here"
-        os.environ["LANGCHAIN_PROJECT"] = "vscode-agent-react-benchmarks"
+        os.environ["LANGCHAIN_PROJECT"] = "aicodex-agent-react-benchmarks"
         # Optimize thread usage for local resource constraint
         os.environ["LANGCHAIN_TRACING_MAX_WORKERS"] = "2"
     else:
@@ -53,7 +53,7 @@ memory = MemorySaver()
 app = workflow.compile(checkpointer=memory)
 
 # When executing a benchmark task:
-# Keep string content in the 'messages' payload truncated to necessary lines 
+# Keep string content in the 'messages' payload truncated to necessary lines
 # when analyzing complex execution logs or huge codebase listings.
 
 ```
@@ -69,7 +69,7 @@ client = Client()
 
 # Identify instances where the ReAct agent loops hit exceptions
 failed_agent_loops = client.list_runs(
-    project_name="vscode-agent-react-benchmarks",
+    project_name="aicodex-agent-react-benchmarks",
     run_type="llm",
     error=True
 )
@@ -86,8 +86,8 @@ for run in failed_agent_loops:
 
 ## 3. Milestones & Risk Mitigations
 
-* **Milestone 1 (Operational Control):** Successfully link your VSCode tool-calling engine to LangSmith using explicit environment gating. Confirm that when `benchmark_mode` is off, the runtime incurs zero network overhead.
-* **Milestone 2 (Loop Optimization):** Identify tool-calling patterns where your ReAct loop executes more than 4 consecutive calls for a single coding problem. Use the LangSmith **Playground** sandbox to refine instructions until the agent hits the target in fewer turns.
-* **Risk (The 14-Day Cliff):** Because the Developer plan purges history after 14 days, successful benchmark configurations must be exported programmatically or screenshotted if you wish to track performance regression over time.
+- **Milestone 1 (Operational Control):** Successfully link your VSCode tool-calling engine to LangSmith using explicit environment gating. Confirm that when `benchmark_mode` is off, the runtime incurs zero network overhead.
+- **Milestone 2 (Loop Optimization):** Identify tool-calling patterns where your ReAct loop executes more than 4 consecutive calls for a single coding problem. Use the LangSmith **Playground** sandbox to refine instructions until the agent hits the target in fewer turns.
+- **Risk (The 14-Day Cliff):** Because the Developer plan purges history after 14 days, successful benchmark configurations must be exported programmatically or screenshotted if you wish to track performance regression over time.
 
 What specific benchmark criteria or tool-calling scenarios (e.g., automated refactoring, file editing, terminal execution) is your extension currently tackling?

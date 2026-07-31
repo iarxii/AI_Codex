@@ -15,6 +15,8 @@ async def _list_models_raw(
     api_key: str = Query(None), 
     x_api_key: str = Header(None),
     x_base_url: str = Header(None),
+    x_account_id: str = Header(None),
+    x_gateway_id: str = Header(None),
     x_local_backend_mode: str = Header(None),
     x_space_slug: str = Header(None),
     x_is_premium: str = Header(None),
@@ -56,6 +58,10 @@ async def _list_models_raw(
             actual_key = os.environ.get("OPENROUTER_API_KEY")
         elif provider == "ollama_cloud":
             actual_key = os.environ.get("OLLAMA_API_KEY")
+        elif provider == "cloudflare_ai_gateway":
+            actual_key = os.environ.get("CLOUDFLARE_AI_GATEWAY_API_KEY")
+        elif provider == "workers_ai":
+            actual_key = os.environ.get("WORKERS_AI_API_KEY")
     async with httpx.AsyncClient(timeout=10.0) as client:
         if provider == "local":
             local_mode = x_local_backend_mode or settings.LOCAL_BACKEND_MODE
@@ -218,6 +224,51 @@ async def _list_models_raw(
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Colab Bridge error: {str(e)}")
 
+        elif provider == "cloudflare_ai_gateway":
+            if not x_base_url:
+                return []
+            try:
+                base_url = x_base_url.rstrip("/")
+                headers = {}
+                if actual_key:
+                    headers["Authorization"] = f"Bearer {actual_key}" if not actual_key.startswith("Bearer") else actual_key
+                # Compose the full gateway path when account/gateway IDs are supplied
+                if x_account_id and x_gateway_id and x_gateway_id not in base_url:
+                    base_url = f"{base_url}/v1/{x_account_id}/{x_gateway_id}"
+                if not base_url.endswith("/v1"):
+                    base_url = f"{base_url}/v1"
+
+                # Cloudflare AI Gateway exposes an OpenAI-compatible /v1/models endpoint
+                response = await client.get(f"{base_url}/models", headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    return [{"id": m["id"], "name": m.get("name", m["id"])} for m in data.get("data", [])]
+                return []
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Cloudflare AI Gateway error: {str(e)}")
+
+        elif provider == "workers_ai":
+            if not x_account_id:
+                return []
+            try:
+                # Workers AI uses the Cloudflare API
+                base_url = "https://api.cloudflare.com/client/v4/accounts"
+                headers = {"Authorization": f"Bearer {actual_key}"} if actual_key else {}
+                
+                # List available models from Workers AI
+                response = await client.get(f"{base_url}/{x_account_id}/ai/models/search", headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    models = []
+                    for m in data.get("result", []):
+                        model_id = m.get("name", "")
+                        if model_id:
+                            models.append({"id": model_id, "name": m.get("display_name", model_id)})
+                    return models
+                return []
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Workers AI error: {str(e)}")
+
         return []
 
 
@@ -227,6 +278,8 @@ async def list_models(
     api_key: str = Query(None), 
     x_api_key: str = Header(None),
     x_base_url: str = Header(None),
+    x_account_id: str = Header(None),
+    x_gateway_id: str = Header(None),
     x_local_backend_mode: str = Header(None),
     x_space_slug: str = Header(None),
     x_is_premium: str = Header(None),
@@ -241,6 +294,8 @@ async def list_models(
         api_key=api_key,
         x_api_key=x_api_key,
         x_base_url=x_base_url,
+        x_account_id=x_account_id,
+        x_gateway_id=x_gateway_id,
         x_local_backend_mode=x_local_backend_mode,
         x_space_slug=x_space_slug,
         x_is_premium=x_is_premium,

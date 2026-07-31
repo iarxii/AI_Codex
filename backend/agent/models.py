@@ -7,7 +7,7 @@ from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
-def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Optional[str] = None, base_url: Optional[str] = None):
+def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Optional[str] = None, base_url: Optional[str] = None, account_id: Optional[str] = None, gateway_id: Optional[str] = None):
     """
     Unified LLM factory for AICodex Agent.
     """
@@ -26,11 +26,14 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
             model_name = "llama3-8b-8192"
         elif provider == "gemini":
             model_name = "gemini-1.5-flash"
+        elif provider in ("cloudflare_ai_gateway", "workers_ai"):
+            model_name = "@cf/meta/llama-3-8b-instruct"
+        elif provider == "litert":
+            model_name = "gemma-2b-it-q4"
         else:
             model_name = "llama3"
 
     logger.info(f"Initializing LLM: provider={provider}, model={model_name}, temperature={temperature}, base_url={base_url}")
-    
     if provider == "local":
         if settings.LOCAL_BACKEND_MODE == "ollama":
             return ChatOllama(
@@ -105,6 +108,49 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
             temperature=temperature
         )
         
+    elif provider == "cloudflare_ai_gateway":
+        # Resolve base URL: 1. dynamic base_url argument, 2. settings, 3. default.
+        # When account_id + gateway_id are provided and the base URL is still the
+        # bare host, compose the full gateway path: .../v1/{account_id}/{gateway_id}
+        resolved_base_url = base_url or getattr(settings, "CLOUDFLARE_AI_GATEWAY_BASE_URL", None) or "https://gateway.ai.cloudflare.com"
+        composed = account_id and gateway_id and gateway_id not in resolved_base_url
+        if composed:
+            resolved_base_url = f"{resolved_base_url.rstrip('/')}/v1/{account_id}/{gateway_id}"
+        elif not resolved_base_url.endswith("/v1"):
+            resolved_base_url = f"{resolved_base_url.rstrip('/')}/v1"
+        logger.info(f"Cloudflare AI Gateway resolved base_url: {resolved_base_url}")
+        return ChatOpenAI(
+            model=model_name,
+            openai_api_key=api_key or "sk-cf-gateway",
+            openai_api_base=resolved_base_url,
+            temperature=temperature
+        )
+        
+    elif provider == "workers_ai":
+        # Workers AI uses Cloudflare's OpenAI-compatible API
+        resolved_account_id = account_id or getattr(settings, "CLOUDFLARE_ACCOUNT_ID", None)
+        if resolved_account_id:
+            resolved_base_url = f"https://api.cloudflare.com/client/v4/accounts/{resolved_account_id}/ai/v1"
+        else:
+            resolved_base_url = base_url or "https://api.cloudflare.com/client/v4/accounts/your-account-id/ai/v1"
+        logger.info(f"Workers AI resolved base_url: {resolved_base_url}")
+        return ChatOpenAI(
+            model=model_name,
+            openai_api_key=api_key or "sk-workers-ai",
+            openai_api_base=resolved_base_url,
+            temperature=temperature
+        )
+        
+    elif provider == "litert":
+        # LiteRT runs client-side (WebGPU/WASM via useLiteRtChat) — the backend
+        # never serves this provider. Fail loudly instead of silently routing to
+        # a local Ollama/llama.cpp instance.
+        logger.warning("LiteRT provider selected on backend — client-side provider, not servable.")
+        raise ValueError(
+            "LiteRT is a client-side provider and cannot be used on the backend. "
+            "Use the Lite Chat portal instead."
+        )
+        
     else:
         # Default fallback — use the configured DEFAULT_MODEL
         logger.warning(f"Unknown provider {provider}, falling back to local ollama with {settings.DEFAULT_MODEL}")
@@ -130,7 +176,7 @@ def get_llm_for_tier(
     resolved_provider = provider
     resolved_model = model
     resolved_api_key = api_key
-    
+
     # 1. Determine target provider/model based on tier
     if tier in ("routing", "guard"):
         # Fast, cheap models
@@ -142,16 +188,28 @@ def get_llm_for_tier(
             resolved_model = "llama-3.1-8b-instant"
         elif provider == "local":
             resolved_model = "llama3"
+        elif provider == "cloudflare_ai_gateway":
+            resolved_model = "@cf/meta/llama-3-8b-instruct"
+        elif provider == "workers_ai":
+            resolved_model = "@cf/meta/llama-3-8b-instruct"
+        elif provider == "litert":
+            resolved_model = "gemma-2b-it-q4"  # Example LiteRT model
     elif tier in ("reasoning", "coder"):
         # Flagship reasoning / coding models
         if provider == "gemini":
             resolved_model = "gemini-1.5-pro"
         elif provider == "openrouter":
-            resolved_model = "anthropic/claude-sonnet-4"  # claude-3.5-sonnet deprecated Jul 2025
+            resolved_model = "anthropic/claude-sonnet-4"
         elif provider == "groq":
             resolved_model = "llama-3.3-70b-versatile"
         elif provider == "local":
             resolved_model = "codellama"
+        elif provider == "cloudflare_ai_gateway":
+            resolved_model = "@cf/meta/llama-3.1-70b-instruct"
+        elif provider == "workers_ai":
+            resolved_model = "@cf/meta/llama-3.1-70b-instruct"
+        elif provider == "litert":
+            resolved_model = "gemma-7b-it-q4"  # Example LiteRT model
             
     # Resolve API Key for the resolved provider from api_keys dict if available
     if api_keys and resolved_provider in api_keys:

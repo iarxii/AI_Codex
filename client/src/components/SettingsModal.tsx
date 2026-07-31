@@ -2,9 +2,10 @@ import React, { Fragment, useState, useEffect } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { Cog6ToothIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useNavigate } from "react-router-dom";
-import { PROVIDERS, type ProviderId } from "./providerMeta";
-import { useAI, type VisualSettings } from "../contexts/AIContext";
+import { PROVIDERS } from "./providerMeta";
+import { useAI, type VisualSettings, type ProviderId } from "../contexts/AIContext";
 import ProviderIcon from "./ProviderIcon";
+import MoreProvidersModal from "./MoreProvidersModal";
 import { config } from "../config";
 import {
   CheckCircleIcon,
@@ -19,19 +20,28 @@ type SettingsModalProps = {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const navigate = useNavigate();
-  const { provider, setProvider, visualSettings, updateVisualSetting } =
+  const { provider, setProvider, visualSettings, updateVisualSetting, activeSpace, isPremiumSpace } =
     useAI();
   const [activeProvider, setActiveProvider] = useState<ProviderId>(provider);
+  const [moreProvidersOpen, setMoreProvidersOpen] = useState(false);
   const [groqKey, setGroqKey] = useState("");
   const [openRouterKey, setOpenRouterKey] = useState("");
   const [geminiKey, setGeminiKey] = useState("");
-  const [geminiAuthMethod, setGeminiAuthMethod] = useState<"api_key" | "vertex">("api_key");
+  const [geminiAuthMethod, setGeminiAuthMethod] = useState<
+    "api_key" | "vertex"
+  >("api_key");
   const [geminiProjectId, setGeminiProjectId] = useState("");
   const [geminiRegion, setGeminiRegion] = useState("");
   const [ollamaCloudKey, setOllamaCloudKey] = useState("");
   const [ollamaCloudUrl, setOllamaCloudUrl] = useState("");
   const [colabBridgeKey, setColabBridgeKey] = useState("");
   const [colabBridgeUrl, setColabBridgeUrl] = useState("");
+  const [cfGatewayKey, setCfGatewayKey] = useState("");
+  const [cfGatewayUrl, setCfGatewayUrl] = useState("");
+  const [cfGatewayAccountId, setCfGatewayAccountId] = useState("");
+  const [cfGatewayGatewayId, setCfGatewayGatewayId] = useState("");
+  const [workersAiKey, setWorkersAiKey] = useState("");
+  const [workersAiAccountId, setWorkersAiAccountId] = useState("");
   const [enableLangsmith, setEnableLangsmith] = useState(false);
   const [langsmithApiKey, setLangsmithApiKey] = useState("");
   const [langsmithProject, setLangsmithProject] = useState("");
@@ -66,10 +76,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
       );
       setColabBridgeKey(localStorage.getItem("colab_bridge_key") || "");
       setColabBridgeUrl(localStorage.getItem("colab_bridge_url") || "");
+      setCfGatewayKey(localStorage.getItem("cloudflare_ai_gateway_key") || "");
+      setCfGatewayUrl(
+        localStorage.getItem("cloudflare_ai_gateway_url") ||
+          "https://gateway.ai.cloudflare.com",
+      );
+      setCfGatewayAccountId(
+        localStorage.getItem("cloudflare_ai_gateway_account_id") || "",
+      );
+      setCfGatewayGatewayId(
+        localStorage.getItem("cloudflare_ai_gateway_gateway_id") || "",
+      );
+      setWorkersAiKey(localStorage.getItem("workers_ai_key") || "");
+      setWorkersAiAccountId(
+        localStorage.getItem("workers_ai_account_id") || "",
+      );
       setEnableLangsmith(localStorage.getItem("enable_langsmith") === "true");
       setLangsmithApiKey(localStorage.getItem("langsmith_api_key") || "");
-      setLangsmithProject(localStorage.getItem("langsmith_project") || "vscode-agent-react-benchmarks");
-      setPrivateWorkspace(localStorage.getItem("private_workspace") !== "false");
+      setLangsmithProject(
+        localStorage.getItem("langsmith_project") ||
+          "aicodex-agent-react-benchmarks",
+      );
+      setPrivateWorkspace(
+        localStorage.getItem("private_workspace") !== "false",
+      );
     }
   }, [isOpen, provider]);
 
@@ -159,10 +189,106 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
     }
   };
 
+  const testCloudflareAIGateway = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const token = localStorage.getItem("token");
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      if (cfGatewayKey) headers["X-API-Key"] = cfGatewayKey;
+      if (cfGatewayUrl) headers["X-Base-Url"] = cfGatewayUrl;
+      if (cfGatewayAccountId) headers["X-Account-Id"] = cfGatewayAccountId;
+      if (cfGatewayGatewayId) headers["X-Gateway-Id"] = cfGatewayGatewayId;
+      if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
+      headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
+
+      const response = await fetch(
+        `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=cloudflare_ai_gateway`,
+        {
+          headers,
+        },
+      );
+
+      if (response.ok) {
+        const models = await response.json();
+        setTestResult({
+          success: true,
+          message:
+            models.length > 0
+              ? `Connected! Found ${models.length} models.`
+              : "Connected, but no models found.",
+        });
+      } else {
+        const err = await response.json();
+        setTestResult({
+          success: false,
+          message: err.detail || "Connection failed.",
+        });
+      }
+    } catch (e) {
+      setTestResult({
+        success: false,
+        message: "Network error. Check configuration.",
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const testWorkersAI = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const token = localStorage.getItem("token");
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      if (workersAiKey) headers["X-API-Key"] = workersAiKey;
+      if (workersAiAccountId) headers["X-Account-Id"] = workersAiAccountId;
+      if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
+      headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
+
+      const response = await fetch(
+        `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=workers_ai`,
+        {
+          headers,
+        },
+      );
+
+      if (response.ok) {
+        const models = await response.json();
+        setTestResult({
+          success: true,
+          message:
+            models.length > 0
+              ? `Connected! Found ${models.length} models.`
+              : "Connected, but no models found.",
+        });
+      } else {
+        const err = await response.json();
+        setTestResult({
+          success: false,
+          message: err.detail || "Connection failed.",
+        });
+      }
+    } catch (e) {
+      setTestResult({
+        success: false,
+        message: "Network error. Check configuration.",
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   const handleSave = () => {
     try {
       setProvider(activeProvider);
-      
+
       localStorage.setItem("groq_api_key", (groqKey || "").trim());
       localStorage.setItem("openrouter_api_key", (openRouterKey || "").trim());
       if (geminiAuthMethod === "vertex") {
@@ -175,18 +301,48 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
       localStorage.setItem("ollama_cloud_url", (ollamaCloudUrl || "").trim());
       localStorage.setItem("colab_bridge_key", (colabBridgeKey || "").trim());
       localStorage.setItem("colab_bridge_url", (colabBridgeUrl || "").trim());
-      localStorage.setItem("enable_langsmith", enableLangsmith ? "true" : "false");
+      localStorage.setItem(
+        "cloudflare_ai_gateway_key",
+        (cfGatewayKey || "").trim(),
+      );
+      localStorage.setItem(
+        "cloudflare_ai_gateway_url",
+        (cfGatewayUrl || "").trim(),
+      );
+      localStorage.setItem(
+        "cloudflare_ai_gateway_account_id",
+        (cfGatewayAccountId || "").trim(),
+      );
+      localStorage.setItem(
+        "cloudflare_ai_gateway_gateway_id",
+        (cfGatewayGatewayId || "").trim(),
+      );
+      localStorage.setItem("workers_ai_key", (workersAiKey || "").trim());
+      localStorage.setItem(
+        "workers_ai_account_id",
+        (workersAiAccountId || "").trim(),
+      );
+      localStorage.setItem(
+        "enable_langsmith",
+        enableLangsmith ? "true" : "false",
+      );
       localStorage.setItem("langsmith_api_key", (langsmithApiKey || "").trim());
-      localStorage.setItem("langsmith_project", (langsmithProject || "").trim());
-      localStorage.setItem("private_workspace", privateWorkspace ? "true" : "false");
+      localStorage.setItem(
+        "langsmith_project",
+        (langsmithProject || "").trim(),
+      );
+      localStorage.setItem(
+        "private_workspace",
+        privateWorkspace ? "true" : "false",
+      );
 
       // Dispatch custom event for parts of the app not yet using Context
       window.dispatchEvent(new Event("ai-settings-changed"));
-      
+
       setIsOpen(false);
-      
+
       // Force reload to ensure all components pick up new keys from localStorage
-      // Small delay to allow modal close animation to start if needed, 
+      // Small delay to allow modal close animation to start if needed,
       // but window.location.reload() is the priority.
       setTimeout(() => {
         window.location.reload();
@@ -281,6 +437,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                         </button>
                       );
                     })}
+                    <button
+                      type="button"
+                      onClick={() => setMoreProvidersOpen(true)}
+                      className="relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-dashed border-black/[0.12] bg-[#D8DCE4] text-[#4A4D5E] hover:bg-[#D0D4DC] hover:border-black/[0.2] transition-all duration-200"
+                    >
+                      <span className="w-7 h-7 rounded-full bg-[#fd3b12]/10 text-[#fd3b12] flex items-center justify-center text-lg font-bold leading-none">
+                        +
+                      </span>
+                      <span className="text-[11px] font-semibold">More</span>
+                    </button>
                   </div>
                 </div>
 
@@ -518,12 +684,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                       ) : (
                         <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
                           <div className="bg-[#1A1D2E]/[0.03] border border-[#1A1D2E]/[0.08] rounded-xl p-3.5 text-xs text-[#4A4D5E] leading-relaxed">
-                            💡 <strong>Application Default Credentials (ADC)</strong>
+                            💡{" "}
+                            <strong>
+                              Application Default Credentials (ADC)
+                            </strong>
                             <p className="mt-1">
-                              Uses the backend environment's credentials. Ensure you have run <code>gcloud auth application-default login</code> on your host.
+                              Uses the backend environment's credentials. Ensure
+                              you have run{" "}
+                              <code>gcloud auth application-default login</code>{" "}
+                              on your host.
                             </p>
                           </div>
-                          
+
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
@@ -532,7 +704,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                               <input
                                 type="text"
                                 value={geminiProjectId}
-                                onChange={(e) => setGeminiProjectId(e.target.value)}
+                                onChange={(e) =>
+                                  setGeminiProjectId(e.target.value)
+                                }
                                 placeholder="aicodex-lab (optional)"
                                 className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
                               />
@@ -544,7 +718,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                               <input
                                 type="text"
                                 value={geminiRegion}
-                                onChange={(e) => setGeminiRegion(e.target.value)}
+                                onChange={(e) =>
+                                  setGeminiRegion(e.target.value)
+                                }
                                 placeholder="us-west1 (optional)"
                                 className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
                               />
@@ -552,6 +728,168 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                           </div>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {activeProvider === "cloudflare_ai_gateway" && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                          Cloudflare AI Gateway Base URL
+                        </label>
+                        <input
+                          type="text"
+                          value={cfGatewayUrl}
+                          onChange={(e) => setCfGatewayUrl(e.target.value)}
+                          placeholder="https://gateway.ai.cloudflare.com"
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
+                            Account ID
+                          </label>
+                          <input
+                            type="text"
+                            value={cfGatewayAccountId}
+                            onChange={(e) =>
+                              setCfGatewayAccountId(e.target.value)
+                            }
+                            placeholder="your-account-id"
+                            className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
+                            Gateway ID
+                          </label>
+                          <input
+                            type="text"
+                            value={cfGatewayGatewayId}
+                            onChange={(e) =>
+                              setCfGatewayGatewayId(e.target.value)
+                            }
+                            placeholder="your-gateway-id"
+                            className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                          Authorization Token (Optional)
+                        </label>
+                        <input
+                          type="password"
+                          value={cfGatewayKey}
+                          onChange={(e) => setCfGatewayKey(e.target.value)}
+                          placeholder="Bearer token or API key"
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={testCloudflareAIGateway}
+                          disabled={isTesting}
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                            isTesting
+                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                          }`}
+                        >
+                          {isTesting ? (
+                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <ArrowPathIcon className="w-4 h-4" />
+                          )}
+                          Test Connection
+                        </button>
+
+                        {testResult && (
+                          <div
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
+                              testResult.success
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {testResult.success ? (
+                              <CheckCircleIcon className="w-4 h-4" />
+                            ) : (
+                              <ExclamationCircleIcon className="w-4 h-4" />
+                            )}
+                            {testResult.message}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeProvider === "workers_ai" && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
+                          Account ID
+                        </label>
+                        <input
+                          type="text"
+                          value={workersAiAccountId}
+                          onChange={(e) =>
+                            setWorkersAiAccountId(e.target.value)
+                          }
+                          placeholder="your-account-id"
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                          API Token (Optional)
+                        </label>
+                        <input
+                          type="password"
+                          value={workersAiKey}
+                          onChange={(e) => setWorkersAiKey(e.target.value)}
+                          placeholder="Bearer token or API key"
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={testWorkersAI}
+                          disabled={isTesting}
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                            isTesting
+                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                          }`}
+                        >
+                          {isTesting ? (
+                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <ArrowPathIcon className="w-4 h-4" />
+                          )}
+                          Test Connection
+                        </button>
+
+                        {testResult && (
+                          <div
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
+                              testResult.success
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {testResult.success ? (
+                              <CheckCircleIcon className="w-4 h-4" />
+                            ) : (
+                              <ExclamationCircleIcon className="w-4 h-4" />
+                            )}
+                            {testResult.message}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -601,8 +939,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                           <input
                             type="text"
                             value={langsmithProject}
-                            onChange={(e) => setLangsmithProject(e.target.value)}
-                            placeholder="vscode-agent-react-benchmarks"
+                            onChange={(e) =>
+                              setLangsmithProject(e.target.value)
+                            }
+                            placeholder="aicodex-agent-react-benchmarks"
                             className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
                           />
                         </div>
@@ -612,18 +952,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                               Private Workspace
                             </span>
                             <span className="text-[10px] text-[#7A7D8E]">
-                              Enforces data egress restriction (gating telemetry)
+                              Enforces data egress restriction (gating
+                              telemetry)
                             </span>
                           </div>
                           <button
-                            onClick={() => setPrivateWorkspace(!privateWorkspace)}
+                            onClick={() =>
+                              setPrivateWorkspace(!privateWorkspace)
+                            }
                             className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                               privateWorkspace ? "bg-[#fd3b12]" : "bg-[#D8DCE4]"
                             }`}
                           >
                             <span
                               className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                privateWorkspace ? "translate-x-5" : "translate-x-0"
+                                privateWorkspace
+                                  ? "translate-x-5"
+                                  : "translate-x-0"
                               }`}
                             />
                           </button>
@@ -703,23 +1048,47 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                     <button
                       onClick={() => {
                         setIsOpen(false);
-                        navigate('/admin/overview');
+                        navigate("/admin/overview");
                       }}
                       className="w-full flex items-center justify-between p-3 rounded-xl bg-black/5 hover:bg-black/10 border border-black/[0.05] transition-all group"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-[#fd3b12]/10 flex items-center justify-center">
-                          <svg className="w-5 h-5 text-[#fd3b12]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A2 2 0 013 15.485V6.415a2 2 0 011.118-1.789L9 2l5.447 2.724A2 2 0 0115 6.415v9.07a2 2 0 01-1.118 1.789L9 20zm0-18v18m0-18l-5.447 2.724m10.894 0L9 2m5.447 13.485L9 20m-5.447-2.724L9 20" />
+                          <svg
+                            className="w-5 h-5 text-[#fd3b12]"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M9 20l-5.447-2.724A2 2 0 013 15.485V6.415a2 2 0 011.118-1.789L9 2l5.447 2.724A2 2 0 0115 6.415v9.07a2 2 0 01-1.118 1.789L9 20zm0-18v18m0-18l-5.447 2.724m10.894 0L9 2m5.447 13.485L9 20m-5.447-2.724L9 20"
+                            />
                           </svg>
                         </div>
                         <div className="text-left">
-                          <div className="text-[11px] font-bold text-[#1A1D2E] uppercase tracking-wider">Super Admin Overview</div>
-                          <div className="text-[9px] text-[#7A7D8E]">Access cross-workspace knowledge clusters</div>
+                          <div className="text-[11px] font-bold text-[#1A1D2E] uppercase tracking-wider">
+                            Super Admin Overview
+                          </div>
+                          <div className="text-[9px] text-[#7A7D8E]">
+                            Access cross-workspace knowledge clusters
+                          </div>
                         </div>
                       </div>
-                      <svg className="w-4 h-4 text-[#7A7D8E] group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                      <svg
+                        className="w-4 h-4 text-[#7A7D8E] group-hover:translate-x-1 transition-transform"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M9 5l7 7-7 7"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -747,6 +1116,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
           </div>
         </div>
       </Dialog>
+
+      <MoreProvidersModal
+        isOpen={moreProvidersOpen}
+        setIsOpen={setMoreProvidersOpen}
+      />
     </Transition>
   );
 };

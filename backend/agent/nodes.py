@@ -113,6 +113,29 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier:
                 base_url = f"{base_url.rstrip('/')}/v1"
             logger.info(f"Initializing Ollama Cloud: model={target_model}, base_url={base_url}")
             llm = ChatOpenAI(model=target_model, base_url=base_url, api_key=api_key or "sk-ollama", temperature=temp, max_tokens=max_toks, streaming=True)
+        elif provider == "cloudflare_ai_gateway":
+            from langchain_openai import ChatOpenAI
+            target_model = model or "@cf/meta/llama-3-8b-instruct"
+            base_url = config.get("configurable", {}).get("base_url") or getattr(settings, "CLOUDFLARE_AI_GATEWAY_BASE_URL", None) or "https://gateway.ai.cloudflare.com"
+            account_id = config.get("configurable", {}).get("account_id")
+            gateway_id = config.get("configurable", {}).get("gateway_id")
+            composed = account_id and gateway_id and gateway_id not in base_url
+            if composed:
+                base_url = f"{base_url.rstrip('/')}/v1/{account_id}/{gateway_id}"
+            elif not base_url.endswith("/v1"):
+                base_url = f"{base_url.rstrip('/')}/v1"
+            logger.info(f"Initializing Cloudflare AI Gateway: model={target_model}, base_url={base_url}")
+            llm = ChatOpenAI(model=target_model, base_url=base_url, api_key=api_key or "sk-cf-gateway", temperature=temp, max_tokens=max_toks, streaming=True)
+        elif provider == "workers_ai":
+            from langchain_openai import ChatOpenAI
+            target_model = model or "@cf/meta/llama-3-8b-instruct"
+            account_id = config.get("configurable", {}).get("account_id") or getattr(settings, "CLOUDFLARE_ACCOUNT_ID", None)
+            if account_id:
+                base_url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1"
+            else:
+                base_url = "https://api.cloudflare.com/client/v4/accounts/your-account-id/ai/v1"
+            logger.info(f"Initializing Workers AI: model={target_model}, base_url={base_url}")
+            llm = ChatOpenAI(model=target_model, base_url=base_url, api_key=api_key or "sk-workers-ai", temperature=temp, max_tokens=max_toks, streaming=True)
         elif provider == "openrouter":
             from langchain_openai import ChatOpenAI
             target_model = model or "openrouter/free"
@@ -131,6 +154,14 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier:
             if target_model.startswith("models/"):
                 target_model = target_model.replace("models/", "")
             llm = ChatGoogleGenerativeAI(model=target_model, api_key=api_key, temperature=temp, max_output_tokens=max_toks, streaming=True)
+        elif provider == "litert":
+            # LiteRT runs entirely client-side (WebGPU/WASM via useLiteRtChat).
+            # It is never served over the WebSocket agent path — fail loudly rather
+            # than silently falling through to the local Ollama/llama.cpp branch.
+            raise ValueError(
+                "LiteRT is a client-side provider and cannot be used over the agent "
+                "WebSocket. Use the Lite Chat portal instead."
+            )
         else:
             # ─── Local Provider: Ollama App or raw llama-server ───
             local_backend_mode = config.get("configurable", {}).get(
@@ -143,7 +174,15 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier:
             if local_model.startswith("sha256-") or local_model.startswith("sha256:"):
                 logger.debug(f"DEBUG: Detected blob digest model name '{local_model[:20]}...', normalizing to 'default'")
                 local_model = "default"
-            
+
+            if local_backend_mode == "litert":
+                # LiteRT is a client-side provider (WebGPU/WASM via useLiteRtChat).
+                # Do not silently fall through to the llama.cpp branch.
+                raise ValueError(
+                    "LiteRT runs client-side and cannot be served by the local backend. "
+                    "Use the Lite Chat portal instead."
+                )
+
             if local_backend_mode == "ollama":
                 # ── OLLAMA MODE ──
                 # Ollama handles chat templates automatically via its Modelfile.

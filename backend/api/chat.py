@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-async def generate_cloud_chat_title(conversation_id: int, first_message: str, provider: str, model: str, api_key: str):
+async def generate_cloud_chat_title(conversation_id: int, first_message: str, provider: str, model: str, api_key: str, account_id: str = None, gateway_id: str = None):
     """Generates a 3-5 word title using the cloud LLM and updates the Conversation."""
     try:
         from backend.agent.models import get_llm
-        llm = get_llm(provider=provider, model=model, api_key=api_key)
+        llm = get_llm(provider=provider, model=model, api_key=api_key, account_id=account_id, gateway_id=gateway_id)
         prompt = f"Summarize the following text in a short 3-5 word title. Output ONLY the title, no quotes or prefix.\n\nText: {first_message}"
         response = await llm.ainvoke([{"role": "user", "content": prompt}])
         title = response.content.strip().strip('"').strip("'")
@@ -131,6 +131,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         if not isinstance(api_keys, dict):
             api_keys = {}
         base_url = payload_data.get("base_url")
+        account_id = payload_data.get("account_id")
+        gateway_id = payload_data.get("gateway_id")
         model_config = payload_data.get("config", {})
         agent_mode = payload_data.get("agent_mode", True)
         local_backend_mode = payload_data.get("local_backend_mode", "ollama")
@@ -138,7 +140,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         benchmark_mode = payload_data.get("benchmark_mode", False)
         private_workspace = payload_data.get("private_workspace", True)
         langsmith_api_key = payload_data.get("langsmith_api_key")
-        langsmith_project = payload_data.get("langsmith_project", "vscode-agent-react-benchmarks")
+        langsmith_project = payload_data.get("langsmith_project", "aicodex-agent-react-benchmarks")
 
         enable_tracing = benchmark_mode and not private_workspace and bool(langsmith_api_key)
         
@@ -332,7 +334,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 
                 if history_len == 1 and conversation.title == "New Conversation":
                     # Generate Title async in background
-                    asyncio.create_task(generate_cloud_chat_title(conversation_id, user_message_str, provider, model, api_key))
+                    asyncio.create_task(generate_cloud_chat_title(conversation_id, user_message_str, provider, model, api_key, account_id, gateway_id))
                 
                 if save_to_db:
                     new_user_msg = Message(
@@ -360,6 +362,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "api_key": api_key,
                         "api_keys": api_keys,
                         "base_url": base_url,
+                        "account_id": account_id,
+                        "gateway_id": gateway_id,
                         "model_config": model_config,
                         "conversation_id": str(conversation_id),
                         "agent_mode": agent_mode,
