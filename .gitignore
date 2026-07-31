@@ -20,8 +20,10 @@ backend/__pycache__/
 .idea/
 
 # Database
-data/*.db
 backend/data/*.db
+
+# Runtime data (SQLite DB, Qdrant, uploads, workspaces)
+/data/
 
 # Logs
 logs/
@@ -31,8 +33,7 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Qdrant Database and git temp files
-data/qdrant/
+# Git temp files
 .gitmessage  
 
 # Temporary Build Contexts
