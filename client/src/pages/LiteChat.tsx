@@ -413,8 +413,8 @@ const LiteChat: React.FC = () => {
                 <div className="my-auto flex flex-col items-center w-full">
                 {/* Welcome hero — LiteRT mark + user greeting */}
                 <div className="mb-10">
-                  <div className="p-5 rounded-3xl bg-[#5bc6a0]/10 border border-[#5bc6a0]/25 mb-6 shadow-lg shadow-[#5bc6a0]/5 inline-block">
-                    <LiteRtMark className="w-12 h-12" />
+                  <div className="p-7 rounded-[2rem] bg-[#fd3b12] border border-[#fd3b12]/40 mb-6 shadow-2xl shadow-[#fd3b12]/40 inline-block">
+                    <LiteRtMark className="w-24 h-24 brightness-0 invert drop-shadow-lg" />
                   </div>
                   <h3 className="text-2xl font-bold text-[var(--text-h)] tracking-tight">
                     Welcome back, <span className="text-[#fd3b12]">{userName}</span>
