@@ -21,6 +21,7 @@ interface ChatHeaderProps {
   artifactCount?: number;
   isHarnessOpen?: boolean;
   setIsHarnessOpen?: (open: boolean) => void;
+  onNewChat?: () => void;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -38,6 +39,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   artifactCount = 0,
   isHarnessOpen,
   setIsHarnessOpen,
+  onNewChat,
 }) => {
   const navigate = useNavigate();
   const { activeSpace } = useAI();
@@ -64,6 +66,26 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               <path d="M9 3v18" />
             </svg>
           </button>
+
+          {/* New Workspace */}
+          {onNewChat && (
+            <button
+              onClick={onNewChat}
+              className="p-2.5 sm:p-1.5 text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95 shrink-0"
+              title="Start a New Workspace"
+              aria-label="New Workspace"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          )}
 
           {/* Logo shown when sidebar is closed or on mobile */}
           <div

@@ -50,7 +50,7 @@
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.74), rgba(226, 230, 236, 0.5));
   backdrop-filter: blur(24px) saturate(1.35);
   -webkit-backdrop-filter: blur(24px) saturate(1.35);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  /* border: 1px solid rgba(255, 255, 255, 0.6); */
   box-shadow: var(--elev-2), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
@@ -59,9 +59,9 @@
    P5 graphics behind remain visible through the frosted top half */
 .chat-surface {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 60%, rgba(255, 255, 255, 1) 100%);
-  backdrop-filter: blur(4px) saturate(1.15);
-  -webkit-backdrop-filter: blur(4px) saturate(1.15);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  /* backdrop-filter: blur(2px) saturate(1.15); */
+  -webkit-backdrop-filter: blur(2px) saturate(1.15);
+  /* border: 1px solid rgba(255, 255, 255, 0.35); */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
@@ -139,18 +139,19 @@
 }
 .press-lift:active { transform: scale(0.97); }
 
-/* Floating composer pill with material focus lift */
+/* Floating composer pill with a solid bottom-right orange offset shadow
+   and a thin AdaptivOrange border that lifts on focus */
 .composer {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(226, 230, 236, 0.62));
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(255, 243, 236, 0.78));
   backdrop-filter: blur(24px) saturate(1.3);
   -webkit-backdrop-filter: blur(24px) saturate(1.3);
-  border: 1px solid rgba(139, 92, 246, 0.16);
-  box-shadow: var(--elev-2), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(253, 59, 18, 0.38);
+  box-shadow: 6px 8px 0 rgba(253, 59, 18, 0.25), 0 14px 30px -12px rgba(253, 59, 18, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.8);
   transition: box-shadow 0.3s var(--ease-material), border-color 0.3s var(--ease-material), transform 0.3s var(--ease-liquid);
 }
 .composer:focus-within {
-  border-color: rgba(253, 59, 18, 0.35);
-  box-shadow: var(--elev-3), 0 0 0 4px rgba(253, 59, 18, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  border-color: rgba(253, 59, 18, 0.6);
+  box-shadow: 5px 7px 0 rgba(253, 59, 18, 0.3), 0 18px 36px -14px rgba(253, 59, 18, 0.4), 0 0 0 4px rgba(253, 59, 18, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
   transform: translateY(-1px);
 }
 

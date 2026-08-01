@@ -1163,6 +1163,7 @@ const workspace: React.FC = () => {
           artifactCount={artifacts.length}
           isHarnessOpen={isHarnessOpen}
           setIsHarnessOpen={setIsHarnessOpen}
+          onNewChat={handleNewChat}
         />
 
         {/* Trading Space Header — contextual sub-header */}

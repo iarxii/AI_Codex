@@ -25,9 +25,11 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import { useLiteRtChat } from '../hooks/useLiteRtChat';
 import PortalSwitcher from '../components/layout/PortalSwitcher';
+import SettingsModal from '../components/SettingsModal';
 import { LocalModelDownloadPanel } from '../components/chat/LocalModelDownloadPanel';
 import { PROVIDERS, MORE_PROVIDERS } from '../components/providerMeta';
 import type { ProviderId } from '../components/providerMeta';
+import ProviderIcon from '../components/ProviderIcon';
 import type { SystemCapabilities, ModelMetadata } from '../services/liteRtService';
 import type { ArtifactDownloadState } from '../services/localModelDownloadService';
 
@@ -195,6 +197,7 @@ const LiteChat: React.FC = () => {
   const navigate = useNavigate();
   const [inputText, setInputText] = useState('');
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [promptHistory, setPromptHistory] = useState<string[]>(loadPromptHistory);
   const [openSection, setOpenSection] = useState<'prompts' | null>(null);
   const [cloudConfigOpen, setCloudConfigOpen] = useState(true);
@@ -331,6 +334,24 @@ const LiteChat: React.FC = () => {
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#fd3b12]/40 to-transparent pointer-events-none" />
 
         <div className="flex items-center gap-3 h-full shrink-0">
+          {/* New Chat */}
+          <button
+            onClick={clearChat}
+            className="p-2.5 sm:p-1.5 text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95 shrink-0"
+            title="Start a New Chat"
+            aria-label="New Chat"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+
           <img
             src="/media/aicodex-spirit-bird-white.png"
             alt="AICodex Logo"
@@ -339,7 +360,7 @@ const LiteChat: React.FC = () => {
               (e.target as HTMLElement).style.display = 'none';
             }}
           />
-          <div className="flex flex-col leading-tight min-w-0">
+          <div className="flex flex-col leading-tight min-w-0 me-4">
             <span className="text-sm font-bold tracking-wider text-[var(--text-h)] truncate">
               AI<span className="text-[#fd3b12]">Codex</span> Chat
             </span>
@@ -350,6 +371,32 @@ const LiteChat: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 h-full">
+          {/* Provider Badge — clickable, opens SettingsModal */}
+          {(() => {
+            const providerInfo = [...PROVIDERS, ...MORE_PROVIDERS].find((p) => p.id === provider);
+            if (!providerInfo) return null;
+            const isLive = cloudProviderStatus[provider] === 'live';
+            return (
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer shrink-0 ${
+                  isLive
+                    ? 'bg-white/20 border-white/25 hover:bg-white/30 text-white'
+                    : 'bg-red-500/30 border-red-500/40 text-red-100'
+                }`}
+                title={`Provider: ${providerInfo.label} — Click to change`}
+              >
+                <ProviderIcon provider={providerInfo} size={16} />
+                <span className="hidden md:flex text-[10px] font-bold uppercase tracking-tight text-white">
+                  {providerInfo.label} API
+                </span>
+                <div
+                  className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`}
+                ></div>
+              </button>
+            );
+          })()}
+
           <PortalSwitcher isDark={true} />
 
           <button
@@ -593,7 +640,7 @@ const LiteChat: React.FC = () => {
                           <select
                             value={provider}
                             onChange={(e) => setProvider(e.target.value as ProviderId)}
-                            className="appearance-none w-full bg-white/60 hover:bg-white/85 border border-black/[0.08] rounded-xl pl-9 pr-8 py-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#fd3b12]/20 transition-all cursor-pointer shadow-sm"
+                            className="appearance-none w-full bg-white/60 hover:bg-white/85 border border-[#fd3b12]/40 rounded-xl pl-9 pr-8 py-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#fd3b12]/20 transition-all cursor-pointer shadow-sm"
                           >
                             {[...PROVIDERS, ...MORE_PROVIDERS]
                               .filter(p => p.id !== 'local' && p.id !== 'litert')
@@ -613,7 +660,7 @@ const LiteChat: React.FC = () => {
                           <select
                             value={activeModelId}
                             onChange={(e) => selectModel(e.target.value)}
-                            className="appearance-none w-full bg-white/60 hover:bg-white/85 border border-black/[0.08] rounded-xl pl-9 pr-8 py-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#fd3b12]/20 transition-all cursor-pointer shadow-sm"
+                            className="appearance-none w-full bg-white/60 hover:bg-white/85 border border-[#fd3b12]/40 rounded-xl pl-9 pr-8 py-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#fd3b12]/20 transition-all cursor-pointer shadow-sm"
                           >
                             {cloudModels[provider] && cloudModels[provider].length > 0 ? (
                               cloudModels[provider].map((m) => (
@@ -678,8 +725,8 @@ const LiteChat: React.FC = () => {
                       onClick={() => setEngineMode(prev => prev === 'local' ? 'cloud' : 'local')}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all press-lift ${
                         engineMode === 'cloud'
-                          ? 'bg-blue-500/10 border-blue-500/30 text-blue-600'
-                          : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600'
+                          ? 'bg-[#fd3b12]/10 border-[#fd3b12]/30 text-[#fd3b12] hover:bg-[#fd3b12]/15 shadow-[0_6px_14px_-6px_rgba(253,59,18,0.45)]'
+                          : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/15 shadow-[0_6px_14px_-6px_rgba(16,185,129,0.45)]'
                       }`}
                       title={
                         engineMode === 'cloud'
@@ -707,8 +754,8 @@ const LiteChat: React.FC = () => {
                         onClick={() => setCloudConfigOpen(o => !o)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all press-lift ${
                           cloudConfigOpen
-                            ? 'bg-[#fd3b12]/10 border-[#fd3b12]/30 text-[#fd3b12]'
-                            : 'bg-white/60 border-black/[0.08] text-[var(--text-muted)] hover:bg-white/85'
+                            ? 'bg-[#fd3b12]/10 border-[#fd3b12]/30 text-[#fd3b12] hover:bg-[#fd3b12]/15 shadow-[0_6px_14px_-6px_rgba(253,59,18,0.45)]'
+                            : 'bg-white/70 border-[#fd3b12]/25 text-[var(--text-muted)] hover:bg-white/90 hover:text-[#fd3b12] hover:border-[#fd3b12]/40'
                         }`}
                         title="Toggle provider & model configuration"
                       >
@@ -841,6 +888,8 @@ const LiteChat: React.FC = () => {
 
       </div>
 
+      {/* Provider Settings Modal */}
+      <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
     </div>
   );
 };
