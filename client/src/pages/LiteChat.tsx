@@ -31,7 +31,7 @@ import { PROVIDERS, MORE_PROVIDERS } from '../components/providerMeta';
 import type { ProviderId } from '../components/providerMeta';
 import ProviderIcon from '../components/ProviderIcon';
 import type { SystemCapabilities, ModelMetadata } from '../services/liteRtService';
-import type { ArtifactDownloadState } from '../services/localModelDownloadService';
+import type { ArtifactDownloadState, DownloadReadiness } from '../services/localModelDownloadService';
 
 const LITERT_ICON = '/media/brand-icons/Litert_icon.svg';
 
@@ -83,6 +83,7 @@ interface SidePanelContentProps {
   modelsList: ModelMetadata[];
   downloadStates: ArtifactDownloadState[];
   downloadTotalBytes: number;
+  downloadReadiness: DownloadReadiness | null;
   downloadLocalModels: () => void;
   cancelLocalModelDownload: () => void;
 }
@@ -95,6 +96,7 @@ const SidePanelContent: React.FC<SidePanelContentProps> = ({
   modelsList,
   downloadStates,
   downloadTotalBytes,
+  downloadReadiness,
   downloadLocalModels,
   cancelLocalModelDownload,
 }) => (
@@ -130,6 +132,7 @@ const SidePanelContent: React.FC<SidePanelContentProps> = ({
     <LocalModelDownloadPanel
       states={downloadStates}
       totalBytes={downloadTotalBytes}
+      readiness={downloadReadiness}
       onDownload={downloadLocalModels}
       onCancel={cancelLocalModelDownload}
     />
@@ -183,7 +186,7 @@ const SidePanelContent: React.FC<SidePanelContentProps> = ({
       <div className="rounded-2xl glass-surface p-4 border border-[#8B5CF6]/15">
         <h5 className="text-xs font-bold text-[var(--text-h)] mb-2 flex items-center gap-1.5">
           <LiteRtMark className="w-3.5 h-3.5" />
-          Edge AI Telemetry
+          Edge AI Telemetry powered by LiteRT.js
         </h5>
         <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
           Gemma 3n uses LiteRT-LM for local text generation. Gecko adds optional local embeddings for retrieval. Model weights are never bundled in this app; download and cache them only after explicit confirmation.
@@ -219,6 +222,7 @@ const LiteChat: React.FC = () => {
     modelsList,
     downloadStates,
     downloadTotalBytes,
+    downloadReadiness,
     downloadLocalModels,
     cancelLocalModelDownload,
     provider,
@@ -318,6 +322,7 @@ const LiteChat: React.FC = () => {
     modelsList,
     downloadStates,
     downloadTotalBytes,
+    downloadReadiness,
     downloadLocalModels,
     cancelLocalModelDownload,
   };

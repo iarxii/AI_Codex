@@ -7,6 +7,9 @@ import {
   createInitialDownloadState,
   downloadArtifact,
   getCachedArtifactIds,
+  getHuggingFaceAccessToken,
+  checkDownloadReadiness,
+  type DownloadReadiness,
   LOCAL_ARTIFACT_TOTAL_BYTES,
   type ArtifactDownloadState,
 } from '../services/localModelDownloadService';
@@ -65,6 +68,7 @@ export const useLiteRtChat = () => {
   const [cloudModels, setCloudModels] = useState<Record<string, CloudModel[]>>({});
   const [cloudConfigSource, setCloudConfigSource] = useState<'backend' | 'fallback'>('fallback');
   const [cloudProviderStatus, setCloudProviderStatus] = useState<Record<string, 'live' | 'none'>>({});
+  const [downloadReadiness, setDownloadReadiness] = useState<DownloadReadiness | null>(null);
 
   // Whether the currently selected provider needs an API key that the user
   // hasn't saved yet. Surfaced in the UI so the user knows to configure it
@@ -138,16 +142,54 @@ export const useLiteRtChat = () => {
     });
   }, []);
 
+  // Determine whether this machine/browser can store and execute the local
+  // models (free storage + WebGPU buffer size) before offering a download.
+  useEffect(() => {
+    let cancelled = false;
+    checkDownloadReadiness(LOCAL_ARTIFACT_TOTAL_BYTES).then((readiness) => {
+      if (!cancelled) setDownloadReadiness(readiness);
+    }).catch((error) => {
+      console.warn('Local model download readiness check failed:', error);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const downloadLocalModels = useCallback(async () => {
     downloadAbortRef.current?.abort();
     const controller = new AbortController();
     downloadAbortRef.current = controller;
+
+    // Gate the download on device readiness (free storage + WebGPU buffer).
+    // Re-check live so the UI reflects the actual browser state at click time.
+    try {
+      const readiness = await checkDownloadReadiness(LOCAL_ARTIFACT_TOTAL_BYTES);
+      setDownloadReadiness(readiness);
+      if (!readiness.ok) {
+        const message = readiness.reason ?? 'This device cannot store or run the local models.';
+        setDownloadStates((previous) => previous.map((item) => (
+          item.phase === 'cached' || item.phase === 'ready'
+            ? item
+            : { ...item, phase: 'error', error: message, receivedBytes: 0 }
+        )));
+        return;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Device readiness check failed.';
+      setDownloadStates((previous) => previous.map((item) => (
+        item.phase === 'cached' || item.phase === 'ready'
+          ? item
+          : { ...item, phase: 'error', error: message, receivedBytes: 0 }
+      )));
+      return;
+    }
 
     setDownloadStates((previous) => previous.map((state) => (
       state.phase === 'cached' || state.phase === 'ready'
         ? state
         : { ...state, phase: 'downloading', receivedBytes: 0, error: undefined }
     )));
+
+    const hfToken = getHuggingFaceAccessToken();
 
     try {
       for (const state of createInitialDownloadState()) {
@@ -159,7 +201,7 @@ export const useLiteRtChat = () => {
             ? { ...item, phase: 'downloading', receivedBytes }
             : item
           ));
-        }, controller.signal);
+        }, controller.signal, hfToken);
 
         setDownloadStates((previous) => previous.map((item) => item.id === state.id
           ? { ...item, phase: 'ready', receivedBytes: item.bytes }
@@ -327,6 +369,7 @@ export const useLiteRtChat = () => {
     modelsList: AVAILABLE_MODELS,
     downloadStates,
     downloadTotalBytes: LOCAL_ARTIFACT_TOTAL_BYTES,
+    downloadReadiness,
     downloadLocalModels,
     cancelLocalModelDownload,
     provider,
