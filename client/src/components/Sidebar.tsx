@@ -298,6 +298,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                       Neural Velocity
                     </>
                   )}
+                  {provider === "openai" && (
+                    <>
+                      <SparklesIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
+                      Neural GPT
+                    </>
+                  )}
                   {provider === "openrouter" && (
                     <>
                       <GlobeAltIcon className="w-3.5 h-3.5 text-[#fd3b12]" />

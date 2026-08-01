@@ -272,6 +272,7 @@ const MessageList: React.FC<MessageListProps> = ({
               {(() => {
                 const cloudProviders = [
                   "groq",
+                  "openai",
                   "openrouter",
                   "gemini",
                   "ollama_cloud",
@@ -280,6 +281,7 @@ const MessageList: React.FC<MessageListProps> = ({
 
                 const hasKey = {
                   groq: !!localStorage.getItem("groq_api_key"),
+                  openai: !!localStorage.getItem("openai_api_key"),
                   openrouter: !!localStorage.getItem("openrouter_api_key"),
                   gemini: !!localStorage.getItem("gemini_api_key"),
                   ollama_cloud: !!localStorage.getItem("ollama_cloud_key"),
@@ -294,6 +296,14 @@ const MessageList: React.FC<MessageListProps> = ({
                       "Visit the Groq Console",
                       "Create a new API Key",
                       "Add it to the Settings modal",
+                    ],
+                  },
+                  openai: {
+                    link: "https://platform.openai.com/api-keys",
+                    steps: [
+                      "Open the OpenAI API keys page",
+                      "Create a new secret key",
+                      "Save it in the Settings modal",
                     ],
                   },
                   openrouter: {

@@ -4,7 +4,7 @@
  */
 
 
-export type ProviderId = 'local' | 'groq' | 'openrouter' | 'gemini' | 'ollama_cloud' | 'colab_bridge' | 'cloudflare_ai_gateway' | 'workers_ai' | 'anthropic' | 'azure' | 'deepseek' | 'xai' | 'together' | 'fireworks' | 'nvidia' | 'perplexity' | 'cohere' | 'mistral' | 'huggingface' | 'cerebras' | 'litert';
+export type ProviderId = 'local' | 'groq' | 'openai' | 'openrouter' | 'gemini' | 'ollama_cloud' | 'colab_bridge' | 'cloudflare_ai_gateway' | 'workers_ai' | 'anthropic' | 'azure' | 'deepseek' | 'xai' | 'together' | 'fireworks' | 'nvidia' | 'perplexity' | 'cohere' | 'mistral' | 'huggingface' | 'cerebras' | 'litert';
 export type LocalBackendMode = 'ollama' | 'llamacpp' | 'litert';
 
 export interface ProviderInfo {
@@ -20,13 +20,12 @@ export interface ProviderInfo {
 
 export const PROVIDERS: ProviderInfo[] = [
   {
-    id: 'local',
-    label: 'Local LLM',
-    description: 'Ollama or llama-server',
-    color: '#A3E635',
-    icon: '/media/brand-icons/ollama-color.svg',
+    id: 'litert',
+    label: 'LiteRT (Web Local)',
+    description: 'On-device inference (WebGPU/WASM)',
+    color: '#3B82F6',
+    icon: '/media/brand-icons/Litert_icon.svg',
     iconType: 'svg-file',
-    brand: 'Ollama',
     class: 'standard',
   },
   {
@@ -50,13 +49,13 @@ export const PROVIDERS: ProviderInfo[] = [
     class: 'pro',
   },
   {
-    id: 'groq',
-    label: 'Groq',
-    description: 'Ultra-fast cloud inference',
-    color: '#fd3b12',
-    icon: '/media/brand-icons/groq.webp',
-    iconType: 'svg-file',
-    brand: 'Groq',
+    id: 'openai',
+    label: 'OpenAI',
+    description: 'GPT models direct',
+    color: '#10A37F',
+    icon: null,
+    iconType: 'inline',
+    brand: 'OpenAI',
     class: 'pro',
   },
   {
@@ -80,16 +79,6 @@ export const PROVIDERS: ProviderInfo[] = [
     class: 'pro',
   },
   {
-    id: 'cloudflare_ai_gateway',
-    label: 'Cloudflare AI Gateway',
-    description: 'Unified AI gateway with logging, caching & routing',
-    color: '#F38020',
-    icon: '/media/brand-icons/cloudflare-color.svg',
-    iconType: 'svg-file',
-    brand: 'Cloudflare',
-    class: 'expert',
-  },
-  {
     id: 'workers_ai',
     label: 'Cloudflare Workers AI',
     description: 'Cloudflare edge AI inference',
@@ -100,19 +89,6 @@ export const PROVIDERS: ProviderInfo[] = [
     class: 'pro',
   },
   {
-    id: 'litert',
-    label: 'LiteRT',
-    description: 'On-device inference (WebGPU/WASM)',
-    color: '#8B5CF6',
-    icon: '/media/brand-icons/Litert_icon.svg',
-    iconType: 'svg-file',
-    class: 'standard',
-  },
-];
-
-/** Additional BYOK providers configured via MoreProvidersModal. */
-export const MORE_PROVIDERS: ProviderInfo[] = [
-  {
     id: 'anthropic',
     label: 'Anthropic',
     description: 'Claude models direct',
@@ -121,6 +97,50 @@ export const MORE_PROVIDERS: ProviderInfo[] = [
     iconType: 'svg-file',
     brand: 'Anthropic',
     class: 'pro',
+  },
+  {
+    id: 'huggingface',
+    label: 'Hugging Face',
+    description: 'Inference endpoints',
+    color: '#FFD21F',
+    icon: null,
+    iconType: 'inline',
+    brand: 'HuggingFace',
+    class: 'expert',
+  },
+];
+
+/** Additional BYOK providers configured via MoreProvidersModal. */
+export const MORE_PROVIDERS: ProviderInfo[] = [
+  {
+    id: 'local',
+    label: 'Local LLM',
+    description: 'Ollama or llama-server',
+    color: '#A3E635',
+    icon: '/media/brand-icons/ollama-color.svg',
+    iconType: 'svg-file',
+    brand: 'Ollama',
+    class: 'standard',
+  },
+  {
+    id: 'groq',
+    label: 'Groq',
+    description: 'Ultra-fast cloud inference',
+    color: '#fd3b12',
+    icon: '/media/brand-icons/groq.webp',
+    iconType: 'svg-file',
+    brand: 'Groq',
+    class: 'pro',
+  },
+  {
+    id: 'cloudflare_ai_gateway',
+    label: 'Cloudflare AI Gateway',
+    description: 'Unified AI gateway with logging, caching & routing',
+    color: '#F38020',
+    icon: '/media/brand-icons/cloudflare-color.svg',
+    iconType: 'svg-file',
+    brand: 'Cloudflare',
+    class: 'expert',
   },
   {
     id: 'azure',
@@ -213,16 +233,6 @@ export const MORE_PROVIDERS: ProviderInfo[] = [
     class: 'pro',
   },
   {
-    id: 'huggingface',
-    label: 'Hugging Face',
-    description: 'Inference endpoints',
-    color: '#FFD21F',
-    icon: null,
-    iconType: 'inline',
-    brand: 'HuggingFace',
-    class: 'expert',
-  },
-  {
     id: 'cerebras',
     label: 'Cerebras',
     description: 'Ultra-fast inference',
@@ -235,7 +245,7 @@ export const MORE_PROVIDERS: ProviderInfo[] = [
 ];
 
 export const PROVIDER_MAP: Record<string, ProviderInfo> = Object.fromEntries(
-  PROVIDERS.map(p => [p.id, p])
+  [...PROVIDERS, ...MORE_PROVIDERS].map(p => [p.id, p])
 );
 
 /** Get the current provider from localStorage, defaulting to 'local' */

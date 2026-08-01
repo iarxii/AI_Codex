@@ -33,6 +33,7 @@ router = APIRouter()
 LITE_CLOUD_PROVIDERS: list[str] = [
     "ollama_cloud",
     "groq",
+    "openai",
     "openrouter",
     "gemini",
     "anthropic",
@@ -851,7 +852,7 @@ async def quick_chat(payload: dict, current_user = Depends(get_current_user)):
     # Cloud and Colab bridge are excluded: they can talk to local/self-hosted
     # instances that require no credentials.
     PROVIDERS_REQUIRING_KEY = {
-        "groq", "openrouter", "gemini", "anthropic", "azure",
+        "groq", "openai", "openrouter", "gemini", "anthropic", "azure",
         "cloudflare_ai_gateway", "workers_ai",
         "deepseek", "xai", "together", "fireworks", "nvidia", "perplexity",
         "cohere", "mistral", "huggingface", "cerebras",

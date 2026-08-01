@@ -3,6 +3,7 @@ import { liteRtService, type SystemCapabilities, type AcceleratorType, AVAILABLE
 import { config, getApiUrl } from '../config';
 import { getProviderApiKey, getProviderConnectionParams, ALL_CLOUD_PROVIDERS } from '../config/providerConfig';
 import type { ProviderId } from '../components/providerMeta';
+import { clearAuthSession, getValidToken } from '../utils/authToken';
 import {
   createInitialDownloadState,
   downloadArtifact,
@@ -28,7 +29,7 @@ export interface LiteMessage {
  *  Ollama Cloud and Colab bridge are excluded (they can target keyless
  *  local/self-hosted instances). Mirrors the backend guard in quick_chat. */
 const PROVIDERS_REQUIRING_KEY: ReadonlySet<string> = new Set([
-  'groq', 'openrouter', 'gemini', 'anthropic', 'azure',
+  'groq', 'openai', 'openrouter', 'gemini', 'anthropic', 'azure',
   'cloudflare_ai_gateway', 'workers_ai',
   'deepseek', 'xai', 'together', 'fireworks', 'nvidia', 'perplexity',
   'cohere', 'mistral', 'huggingface', 'cerebras',
@@ -89,16 +90,25 @@ export const useLiteRtChat = () => {
     let cancelled = false;
     const fetchCloudConfig = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getValidToken();
+        if (!token) {
+          setCloudConfigSource('fallback');
+          return;
+        }
         const baseUrl = getApiUrl(false);
         const response = await fetch(`${baseUrl}${config.API_V1_STR}/chat/cloud-config`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({ providers: buildProviderConfig() })
         });
+        if (response.status === 401) {
+          clearAuthSession();
+          setCloudConfigSource('fallback');
+          return;
+        }
         if (!response.ok) throw new Error(`Cloud config failed with status ${response.status}`);
         const data = await response.json();
         if (cancelled || !data?.providers || !Array.isArray(data.providers)) return;

@@ -22,6 +22,8 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
             model_name = settings.DEFAULT_MODEL  # e.g. llama3.2:3b from config
         elif provider == "openrouter":
             model_name = "meta-llama/llama-3-8b-instruct"
+        elif provider == "openai":
+            model_name = "gpt-4o-mini"
         elif provider == "groq":
             model_name = "llama3-8b-8192"
         elif provider == "gemini":
@@ -81,10 +83,20 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
         )
         
     elif provider == "openrouter":
+        resolved_base_url = base_url or "https://openrouter.ai/api/v1"
         return ChatOpenAI(
             model=model_name,
             openai_api_key=api_key or "sk-dummy",
-            openai_api_base="https://openrouter.ai/api/v1",
+            openai_api_base=resolved_base_url,
+            temperature=temperature
+        )
+
+    elif provider == "openai":
+        resolved_base_url = base_url or "https://api.openai.com/v1"
+        return ChatOpenAI(
+            model=model_name,
+            openai_api_key=api_key or "sk-dummy",
+            openai_api_base=resolved_base_url,
             temperature=temperature
         )
         
@@ -174,6 +186,7 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
         )
 
     elif provider in (
+        "openai",
         "deepseek", "xai", "together", "fireworks", "nvidia",
         "perplexity", "cohere", "mistral", "huggingface", "cerebras",
     ):
@@ -181,6 +194,7 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
         # supplied a custom base_url (stored from MoreProvidersModal) it wins;
         # otherwise fall back to the provider's public default.
         default_base = {
+            "openai": "https://api.openai.com/v1",
             "deepseek": "https://api.deepseek.com/v1",
             "xai": "https://api.x.ai/v1",
             "together": "https://api.together.xyz/v1",

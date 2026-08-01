@@ -3,12 +3,82 @@ from fastapi import APIRouter, HTTPException, Query, Header, Depends
 from typing import List, Dict, Any
 import json
 from pydantic import BaseModel
+from urllib.parse import urlparse
 from backend.config import settings
 from backend.db.session import get_db
 from backend.db.models import User
-from backend.api.auth import get_current_user
+from backend.api.auth import get_current_user_optional
 
 router = APIRouter()
+
+OPENAI_COMPAT_BASE_URLS: Dict[str, str] = {
+    "openai": "https://api.openai.com/v1",
+    "openrouter": "https://openrouter.ai/api/v1",
+    "groq": "https://api.groq.com/openai/v1",
+    "deepseek": "https://api.deepseek.com/v1",
+    "xai": "https://api.x.ai/v1",
+    "together": "https://api.together.xyz/v1",
+    "fireworks": "https://api.fireworks.ai/inference/v1",
+    "nvidia": "https://integrate.api.nvidia.com/v1",
+    "perplexity": "https://api.perplexity.ai",
+    "cohere": "https://api.cohere.com",
+    "mistral": "https://api.mistral.ai/v1",
+    "huggingface": "https://router.huggingface.co/v1",
+    "cerebras": "https://api.cerebras.ai/v1",
+}
+
+
+def _normalize_base_url(base_url: str, provider: str) -> str:
+    """Normalize user-supplied base URLs and reject malformed hosts early."""
+    value = (base_url or "").strip().strip('"').strip("'")
+    if not value:
+        return ""
+    if "://" not in value:
+        value = f"https://{value.lstrip('/')}"
+
+    parsed = urlparse(value)
+    if not parsed.scheme or not parsed.netloc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid base URL for provider '{provider}': {base_url}",
+        )
+    if any(ch in parsed.netloc for ch in ("{", "}", " ")):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Invalid hostname in base URL for provider '{provider}': {parsed.netloc}. "
+                "Remove placeholders and whitespace."
+            ),
+        )
+
+    path = (parsed.path or "").rstrip("/")
+    return f"{parsed.scheme}://{parsed.netloc}{path}"
+
+
+def _models_url(base_url: str) -> str:
+    return f"{base_url.rstrip('/')}/models"
+
+
+def _extract_openai_models(payload: Any) -> List[Dict[str, str]]:
+    """Best-effort normalize OpenAI-compatible model list payloads."""
+    if not isinstance(payload, dict):
+        return []
+    raw = payload.get("data", [])
+    if not isinstance(raw, list):
+        return []
+
+    models: List[Dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        model_id = item.get("id") or item.get("name")
+        if not isinstance(model_id, str) or not model_id:
+            continue
+        model_name = item.get("name") or model_id
+        if not isinstance(model_name, str):
+            model_name = model_id
+        models.append({"id": model_id, "name": model_name})
+    return models
 
 async def _list_models_raw(
     provider: str, 
@@ -20,7 +90,7 @@ async def _list_models_raw(
     x_local_backend_mode: str = Header(None),
     x_space_slug: str = Header(None),
     x_is_premium: str = Header(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User | None = Depends(get_current_user_optional),
     db: Any = Depends(get_db)
 ):
     """
@@ -52,6 +122,8 @@ async def _list_models_raw(
         import os
         if provider == "gemini" or provider == "google":
             actual_key = os.environ.get("GEMINI_API_KEY")
+        elif provider == "openai":
+            actual_key = os.environ.get("OPENAI_API_KEY")
         elif provider == "groq":
             actual_key = os.environ.get("GROQ_API_KEY")
         elif provider == "openrouter":
@@ -153,7 +225,8 @@ async def _list_models_raw(
             if not x_base_url:
                 return []
             try:
-                url = f"{x_base_url.rstrip('/')}/api/tags"
+                normalized_base = _normalize_base_url(x_base_url, "ollama_cloud")
+                url = f"{normalized_base.rstrip('/')}/api/tags"
                 headers = {}
                 if actual_key:
                     headers["Authorization"] = f"Bearer {actual_key}" if not actual_key.startswith("Bearer") else actual_key
@@ -163,6 +236,11 @@ async def _list_models_raw(
                     data = response.json()
                     return [{"id": m["name"], "name": m["name"]} for m in data.get("models", [])]
                 return []
+            except HTTPException:
+                raise
+            except httpx.RequestError as e:
+                target = str(getattr(e, "request", None).url) if getattr(e, "request", None) else normalized_base
+                raise HTTPException(status_code=502, detail=f"Ollama Cloud network error ({target}): {str(e)}")
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Ollama Cloud error: {str(e)}")
 
@@ -170,11 +248,18 @@ async def _list_models_raw(
             if not actual_key:
                 return []
             try:
-                response = await client.get("https://openrouter.ai/api/v1/models")
+                base_url = _normalize_base_url(x_base_url or OPENAI_COMPAT_BASE_URLS["openrouter"], "openrouter")
+                headers = {"Authorization": f"Bearer {actual_key}"}
+                response = await client.get(_models_url(base_url), headers=headers)
                 if response.status_code == 200:
                     data = response.json()
-                    return [{"id": m["id"], "name": m["name"]} for m in data.get("data", [])]
+                    return _extract_openai_models(data)
                 return []
+            except HTTPException:
+                raise
+            except httpx.RequestError as e:
+                target = str(getattr(e, "request", None).url) if getattr(e, "request", None) else "openrouter"
+                raise HTTPException(status_code=502, detail=f"OpenRouter network error ({target}): {str(e)}")
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"OpenRouter error: {str(e)}")
 
@@ -182,12 +267,18 @@ async def _list_models_raw(
             if not actual_key:
                 return []
             try:
+                base_url = _normalize_base_url(x_base_url or OPENAI_COMPAT_BASE_URLS["groq"], "groq")
                 headers = {"Authorization": f"Bearer {actual_key}"}
-                response = await client.get("https://api.groq.com/openai/v1/models", headers=headers)
+                response = await client.get(_models_url(base_url), headers=headers)
                 if response.status_code == 200:
                     data = response.json()
-                    return [{"id": m["id"], "name": m["id"]} for m in data.get("data", [])]
+                    return _extract_openai_models(data)
                 return []
+            except HTTPException:
+                raise
+            except httpx.RequestError as e:
+                target = str(getattr(e, "request", None).url) if getattr(e, "request", None) else "groq"
+                raise HTTPException(status_code=502, detail=f"Groq network error ({target}): {str(e)}")
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Groq error: {str(e)}")
 
@@ -220,7 +311,7 @@ async def _list_models_raw(
             if not x_base_url:
                 return [{"id": "gemma-4-E4B_q4_0-it", "name": "Gemma 4 QAT (Colab Bridge)"}]
             try:
-                base_url = x_base_url.rstrip("/")
+                base_url = _normalize_base_url(x_base_url, "colab_bridge").rstrip("/")
                 headers = {}
                 if actual_key:
                     headers["Authorization"] = f"Bearer {actual_key}" if not actual_key.startswith("Bearer") else actual_key
@@ -245,6 +336,11 @@ async def _list_models_raw(
                 
                 # If both fail, return a default placeholder
                 return [{"id": "gemma-4-E4B_q4_0-it", "name": "Gemma 4 QAT (Colab Bridge)"}]
+            except HTTPException:
+                raise
+            except httpx.RequestError as e:
+                target = str(getattr(e, "request", None).url) if getattr(e, "request", None) else "colab_bridge"
+                raise HTTPException(status_code=502, detail=f"Colab Bridge network error ({target}): {str(e)}")
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Colab Bridge error: {str(e)}")
 
@@ -252,7 +348,7 @@ async def _list_models_raw(
             if not x_base_url:
                 return []
             try:
-                base_url = x_base_url.rstrip("/")
+                base_url = _normalize_base_url(x_base_url, "cloudflare_ai_gateway").rstrip("/")
                 headers = {}
                 if actual_key:
                     headers["Authorization"] = f"Bearer {actual_key}" if not actual_key.startswith("Bearer") else actual_key
@@ -266,8 +362,13 @@ async def _list_models_raw(
                 response = await client.get(f"{base_url}/models", headers=headers)
                 if response.status_code == 200:
                     data = response.json()
-                    return [{"id": m["id"], "name": m.get("name", m["id"])} for m in data.get("data", [])]
+                    return _extract_openai_models(data)
                 return []
+            except HTTPException:
+                raise
+            except httpx.RequestError as e:
+                target = str(getattr(e, "request", None).url) if getattr(e, "request", None) else "cloudflare_ai_gateway"
+                raise HTTPException(status_code=502, detail=f"Cloudflare AI Gateway network error ({target}): {str(e)}")
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Cloudflare AI Gateway error: {str(e)}")
 
@@ -290,6 +391,9 @@ async def _list_models_raw(
                             models.append({"id": model_id, "name": m.get("display_name", model_id)})
                     return models
                 return []
+            except httpx.RequestError as e:
+                target = str(getattr(e, "request", None).url) if getattr(e, "request", None) else "workers_ai"
+                raise HTTPException(status_code=502, detail=f"Workers AI network error ({target}): {str(e)}")
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Workers AI error: {str(e)}")
 
@@ -299,33 +403,33 @@ async def _list_models_raw(
         # /v1/models endpoint. Anthropic & Azure OpenAI are handled separately
         # below because of their non-OpenAI / endpoint-specific contracts.
         elif provider in (
+            "openai",
             "deepseek", "xai", "together", "fireworks", "nvidia",
             "perplexity", "cohere", "mistral", "huggingface", "cerebras",
         ):
-            default_base = {
-                "deepseek": "https://api.deepseek.com/v1",
-                "xai": "https://api.x.ai/v1",
-                "together": "https://api.together.xyz/v1",
-                "fireworks": "https://api.fireworks.ai/inference/v1",
-                "nvidia": "https://integrate.api.nvidia.com/v1",
-                "perplexity": "https://api.perplexity.ai",
-                "cohere": "https://api.cohere.com",
-                "mistral": "https://api.mistral.ai/v1",
-                "huggingface": "https://router.huggingface.co/v1",
-                "cerebras": "https://api.cerebras.ai/v1",
-            }.get(provider, "")
-            base_url = x_base_url or default_base
+            base_url = _normalize_base_url(x_base_url or OPENAI_COMPAT_BASE_URLS.get(provider, ""), provider)
             if not actual_key:
                 return []
             if not base_url:
                 return []
             try:
                 headers = {"Authorization": f"Bearer {actual_key}"}
-                response = await client.get(f"{base_url.rstrip('/')}/models", headers=headers)
+                response = await client.get(_models_url(base_url), headers=headers)
                 if response.status_code == 200:
                     data = response.json()
-                    return [{"id": m.get("id", m.get("name")), "name": m.get("name") or m.get("id")} for m in data.get("data", []) if m.get("id")]
+                    return _extract_openai_models(data)
                 return []
+            except HTTPException:
+                raise
+            except httpx.RequestError as e:
+                target = str(getattr(e, "request", None).url) if getattr(e, "request", None) else base_url
+                raise HTTPException(
+                    status_code=502,
+                    detail=(
+                        f"{provider} network error ({target}): {str(e)}. "
+                        f"Check DNS and the configured base URL."
+                    ),
+                )
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"{provider} error: {str(e)}")
 
@@ -343,7 +447,7 @@ async def list_models(
     x_local_backend_mode: str = Header(None),
     x_space_slug: str = Header(None),
     x_is_premium: str = Header(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User | None = Depends(get_current_user_optional),
     db: Any = Depends(get_db)
 ):
     if provider == "google":

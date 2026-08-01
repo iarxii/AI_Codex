@@ -5,6 +5,12 @@ import { type ProviderId, MORE_PROVIDERS } from "./providerMeta";
 import { useAI } from "../contexts/AIContext";
 import ProviderIcon from "./ProviderIcon";
 import { config, getApiUrl } from "../config";
+import {
+  getProviderApiKeyStorageKey,
+  getProviderBaseUrlStorageKey,
+  getStoredProviderBaseUrl,
+  getProviderInputPolicy,
+} from "../config/providerConfig";
 
 interface MoreProvidersModalProps {
   isOpen: boolean;
@@ -29,9 +35,10 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
       setActiveProvider(provider);
       // Load stored keys for all more providers
       MORE_PROVIDERS.forEach((p) => {
-        const key = localStorage.getItem(`${p.id}_api_key`);
+        const keyStorage = getProviderApiKeyStorageKey(p.id);
+        const key = keyStorage ? localStorage.getItem(keyStorage) : null;
         if (key) setProviderKeys(prev => ({ ...prev, [p.id]: key }));
-        const url = localStorage.getItem(`${p.id}_base_url`);
+        const url = getStoredProviderBaseUrl(p.id);
         if (url) setProviderUrls(prev => ({ ...prev, [p.id]: url }));
       });
     }
@@ -40,8 +47,10 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
   const testAndLoadModels = async (providerId: string) => {
     setLoading(true);
     setTestResult(null);
-    const apiKey = providerKeys[providerId] || localStorage.getItem(`${providerId}_api_key`) || "";
-    const baseUrl = providerUrls[providerId] || localStorage.getItem(`${providerId}_base_url`) || "";
+    const policy = getProviderInputPolicy(providerId);
+    const keyStorage = getProviderApiKeyStorageKey(providerId);
+    const apiKey = providerKeys[providerId] || (keyStorage ? localStorage.getItem(keyStorage) || "" : "");
+    const baseUrl = providerUrls[providerId] || getStoredProviderBaseUrl(providerId);
 
     try {
       const headers: Record<string, string> = {};
@@ -49,7 +58,7 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      if (apiKey) headers["X-API-Key"] = apiKey;
+      if (policy.supportsApiKey && apiKey) headers["X-API-Key"] = apiKey;
       if (baseUrl) headers["X-Base-Url"] = baseUrl;
       if (activeSpace) {
         headers["X-Space-Slug"] = activeSpace.slug;
@@ -94,8 +103,14 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
       
       // Save keys for all more providers (write even when empty so values can be cleared)
       MORE_PROVIDERS.forEach((p) => {
-        localStorage.setItem(`${p.id}_api_key`, (providerKeys[p.id] || "").trim());
-        localStorage.setItem(`${p.id}_base_url`, (providerUrls[p.id] || "").trim());
+        const keyStorage = getProviderApiKeyStorageKey(p.id);
+        const urlStorage = getProviderBaseUrlStorageKey(p.id);
+        if (keyStorage) {
+          localStorage.setItem(keyStorage, (providerKeys[p.id] || "").trim());
+        }
+        if (urlStorage) {
+          localStorage.setItem(urlStorage, (providerUrls[p.id] || "").trim());
+        }
       });
 
       window.dispatchEvent(new Event("ai-settings-changed"));
@@ -154,8 +169,10 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
                 <div className="space-y-4 max-h-[50vh] overflow-y-auto">
                   {MORE_PROVIDERS.map((provider) => {
                     const isActive = activeProvider === provider.id;
-                    const storedKey = providerKeys[provider.id] || localStorage.getItem(`${provider.id}_api_key`) || "";
-                    const storedUrl = providerUrls[provider.id] || localStorage.getItem(`${provider.id}_base_url`) || "";
+                    const policy = getProviderInputPolicy(provider.id);
+                    const keyStorage = getProviderApiKeyStorageKey(provider.id);
+                    const storedKey = providerKeys[provider.id] || (keyStorage ? localStorage.getItem(keyStorage) || "" : "");
+                    const storedUrl = providerUrls[provider.id] || getStoredProviderBaseUrl(provider.id);
                     const models = availableModels[provider.id] || [];
                     const showTest = testResult?.providerId === provider.id;
 
@@ -187,18 +204,20 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
                             <p className="text-xs text-[#7A7D8E] mb-3">{provider.description}</p>
 
                             <div className="space-y-2">
-                              <div>
-                                <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
-                                  API Key
-                                </label>
-                                <input
-                                  type="password"
-                                  value={storedKey}
-                                  onChange={(e) => setProviderKeys(prev => ({ ...prev, [provider.id]: e.target.value }))}
-                                  placeholder="sk-... or Bearer token"
-                                  className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
-                                />
-                              </div>
+                              {policy.supportsApiKey && (
+                                <div>
+                                  <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
+                                    API Key {policy.requiresApiKey ? "" : "(Optional)"}
+                                  </label>
+                                  <input
+                                    type="password"
+                                    value={storedKey}
+                                    onChange={(e) => setProviderKeys(prev => ({ ...prev, [provider.id]: e.target.value }))}
+                                    placeholder={policy.requiresApiKey ? "Required for this provider" : "sk-... or Bearer token"}
+                                    className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
+                                  />
+                                </div>
+                              )}
 
                               <div>
                                 <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
@@ -216,9 +235,9 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
                               <div className="flex flex-col gap-2">
                                 <button
                                   onClick={() => testAndLoadModels(provider.id)}
-                                  disabled={loading || !storedKey}
+                                  disabled={loading || (policy.requiresApiKey && !storedKey)}
                                   className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                    loading || !storedKey
+                                    loading || (policy.requiresApiKey && !storedKey)
                                       ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
                                       : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
                                   }`}

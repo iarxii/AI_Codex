@@ -257,9 +257,9 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                       return false;
                     }
 
-                    // Restrict to Local, Ollama Cloud, OpenRouter, Gemini (exclude Groq) for code-lab and gpt-oss spaces
+                    // Restrict to Local, Ollama Cloud, OpenRouter, Gemini for code-lab and gpt-oss spaces
                     if (activeSpace && ["code-lab", "gpt-oss"].includes(activeSpace.slug)) {
-                      if (p.id === "groq") return false;
+                      if (p.id === "groq" || p.id === "openai") return false;
                     }
 
                     // Always allow Ollama Cloud (it's BYOK)

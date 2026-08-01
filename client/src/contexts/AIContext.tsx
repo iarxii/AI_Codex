@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, type ReactNode }
 import { config, getApiUrl } from '../config';
 import { getProviderApiKey } from '../config/providerConfig';
 import type { ProviderId } from '../components/providerMeta';
+import { clearAuthSession, getValidToken } from '../utils/authToken';
 
 export type { ProviderId };
 
@@ -111,6 +112,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [models, setModels] = useState<Record<ProviderId, string>>({
     local: localStorage.getItem('ai_model_local') || '',
     groq: localStorage.getItem('ai_model_groq') || '',
+    openai: localStorage.getItem('ai_model_openai') || '',
     openrouter: localStorage.getItem('ai_model_openrouter') || '',
     gemini: localStorage.getItem('ai_model_gemini') || '',
     ollama_cloud: localStorage.getItem('ai_model_ollama_cloud') || '',
@@ -179,7 +181,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const activeModel = models[provider];
 
   const refreshProfile = async () => {
-    const token = localStorage.getItem('token');
+    const token = getValidToken();
     if (!token) return;
 
     try {
@@ -220,9 +222,9 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
           }
         }
       } else if (res.status === 401) {
+        clearAuthSession();
+        setUserProfile(null);
         setActiveSpace(null);
-        localStorage.removeItem('ai_active_space');
-        localStorage.removeItem('ai_sidebar_tab');
       }
     } catch (e) {
       console.error('Failed to sync profile', e);
@@ -271,7 +273,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   }, [activeSpace]); // Re-initialize pulse if activeSpace changes (to ensure we hit the right endpoint)
 
   const syncSettingsToCloud = async (visual?: VisualSettings, models?: Record<string, ModelConfig>) => {
-    const token = localStorage.getItem('token');
+    const token = getValidToken();
     if (!token) return;
 
     const settings_json = JSON.stringify({
@@ -361,6 +363,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const getAllApiKeys = () => {
     return {
       groq: localStorage.getItem('groq_api_key'),
+      openai: localStorage.getItem('openai_api_key'),
       openrouter: localStorage.getItem('openrouter_api_key'),
       gemini: localStorage.getItem('gemini_api_key'),
       ollama_cloud: localStorage.getItem('ollama_cloud_key'),

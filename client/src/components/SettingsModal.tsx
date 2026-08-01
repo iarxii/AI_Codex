@@ -7,6 +7,7 @@ import { useAI, type VisualSettings, type ProviderId } from "../contexts/AIConte
 import ProviderIcon from "./ProviderIcon";
 import MoreProvidersModal from "./MoreProvidersModal";
 import { config } from "../config";
+import { getStoredProviderBaseUrl } from "../config/providerConfig";
 import {
   CheckCircleIcon,
   ExclamationCircleIcon,
@@ -24,7 +25,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
     useAI();
   const [activeProvider, setActiveProvider] = useState<ProviderId>(provider);
   const [moreProvidersOpen, setMoreProvidersOpen] = useState(false);
-  const [groqKey, setGroqKey] = useState("");
+  const [openAiKey, setOpenAiKey] = useState("");
+  const [openAiBaseUrl, setOpenAiBaseUrl] = useState("");
   const [openRouterKey, setOpenRouterKey] = useState("");
   const [geminiKey, setGeminiKey] = useState("");
   const [geminiAuthMethod, setGeminiAuthMethod] = useState<
@@ -40,12 +42,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const [cfGatewayUrl, setCfGatewayUrl] = useState("");
   const [cfGatewayAccountId, setCfGatewayAccountId] = useState("");
   const [cfGatewayGatewayId, setCfGatewayGatewayId] = useState("");
-  const [workersAiKey, setWorkersAiKey] = useState("");
-  const [workersAiAccountId, setWorkersAiAccountId] = useState("");
-  const [enableLangsmith, setEnableLangsmith] = useState(false);
-  const [langsmithApiKey, setLangsmithApiKey] = useState("");
-  const [langsmithProject, setLangsmithProject] = useState("");
-  const [privateWorkspace, setPrivateWorkspace] = useState(true);
+const [workersAiKey, setWorkersAiKey] = useState("");
+const [workersAiAccountId, setWorkersAiAccountId] = useState("");
+const [anthropicKey, setAnthropicKey] = useState("");
+const [anthropicBaseUrl, setAnthropicBaseUrl] = useState("");
+const [huggingfaceKey, setHuggingfaceKey] = useState("");
+const [huggingfaceBaseUrl, setHuggingfaceBaseUrl] = useState("");
+const [enableLangsmith, setEnableLangsmith] = useState(false);
+const [langsmithApiKey, setLangsmithApiKey] = useState("");
+const [langsmithProject, setLangsmithProject] = useState("");
+const [privateWorkspace, setPrivateWorkspace] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
@@ -55,7 +61,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   useEffect(() => {
     if (isOpen) {
       setActiveProvider(provider);
-      setGroqKey(localStorage.getItem("groq_api_key") || "");
+      setOpenAiKey(localStorage.getItem("openai_api_key") || "");
+      setOpenAiBaseUrl(getStoredProviderBaseUrl("openai"));
       setOpenRouterKey(localStorage.getItem("openrouter_api_key") || "");
       const storedGeminiKey = localStorage.getItem("gemini_api_key") || "";
       if (storedGeminiKey.startsWith("vertex_adc:")) {
@@ -71,27 +78,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
         setGeminiRegion("");
       }
       setOllamaCloudKey(localStorage.getItem("ollama_cloud_key") || "");
-      setOllamaCloudUrl(
-        localStorage.getItem("ollama_cloud_url") || "https://ollama.com",
-      );
+      setOllamaCloudUrl(getStoredProviderBaseUrl("ollama_cloud"));
       setColabBridgeKey(localStorage.getItem("colab_bridge_key") || "");
-      setColabBridgeUrl(localStorage.getItem("colab_bridge_url") || "");
+      setColabBridgeUrl(getStoredProviderBaseUrl("colab_bridge"));
       setCfGatewayKey(localStorage.getItem("cloudflare_ai_gateway_key") || "");
-      setCfGatewayUrl(
-        localStorage.getItem("cloudflare_ai_gateway_url") ||
-          "https://gateway.ai.cloudflare.com",
-      );
+      setCfGatewayUrl(getStoredProviderBaseUrl("cloudflare_ai_gateway"));
       setCfGatewayAccountId(
         localStorage.getItem("cloudflare_ai_gateway_account_id") || "",
       );
       setCfGatewayGatewayId(
         localStorage.getItem("cloudflare_ai_gateway_gateway_id") || "",
       );
-      setWorkersAiKey(localStorage.getItem("workers_ai_key") || "");
-      setWorkersAiAccountId(
-        localStorage.getItem("workers_ai_account_id") || "",
-      );
-      setEnableLangsmith(localStorage.getItem("enable_langsmith") === "true");
+       setWorkersAiKey(localStorage.getItem("workers_ai_key") || "");
+       setWorkersAiAccountId(
+         localStorage.getItem("workers_ai_account_id") || "",
+       );
+       setAnthropicKey(localStorage.getItem("anthropic_api_key") || "");
+      setAnthropicBaseUrl(getStoredProviderBaseUrl("anthropic"));
+        setHuggingfaceKey(localStorage.getItem("huggingface_api_key") || "");
+      setHuggingfaceBaseUrl(getStoredProviderBaseUrl("huggingface"));
+       setEnableLangsmith(localStorage.getItem("enable_langsmith") === "true");
       setLangsmithApiKey(localStorage.getItem("langsmith_api_key") || "");
       setLangsmithProject(
         localStorage.getItem("langsmith_project") ||
@@ -109,7 +115,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
     try {
       const token = localStorage.getItem("token");
       const headers: Record<string, string> = {
-        "X-Base-Url": ollamaCloudUrl || "https://ollama.com",
+        "X-Base-Url": ollamaCloudUrl || getStoredProviderBaseUrl("ollama_cloud"),
       };
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
@@ -145,6 +151,97 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
       setIsTesting(false);
     }
   };
+
+  const testOpenAI = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const token = localStorage.getItem("token");
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      if (openAiKey) headers["X-API-Key"] = openAiKey;
+      if (openAiBaseUrl) headers["X-Base-Url"] = openAiBaseUrl;
+      if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
+      headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
+
+      const response = await fetch(
+        `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=openai`,
+        {
+          headers,
+        },
+      );
+
+      if (response.ok) {
+        const models = await response.json();
+        setTestResult({
+          success: true,
+          message:
+            models.length > 0
+              ? `Connected! Found ${models.length} models.`
+              : "Connected, but no models found.",
+        });
+      } else {
+        const err = await response.json();
+        setTestResult({
+          success: false,
+          message: err.detail || "Connection failed.",
+        });
+      }
+    } catch (e) {
+      setTestResult({ success: false, message: "Network error. Check configuration." });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+    const testAnthropic = async () => {
+      setIsTesting(true);
+      setTestResult(null);
+      try {
+        const token = localStorage.getItem("token");
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+        if (anthropicKey) headers["X-API-Key"] = anthropicKey;
+        if (anthropicBaseUrl) headers["X-Base-Url"] = anthropicBaseUrl;
+        if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
+        headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
+
+        const response = await fetch(
+          `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=anthropic`,
+          {
+            headers,
+          },
+        );
+
+        if (response.ok) {
+          const models = await response.json();
+          setTestResult({
+            success: true,
+            message:
+              models.length > 0
+                ? `Connected! Found ${models.length} models.`
+                : "Connected, but no models found.",
+          });
+        } else {
+          const err = await response.json();
+          setTestResult({
+            success: false,
+            message: err.detail || "Connection failed.",
+          });
+        }
+      } catch (e) {
+        setTestResult({
+          success: false,
+          message: "Network error. Check configuration.",
+        });
+      } finally {
+        setIsTesting(false);
+      }
+    };
 
   const testColabBridge = async () => {
     setIsTesting(true);
@@ -238,58 +335,103 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
     }
   };
 
-  const testWorkersAI = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-    try {
-      const token = localStorage.getItem("token");
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-      if (workersAiKey) headers["X-API-Key"] = workersAiKey;
-      if (workersAiAccountId) headers["X-Account-Id"] = workersAiAccountId;
-      if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
-      headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
+   const testWorkersAI = async () => {
+     setIsTesting(true);
+     setTestResult(null);
+     try {
+       const token = localStorage.getItem("token");
+       const headers: Record<string, string> = {};
+       if (token) {
+         headers["Authorization"] = `Bearer ${token}`;
+       }
+       if (workersAiKey) headers["X-API-Key"] = workersAiKey;
+       if (workersAiAccountId) headers["X-Account-Id"] = workersAiAccountId;
+       if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
+       headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
 
-      const response = await fetch(
-        `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=workers_ai`,
-        {
-          headers,
-        },
-      );
+       const response = await fetch(
+         `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=workers_ai`,
+         {
+           headers,
+         }
+       );
 
-      if (response.ok) {
-        const models = await response.json();
-        setTestResult({
-          success: true,
-          message:
-            models.length > 0
-              ? `Connected! Found ${models.length} models.`
-              : "Connected, but no models found.",
-        });
-      } else {
-        const err = await response.json();
-        setTestResult({
-          success: false,
-          message: err.detail || "Connection failed.",
-        });
-      }
-    } catch (e) {
-      setTestResult({
-        success: false,
-        message: "Network error. Check configuration.",
-      });
-    } finally {
-      setIsTesting(false);
-    }
-  };
+       if (response.ok) {
+         const models = await response.json();
+         setTestResult({
+           success: true,
+           message:
+             models.length > 0
+               ? `Connected! Found ${models.length} models.`
+               : "Connected, but no models found.",
+         });
+       } else {
+         const err = await response.json();
+         setTestResult({
+           success: false,
+           message: err.detail || "Connection failed.",
+         });
+       }
+     } catch (e) {
+       setTestResult({
+         success: false,
+         message: "Network error. Check configuration.",
+       });
+     } finally {
+       setIsTesting(false);
+     }
+   };
+
+   const testHuggingFace = async () => {
+     setIsTesting(true);
+     setTestResult(null);
+     try {
+       const token = localStorage.getItem("token");
+       const headers: Record<string, string> = {};
+       if (token) {
+         headers["Authorization"] = `Bearer ${token}`;
+       }
+       if (huggingfaceKey) headers["X-API-Key"] = huggingfaceKey;
+       if (huggingfaceBaseUrl) headers["X-Base-Url"] = huggingfaceBaseUrl;
+       if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
+       headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
+
+       const response = await fetch(
+         `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=huggingface`,
+         {
+           headers,
+         }
+       );
+
+       if (response.ok) {
+         const models = await response.json();
+         setTestResult({
+           success: true,
+           message:
+             models.length > 0
+               ? `Connected! Found ${models.length} models.`
+               : "Connected, but no models found.",
+         });
+       } else {
+         const err = await response.json();
+         setTestResult({
+           success: false,
+           message: err.detail || "Connection failed.",
+         });
+       }
+     } catch (e) {
+       setTestResult({ success: false, message: "Network error. Check configuration." });
+     } finally {
+       setIsTesting(false);
+     }
+   };
 
   const handleSave = () => {
     try {
       setProvider(activeProvider);
 
-      localStorage.setItem("groq_api_key", (groqKey || "").trim());
+      localStorage.setItem("openai_api_key", (openAiKey || "").trim());
+      localStorage.setItem("openai_base_url", (openAiBaseUrl || "").trim());
       localStorage.setItem("openrouter_api_key", (openRouterKey || "").trim());
       if (geminiAuthMethod === "vertex") {
         const constructedKey = `vertex_adc:${(geminiProjectId || "").trim()}:${(geminiRegion || "").trim()}`;
@@ -317,24 +459,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
         "cloudflare_ai_gateway_gateway_id",
         (cfGatewayGatewayId || "").trim(),
       );
-      localStorage.setItem("workers_ai_key", (workersAiKey || "").trim());
-      localStorage.setItem(
-        "workers_ai_account_id",
-        (workersAiAccountId || "").trim(),
-      );
-      localStorage.setItem(
-        "enable_langsmith",
-        enableLangsmith ? "true" : "false",
-      );
-      localStorage.setItem("langsmith_api_key", (langsmithApiKey || "").trim());
-      localStorage.setItem(
-        "langsmith_project",
-        (langsmithProject || "").trim(),
-      );
-      localStorage.setItem(
-        "private_workspace",
-        privateWorkspace ? "true" : "false",
-      );
+       localStorage.setItem("workers_ai_key", (workersAiKey || "").trim());
+       localStorage.setItem(
+         "workers_ai_account_id",
+         (workersAiAccountId || "").trim(),
+       );
+       localStorage.setItem("anthropic_api_key", (anthropicKey || "").trim());
+       localStorage.setItem("anthropic_base_url", (anthropicBaseUrl || "").trim());
+       localStorage.setItem("huggingface_api_key", (huggingfaceKey || "").trim());
+       localStorage.setItem("huggingface_base_url", (huggingfaceBaseUrl || "").trim());
+       localStorage.setItem(
+         "enable_langsmith",
+         enableLangsmith ? "true" : "false",
+       );
+       localStorage.setItem("langsmith_api_key", (langsmithApiKey || "").trim());
+       localStorage.setItem(
+         "langsmith_project",
+         (langsmithProject || "").trim(),
+       );
+       localStorage.setItem(
+         "private_workspace",
+         privateWorkspace ? "true" : "false",
+       );
 
       // Dispatch custom event for parts of the app not yet using Context
       window.dispatchEvent(new Event("ai-settings-changed"));
@@ -415,22 +561,39 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                   <div className="grid grid-cols-5 gap-2">
                     {PROVIDERS.map((provider) => {
                       const isActive = activeProvider === provider.id;
+                      const isLiteRt = provider.id === "litert";
                       return (
                         <button
                           key={provider.id}
                           onClick={() => setActiveProvider(provider.id)}
                           className={`relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${
                             isActive
-                              ? "bg-[#fd3b12]/10 border-[#fd3b12] shadow-md shadow-[#fd3b12]/10"
-                              : "bg-[#D8DCE4] border-transparent hover:bg-[#D0D4DC] hover:border-black/[0.08]"
+                              ? isLiteRt
+                                ? "bg-white/60 backdrop-blur-md border-[#3B82F6]/60 shadow-lg shadow-[#3B82F6]/20"
+                                : "bg-[#fd3b12]/10 border-[#fd3b12] shadow-md shadow-[#fd3b12]/10"
+                              : isLiteRt
+                                ? "bg-white/35 backdrop-blur-md border-[#3B82F6]/20 hover:bg-white/55 hover:border-[#3B82F6]/40"
+                                : "bg-[#D8DCE4] border-transparent hover:bg-[#D0D4DC] hover:border-black/[0.08]"
                           }`}
                         >
                           {isActive && (
-                            <div className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#fd3b12] shadow-[0_0_6px_rgba(255,102,0,0.7)]" />
+                            <div
+                              className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${
+                                isLiteRt
+                                  ? "bg-[#3B82F6] shadow-[0_0_8px_rgba(59,130,246,0.75)]"
+                                  : "bg-[#fd3b12] shadow-[0_0_6px_rgba(255,102,0,0.7)]"
+                              }`}
+                            />
                           )}
                           <ProviderIcon provider={provider} size={28} />
                           <span
-                            className={`text-[11px] font-semibold ${isActive ? "text-[#fd3b12]" : "text-[#4A4D5E]"}`}
+                            className={`text-[11px] font-semibold ${
+                              isActive
+                                ? isLiteRt
+                                  ? "text-[#1D4ED8]"
+                                  : "text-[#fd3b12]"
+                                : "text-[#4A4D5E]"
+                            }`}
                           >
                             {provider.label}
                           </span>
@@ -473,6 +636,56 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                       <p className="text-[10px] text-green-600/70 mt-1.5">
                         Ensure Ollama is running on localhost:11434
                       </p>
+                    </div>
+                  )}
+
+                  {activeProvider === "litert" && (
+                    <div className="relative overflow-hidden space-y-3 rounded-2xl border border-[#3B82F6]/25 bg-white/45 backdrop-blur-md shadow-[0_12px_28px_-18px_rgba(59,130,246,0.85)] p-4">
+                      <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-white/65 via-[#DBEAFE]/30 to-[#93C5FD]/20" />
+                      <p className="relative text-xs text-[#1E40AF] font-medium leading-relaxed">
+                        LiteRT runs in the dedicated Chat portal where you can use local on-device inference controls.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProvider("litert");
+                          setIsOpen(false);
+                          navigate("/chat");
+                        }}
+                        className="relative w-full flex items-center justify-center gap-2 rounded-xl border border-[#3B82F6]/40 bg-white/80 text-[#1D4ED8] px-4 py-3 text-sm font-semibold hover:bg-[#DBEAFE]/70 hover:border-[#3B82F6]/60 transition-all shadow-sm"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M7.5 7.5V4.5L3 9L7.5 13.5V10.5H10.5C13.2614 10.5 15.5 12.7386 15.5 15.5V17"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <rect
+                            x="13"
+                            y="4"
+                            width="8"
+                            height="8"
+                            rx="2"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                          />
+                          <path
+                            d="M15.5 18H20"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        Open LiteRT Chat Portal
+                      </button>
                     </div>
                   )}
 
@@ -606,18 +819,68 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                     </div>
                   )}
 
-                  {activeProvider === "groq" && (
-                    <div>
-                      <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                        Groq API Key
-                      </label>
-                      <input
-                        type="password"
-                        value={groqKey}
-                        onChange={(e) => setGroqKey(e.target.value)}
-                        placeholder="gsk_..."
-                        className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
-                      />
+                  {activeProvider === "openai" && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                          OpenAI Base URL (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={openAiBaseUrl}
+                          onChange={(e) => setOpenAiBaseUrl(e.target.value)}
+                          placeholder="https://api.openai.com/v1"
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                          OpenAI API Key
+                        </label>
+                        <input
+                          type="password"
+                          value={openAiKey}
+                          onChange={(e) => setOpenAiKey(e.target.value)}
+                          placeholder="sk-..."
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={testOpenAI}
+                          disabled={isTesting}
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                            isTesting
+                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                          }`}
+                        >
+                          {isTesting ? (
+                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <ArrowPathIcon className="w-4 h-4" />
+                          )}
+                          Test Connection
+                        </button>
+
+                        {testResult && (
+                          <div
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
+                              testResult.success
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {testResult.success ? (
+                              <CheckCircleIcon className="w-4 h-4" />
+                            ) : (
+                              <ExclamationCircleIcon className="w-4 h-4" />
+                            )}
+                            {testResult.message}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -858,6 +1121,136 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                       <div className="flex flex-col gap-2">
                         <button
                           onClick={testWorkersAI}
+                          disabled={isTesting}
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                            isTesting
+                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                          }`}
+                        >
+                          {isTesting ? (
+                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <ArrowPathIcon className="w-4 h-4" />
+                          )}
+                          Test Connection
+                        </button>
+
+                        {testResult && (
+                          <div
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
+                              testResult.success
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {testResult.success ? (
+                              <CheckCircleIcon className="w-4 h-4" />
+                            ) : (
+                              <ExclamationCircleIcon className="w-4 h-4" />
+                            )}
+                            {testResult.message}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeProvider === "anthropic" && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                          Anthropic Base URL (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={anthropicBaseUrl}
+                          onChange={(e) => setAnthropicBaseUrl(e.target.value)}
+                          placeholder="https://api.anthropic.com"
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                          Anthropic API Key
+                        </label>
+                        <input
+                          type="password"
+                          value={anthropicKey}
+                          onChange={(e) => setAnthropicKey(e.target.value)}
+                          placeholder="sk-ant-..."
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={testAnthropic}
+                          disabled={isTesting}
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                            isTesting
+                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                          }`}
+                        >
+                          {isTesting ? (
+                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <ArrowPathIcon className="w-4 h-4" />
+                          )}
+                          Test Connection
+                        </button>
+
+                        {testResult && (
+                          <div
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
+                              testResult.success
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {testResult.success ? (
+                              <CheckCircleIcon className="w-4 h-4" />
+                            ) : (
+                              <ExclamationCircleIcon className="w-4 h-4" />
+                            )}
+                            {testResult.message}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeProvider === "huggingface" && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                          Hugging Face Base URL (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={huggingfaceBaseUrl}
+                          onChange={(e) => setHuggingfaceBaseUrl(e.target.value)}
+                          placeholder="https://api-inference.huggingface.co"
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                          Hugging Face API Key
+                        </label>
+                        <input
+                          type="password"
+                          value={huggingfaceKey}
+                          onChange={(e) => setHuggingfaceKey(e.target.value)}
+                          placeholder="hf_..."
+                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={testHuggingFace}
                           disabled={isTesting}
                           className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
                             isTesting

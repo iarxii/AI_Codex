@@ -14,6 +14,10 @@ from backend.db.models import User
 router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login",
+    auto_error=False,
+)
 
 class Token(BaseModel):
     access_token: str
@@ -66,6 +70,23 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: As
     if user is None:
         raise credentials_exception
     return user
+
+
+async def get_current_user_optional(
+    token: Annotated[str | None, Depends(oauth2_scheme_optional)],
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        username: str | None = payload.get("sub")
+        if not username:
+            return None
+        result = await db.execute(select(User).filter_by(username=username))
+        return result.scalar_one_or_none()
+    except JWTError:
+        return None
 
 async def get_user_from_token(token: str, db: AsyncSession) -> User | None:
     """Helper for WebSocket authentication."""
