@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Chat from './pages/Chat';
+import WorkspaceChat from './pages/Workspace';
 import LiteChat from './pages/LiteChat';
 import AdminOverview from './pages/AdminOverview';
 import AdminDashboard from './pages/AdminDashboard';
@@ -26,8 +26,8 @@ const AppContent: React.FC = () => {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/lite-chat" element={<LiteChat />} />
+          <Route path="/workspace" element={<WorkspaceChat />} />
+          <Route path="/chat" element={<LiteChat />} />
           <Route path="/admin/overview" element={<AdminOverview />} />
           <Route path="/admin/users" element={<AdminDashboard />} />
           {/* Fallback to login */}

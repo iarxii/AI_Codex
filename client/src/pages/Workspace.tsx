@@ -36,7 +36,7 @@ import {
   assignModuleFromBatch,
 } from "../utils/artifactParser";
 
-const Chat: React.FC = () => {
+const workspace: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1599,4 +1599,4 @@ const Chat: React.FC = () => {
   );
 };
 
-export default Chat;
+export default workspace;

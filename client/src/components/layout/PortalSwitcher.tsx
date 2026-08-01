@@ -11,19 +11,19 @@ export const PortalSwitcher: React.FC<PortalSwitcherProps> = ({ isDark = false }
   const location = useLocation();
   const { provider, setProvider } = useAI();
 
-  const isChatLite = location.pathname === '/lite-chat';
+  const isChatLite = location.pathname === '/chat';
 
-  const handlePortalSwitch = (targetPortal: 'workspace' | 'lite-chat') => {
-    if (targetPortal === 'lite-chat') {
+  const handlePortalSwitch = (targetPortal: 'workspace' | 'chat') => {
+    if (targetPortal === 'chat') {
       // Switch to LiteRT for lite-chat portal
       setProvider('litert');
-      navigate('/lite-chat');
+      navigate('/chat');
     } else {
       // Switch back to local (Ollama/llama.cpp) for workspace portal
       if (provider === 'litert') {
         setProvider('local');
       }
-      navigate('/chat');
+      navigate('/workspace');
     }
   };
 
@@ -46,7 +46,7 @@ export const PortalSwitcher: React.FC<PortalSwitcherProps> = ({ isDark = false }
         Workspace
       </button>
       <button
-        onClick={() => handlePortalSwitch('lite-chat')}
+        onClick={() => handlePortalSwitch('chat')}
         className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-lg transition-all active:scale-95 ${
           isChatLite
             ? 'bg-[#fd3b12] text-white shadow-md shadow-[#fd3b12]/20 font-black'

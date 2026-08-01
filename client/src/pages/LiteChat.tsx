@@ -329,9 +329,9 @@ const LiteChat: React.FC = () => {
 
         <div className="flex items-center gap-3 h-full shrink-0">
           <img
-            src="/media/aicodex-spirit-bird.png"
+            src="/media/aicodex-spirit-bird-white.png"
             alt="AICodex Logo"
-            className="w-7 h-7 p-1 bg-white object-contain rounded-lg border border-[#fd3b12]/30 shadow-sm shadow-[#fd3b12]/10"
+            className="w-7 h-7 p-1 bg-[#fd3b12] object-contain rounded-lg border border-[#fd3b12]/30 shadow-sm shadow-[#fd3b12]/10"
             onError={(e) => {
               (e.target as HTMLElement).style.display = 'none';
             }}
@@ -414,7 +414,7 @@ const LiteChat: React.FC = () => {
                     <LiteRtMark className="w-12 h-12" />
                   </div>
                   <h3 className="text-2xl font-bold text-[var(--text-h)] tracking-tight">
-                    Welcome back, <span className="text-[#5bc6a0]">{userName}</span>
+                    Welcome back, <span className="text-[#fd3b12]">{userName}</span>
                   </h3>
                   <p className="text-sm text-[var(--text-muted)] mt-2.5">
                     Pick a model or load a prompt to start chatting.

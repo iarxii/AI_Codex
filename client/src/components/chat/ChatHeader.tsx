@@ -70,9 +70,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             className={`flex items-center gap-2 animate-in fade-in slide-in-from-left-4 duration-300 shrink-0 ${isSidebarOpen ? "lg:hidden" : ""}`}
           >
             <img
-              src="/media/aicodex-spirit-bird.png"
+              src="/media/aicodex-spirit-bird-white.png"
               alt="AICodex Logo"
-              className="p-1 w-7 h-7 shrink-0 object-contain rounded-lg border border-[var(--accent)]"
+              className="p-1 w-7 h-7 bg-[#fd3b12] shrink-0 object-contain rounded-lg border border-[var(--accent)]"
             />
             <span className="text-sm font-bold tracking-tight text-[var(--text-primary)] hidden sm:block">
               AI<span className="text-[var(--accent)]">Codex</span> Workspace
