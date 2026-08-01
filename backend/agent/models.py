@@ -30,6 +30,28 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
             model_name = "@cf/meta/llama-3-8b-instruct"
         elif provider == "litert":
             model_name = "gemma-2b-it-q4"
+        elif provider == "deepseek":
+            model_name = "deepseek-chat"
+        elif provider == "xai":
+            model_name = "grok-2"
+        elif provider == "together":
+            model_name = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+        elif provider == "fireworks":
+            model_name = "accounts/fireworks/models/llama-v3p3-70b-instruct"
+        elif provider == "nvidia":
+            model_name = "meta/llama-3.1-8b-instruct"
+        elif provider == "perplexity":
+            model_name = "sonar"
+        elif provider == "cohere":
+            model_name = "command-r-plus"
+        elif provider == "mistral":
+            model_name = "mistral-large-latest"
+        elif provider == "huggingface":
+            model_name = "meta-llama/Llama-3.3-70B-Instruct"
+        elif provider == "cerebras":
+            model_name = "llama-3.3-70b"
+        elif provider == "anthropic":
+            model_name = "claude-sonnet-4"
         else:
             model_name = "llama3"
 
@@ -150,7 +172,72 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
             "LiteRT is a client-side provider and cannot be used on the backend. "
             "Use the Lite Chat portal instead."
         )
-        
+
+    elif provider in (
+        "deepseek", "xai", "together", "fireworks", "nvidia",
+        "perplexity", "cohere", "mistral", "huggingface", "cerebras",
+    ):
+        # More-providers: all expose OpenAI-compatible endpoints. If the client
+        # supplied a custom base_url (stored from MoreProvidersModal) it wins;
+        # otherwise fall back to the provider's public default.
+        default_base = {
+            "deepseek": "https://api.deepseek.com/v1",
+            "xai": "https://api.x.ai/v1",
+            "together": "https://api.together.xyz/v1",
+            "fireworks": "https://api.fireworks.ai/inference/v1",
+            "nvidia": "https://integrate.api.nvidia.com/v1",
+            "perplexity": "https://api.perplexity.ai",
+            "cohere": "https://api.cohere.com",
+            "mistral": "https://api.mistral.ai/v1",
+            "huggingface": "https://router.huggingface.co/v1",
+            "cerebras": "https://api.cerebras.ai/v1",
+        }
+        resolved_base_url = base_url or default_base.get(provider, "")
+        if not api_key:
+            logger.warning(f"Provider {provider} selected without an API key — requests will fail upstream.")
+        logger.info(f"Initializing {provider}: model={model_name}, base_url={resolved_base_url}")
+        return ChatOpenAI(
+            model=model_name,
+            openai_api_key=api_key or "sk-dummy",
+            openai_api_base=resolved_base_url,
+            temperature=temperature
+        )
+
+    elif provider == "anthropic":
+        # Anthropic's OpenAI-compatible endpoint. Claude is served over
+        # https://api.anthropic.com/v1 (messages/models are OpenAI-shaped).
+        resolved_base_url = base_url or "https://api.anthropic.com/v1"
+        if not api_key:
+            logger.warning("Anthropic provider selected without an API key — requests will fail upstream.")
+        logger.info(f"Initializing Anthropic: model={model_name}, base_url={resolved_base_url}")
+        return ChatOpenAI(
+            model=model_name,
+            openai_api_key=api_key or "sk-ant-dummy",
+            openai_api_base=resolved_base_url,
+            temperature=temperature
+        )
+
+    elif provider == "azure":
+        # Azure OpenAI needs the resource endpoint + API version. The base_url
+        # passed in must be the full "https://<resource>.openai.azure.com/"
+        # deployment endpoint (the frontend stores it via MoreProvidersModal).
+        resolved_base_url = base_url or ""
+        if not resolved_base_url:
+            logger.error("Azure provider selected without an azure_endpoint base_url.")
+            raise ValueError(
+                "Azure OpenAI requires an endpoint URL. Add your Azure resource "
+                "endpoint (https://<resource>.openai.azure.com/) in the provider settings."
+            )
+        if not resolved_base_url.endswith("/v1"):
+            resolved_base_url = f"{resolved_base_url.rstrip('/')}/v1"
+        logger.info(f"Initializing Azure OpenAI: model={model_name}, base_url={resolved_base_url}")
+        return ChatOpenAI(
+            model=model_name,
+            openai_api_key=api_key or "sk-azure-dummy",
+            openai_api_base=resolved_base_url,
+            temperature=temperature
+        )
+
     else:
         # Default fallback — use the configured DEFAULT_MODEL
         logger.warning(f"Unknown provider {provider}, falling back to local ollama with {settings.DEFAULT_MODEL}")

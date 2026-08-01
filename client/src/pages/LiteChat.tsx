@@ -26,7 +26,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useLiteRtChat } from '../hooks/useLiteRtChat';
 import PortalSwitcher from '../components/layout/PortalSwitcher';
 import { LocalModelDownloadPanel } from '../components/chat/LocalModelDownloadPanel';
-import { PROVIDERS } from '../components/providerMeta';
+import { PROVIDERS, MORE_PROVIDERS } from '../components/providerMeta';
 import type { ProviderId } from '../components/providerMeta';
 import type { SystemCapabilities, ModelMetadata } from '../services/liteRtService';
 import type { ArtifactDownloadState } from '../services/localModelDownloadService';
@@ -38,7 +38,7 @@ const LiteRtMark: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' })
 );
 
 const ProviderBrandThumb: React.FC<{ providerId: string; className?: string }> = ({ providerId, className = 'w-5 h-5' }) => {
-  const info = PROVIDERS.find((p) => p.id === providerId);
+  const info = [...PROVIDERS, ...MORE_PROVIDERS].find((p) => p.id === providerId);
   if (!info || !info.icon) return null;
   return (
     <img
@@ -221,6 +221,9 @@ const LiteChat: React.FC = () => {
     provider,
     setProvider,
     cloudModels,
+    cloudProviderStatus,
+    cloudConfigSource,
+    missingApiKey,
   } = useLiteRtChat();
 
   // Auto scroll to bottom on new messages (skip when there are none, otherwise
@@ -592,7 +595,9 @@ const LiteChat: React.FC = () => {
                             onChange={(e) => setProvider(e.target.value as ProviderId)}
                             className="appearance-none w-full bg-white/60 hover:bg-white/85 border border-black/[0.08] rounded-xl pl-9 pr-8 py-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#fd3b12]/20 transition-all cursor-pointer shadow-sm"
                           >
-                            {PROVIDERS.filter(p => p.id !== 'local' && p.id !== 'litert').map((p) => (
+                            {[...PROVIDERS, ...MORE_PROVIDERS]
+                              .filter(p => p.id !== 'local' && p.id !== 'litert')
+                              .map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.label}
                               </option>
@@ -610,14 +615,20 @@ const LiteChat: React.FC = () => {
                             onChange={(e) => selectModel(e.target.value)}
                             className="appearance-none w-full bg-white/60 hover:bg-white/85 border border-black/[0.08] rounded-xl pl-9 pr-8 py-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#fd3b12]/20 transition-all cursor-pointer shadow-sm"
                           >
-                            {cloudModels[provider] ? (
+                            {cloudModels[provider] && cloudModels[provider].length > 0 ? (
                               cloudModels[provider].map((m) => (
                                 <option key={m.id} value={m.id}>
                                   {m.name}
                                 </option>
                               ))
                             ) : (
-                              <option value="">No models available</option>
+                              <option value="">
+                                {missingApiKey
+                                  ? 'Add your API key to load models'
+                                  : (cloudProviderStatus[provider] === 'live'
+                                      ? 'No models available'
+                                      : 'No models loaded — configure & refresh')}
+                              </option>
                             )}
                           </select>
                           <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#fd3b12]">
@@ -628,7 +639,18 @@ const LiteChat: React.FC = () => {
                       </div>
                     </motion.div>
                   )}
-                </AnimatePresence>
+                  </AnimatePresence>
+
+                {/* Missing API Key Notice */}
+                {engineMode === 'cloud' && missingApiKey && (
+                  <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-xl border border-amber-300/60 bg-amber-50/70 text-xs text-amber-800">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
+                    <span className="min-w-0">
+                      No API key saved for this provider. Open your provider settings and add your{' '}
+                      <span className="font-semibold">{provider}</span> API key to send messages.
+                    </span>
+                  </div>
+                )}
 
                 {/* Composer Row */}
                 <div className="flex items-end gap-2">
@@ -715,6 +737,12 @@ const LiteChat: React.FC = () => {
                   Web Engine Online
                 </span>
                 <span className="hidden sm:inline text-black/10">|</span>
+                <span className={`material-chip hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full shrink-0 ${
+                  cloudConfigSource === 'backend' ? 'text-emerald-700' : 'text-[var(--text-muted)]'
+                }`} title={cloudConfigSource === 'backend' ? 'Model catalog loaded from the backend' : 'Using bundled fallback model catalog'}>
+                  <Cloud className="w-3.5 h-3.5" />
+                  {cloudConfigSource === 'backend' ? 'Cloud Config: Live' : 'Cloud Config: Fallback'}
+                </span>
                 <span className="material-chip hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full shrink-0">
                   <Microchip className="w-3.5 h-3.5 text-[#5bc6a0]" />
                   Accelerator:

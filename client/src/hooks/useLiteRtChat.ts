@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { liteRtService, type SystemCapabilities, type AcceleratorType, AVAILABLE_MODELS } from '../services/liteRtService';
 import { config, getApiUrl } from '../config';
+import { getProviderApiKey, getProviderConnectionParams, ALL_CLOUD_PROVIDERS } from '../config/providerConfig';
 import type { ProviderId } from '../components/providerMeta';
 import {
   createInitialDownloadState,
@@ -20,33 +21,35 @@ export interface LiteMessage {
   tps?: number; // Tokens per second
 }
 
-const CLOUD_MODELS: Record<string, { id: string, name: string }[]> = {
-  ollama_cloud: [
-    { id: 'llama3', name: 'Llama 3' },
-    { id: 'gemma2', name: 'Gemma 2' },
-    { id: 'mistral', name: 'Mistral' },
-    { id: 'phi3', name: 'Phi 3' },
-  ],
-  groq: [
-    { id: 'llama3-70b-8192', name: 'Llama 3 70B' },
-    { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B' },
-  ],
-  openrouter: [
-    { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5' },
-    { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus' },
-  ],
-  gemini: [
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-  ],
-  anthropic: [
-    { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet' },
-    { id: 'claude-3-opus', name: 'Claude 3 Opus' },
-  ],
-  azure: [
-    { id: 'gpt-4o', name: 'GPT-4o' },
-    { id: 'gpt-35-turbo', name: 'GPT-3.5 Turbo' },
-  ],
+/** Cloud providers that can never respond without a user-supplied API key.
+ *  Ollama Cloud and Colab bridge are excluded (they can target keyless
+ *  local/self-hosted instances). Mirrors the backend guard in quick_chat. */
+const PROVIDERS_REQUIRING_KEY: ReadonlySet<string> = new Set([
+  'groq', 'openrouter', 'gemini', 'anthropic', 'azure',
+  'cloudflare_ai_gateway', 'workers_ai',
+  'deepseek', 'xai', 'together', 'fireworks', 'nvidia', 'perplexity',
+  'cohere', 'mistral', 'huggingface', 'cerebras',
+]);
+
+type CloudModel = { id: string; name: string };
+
+/** Per-provider config sent to /chat/cloud-config so the backend can live-list
+ *  models with the user's actual credentials (same values Workspace forwards
+ *  via X-API-Key / X-Account-Id headers). */
+const buildProviderConfig = (): Record<string, { api_key?: string; base_url?: string; account_id?: string; gateway_id?: string }> => {
+  const out: Record<string, { api_key?: string; base_url?: string; account_id?: string; gateway_id?: string }> = {};
+  for (const prov of ALL_CLOUD_PROVIDERS) {
+    const key = getProviderApiKey(prov);
+    const params = getProviderConnectionParams(prov);
+    if (!key && !params.base_url && !params.account_id && !params.gateway_id) continue;
+    out[prov] = {
+      ...(key ? { api_key: key } : {}),
+      ...(params.base_url ? { base_url: params.base_url } : {}),
+      ...(params.account_id ? { account_id: params.account_id } : {}),
+      ...(params.gateway_id ? { gateway_id: params.gateway_id } : {}),
+    };
+  }
+  return out;
 };
 
 export const useLiteRtChat = () => {
@@ -59,14 +62,61 @@ export const useLiteRtChat = () => {
   const downloadAbortRef = useRef<AbortController | null>(null);
   const [engineMode, setEngineMode] = useState<'local' | 'cloud'>('cloud');
   const [provider, setProvider] = useState<ProviderId>('ollama_cloud');
+  const [cloudModels, setCloudModels] = useState<Record<string, CloudModel[]>>({});
+  const [cloudConfigSource, setCloudConfigSource] = useState<'backend' | 'fallback'>('fallback');
+  const [cloudProviderStatus, setCloudProviderStatus] = useState<Record<string, 'live' | 'none'>>({});
+
+  // Whether the currently selected provider needs an API key that the user
+  // hasn't saved yet. Surfaced in the UI so the user knows to configure it
+  // instead of sending requests that are guaranteed to fail upstream.
+  const missingApiKey = PROVIDERS_REQUIRING_KEY.has(provider) && !getProviderApiKey(provider);
 
   // Update model when provider changes (only for cloud)
   useEffect(() => {
-    if (engineMode === 'cloud' && CLOUD_MODELS[provider]) {
-      const firstModel = CLOUD_MODELS[provider][0];
+    if (engineMode === 'cloud' && cloudModels[provider]?.length) {
+      const firstModel = cloudModels[provider][0];
       setActiveModelId(firstModel.id);
     }
-  }, [provider, engineMode]);
+  }, [provider, engineMode, cloudModels]);
+
+  // Hydrate the cloud provider/model catalog from the backend. There is no
+  // bundled fallback catalog — the endpoint reports which providers are live.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchCloudConfig = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const baseUrl = getApiUrl(false);
+        const response = await fetch(`${baseUrl}${config.API_V1_STR}/chat/cloud-config`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ providers: buildProviderConfig() })
+        });
+        if (!response.ok) throw new Error(`Cloud config failed with status ${response.status}`);
+        const data = await response.json();
+        if (cancelled || !data?.providers || !Array.isArray(data.providers)) return;
+
+        const next: Record<string, CloudModel[]> = {};
+        const status: Record<string, 'live' | 'none'> = {};
+        for (const p of data.providers) {
+          const models = Array.isArray(p?.models) ? p.models : [];
+          next[p.id] = models.map((m: any) => ({ id: String(m.id ?? m.name), name: String(m.name ?? m.id) }));
+          status[p.id] = p.source === 'live' ? 'live' : 'none';
+        }
+        setCloudModels(() => next);
+        setCloudProviderStatus(() => status);
+        setCloudConfigSource('backend');
+      } catch (error) {
+        console.warn('Cloud config fetch failed; no provider catalog available.', error);
+        setCloudConfigSource('fallback');
+      }
+    };
+    fetchCloudConfig();
+    return () => { cancelled = true; };
+  }, []);
 
   // Load capabilities on mount
   useEffect(() => {
@@ -191,7 +241,9 @@ export const useLiteRtChat = () => {
             system_context: 'You are the AICodex Chat assistant, a fast, friendly conversational agent embedded in the AICodex Chat (LiteRT) portal. Keep replies concise, clear, and helpful.',
             message: content,
             provider: provider,
-            model: activeModelId
+            model: activeModelId,
+            api_key: getProviderApiKey(provider) || undefined,
+            ...getProviderConnectionParams(provider),
           })
         });
 
@@ -279,6 +331,9 @@ export const useLiteRtChat = () => {
     cancelLocalModelDownload,
     provider,
     setProvider,
-    cloudModels: CLOUD_MODELS,
+    cloudModels,
+    cloudProviderStatus,
+    cloudConfigSource,
+    missingApiKey,
   };
 };

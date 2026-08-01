@@ -4,6 +4,7 @@ import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { useAI } from "../contexts/AIContext";
 import { useBridge } from "../contexts/BridgeContext";
 import { config, getApiUrl } from "../config";
+import { getProviderApiKey, getProviderConnectionParams } from "../config/providerConfig";
 import { PROVIDERS, PROVIDER_MAP, getLocalBackendMode, setLocalBackendMode } from "./providerMeta";
 import type { LocalBackendMode } from "./providerMeta";
 import ProviderIcon from "./ProviderIcon";
@@ -33,10 +34,6 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 
   const fetchModels = async () => {
     const colabUrl = localStorage.getItem("colab_bridge_url");
-    const cfGatewayUrl = localStorage.getItem("cloudflare_ai_gateway_url");
-    const cfGatewayAccountId = localStorage.getItem("cloudflare_ai_gateway_account_id");
-    const cfGatewayGatewayId = localStorage.getItem("cloudflare_ai_gateway_gateway_id");
-    const workersAiAccountId = localStorage.getItem("workers_ai_account_id");
     if (provider === "colab_bridge" && !colabUrl) {
       setLoading(true);
       const formattedModels = bridgeModels.map((m) => ({ id: m, name: m }));
@@ -56,21 +53,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       return;
     }
     setLoading(true);
-    let apiKey = "";
-    if (provider === "groq")
-      apiKey = localStorage.getItem("groq_api_key") || "";
-    else if (provider === "openrouter")
-      apiKey = localStorage.getItem("openrouter_api_key") || "";
-    else if (provider === "gemini")
-      apiKey = localStorage.getItem("gemini_api_key") || "";
-    else if (provider === "ollama_cloud")
-      apiKey = localStorage.getItem("ollama_cloud_key") || "";
-    else if (provider === "colab_bridge")
-      apiKey = localStorage.getItem("colab_bridge_key") || "";
-    else if (provider === "cloudflare_ai_gateway")
-      apiKey = localStorage.getItem("cloudflare_ai_gateway_key") || "";
-    else if (provider === "workers_ai")
-      apiKey = localStorage.getItem("workers_ai_key") || "";
+    const apiKey = getProviderApiKey(provider) || "";
+    const connParams = getProviderConnectionParams(provider);
 
     try {
       const url = `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/models?provider=${provider}`;
@@ -87,18 +71,10 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       }
       headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
 
-      if (provider === "ollama_cloud") {
-        const cloudUrl = localStorage.getItem("ollama_cloud_url");
-        if (cloudUrl) headers["X-Base-Url"] = cloudUrl;
-      } else if (provider === "colab_bridge") {
-        if (colabUrl) headers["X-Base-Url"] = colabUrl;
-      } else if (provider === "cloudflare_ai_gateway") {
-        if (cfGatewayUrl) headers["X-Base-Url"] = cfGatewayUrl;
-        if (cfGatewayAccountId) headers["X-Account-Id"] = cfGatewayAccountId;
-        if (cfGatewayGatewayId) headers["X-Gateway-Id"] = cfGatewayGatewayId;
-      } else if (provider === "workers_ai") {
-        if (workersAiAccountId) headers["X-Account-Id"] = workersAiAccountId;
-      }
+      // Connection params from the shared providerConfig module
+      if (connParams.base_url) headers["X-Base-Url"] = connParams.base_url;
+      if (connParams.account_id) headers["X-Account-Id"] = connParams.account_id;
+      if (connParams.gateway_id) headers["X-Gateway-Id"] = connParams.gateway_id;
 
       // Pass local backend mode so the API queries the correct server
       if (provider === "local") {

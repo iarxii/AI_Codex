@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { config, getApiUrl } from '../config';
+import { getProviderApiKey } from '../config/providerConfig';
 import type { ProviderId } from '../components/providerMeta';
 
 export type { ProviderId };
@@ -355,29 +356,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const currentModelKey = `${provider}:${activeModel || 'default'}`;
   const activeModelConfig = modelConfigs[currentModelKey] || DEFAULT_MODEL_CONFIG;
 
-  const getApiKey = (p: ProviderId) => {
-    switch (p) {
-      case 'groq': return localStorage.getItem('groq_api_key');
-      case 'openrouter': return localStorage.getItem('openrouter_api_key');
-      case 'gemini': return localStorage.getItem('gemini_api_key');
-      case 'ollama_cloud': return localStorage.getItem('ollama_cloud_key');
-      case 'cloudflare_ai_gateway': return localStorage.getItem('cloudflare_ai_gateway_key');
-      case 'workers_ai': return localStorage.getItem('workers_ai_key');
-      case 'anthropic': return localStorage.getItem('anthropic_api_key');
-      case 'azure': return localStorage.getItem('azure_api_key');
-      case 'deepseek': return localStorage.getItem('deepseek_api_key');
-      case 'xai': return localStorage.getItem('xai_api_key');
-      case 'together': return localStorage.getItem('together_api_key');
-      case 'fireworks': return localStorage.getItem('fireworks_api_key');
-      case 'nvidia': return localStorage.getItem('nvidia_api_key');
-      case 'perplexity': return localStorage.getItem('perplexity_api_key');
-      case 'cohere': return localStorage.getItem('cohere_api_key');
-      case 'mistral': return localStorage.getItem('mistral_api_key');
-      case 'huggingface': return localStorage.getItem('huggingface_api_key');
-      case 'cerebras': return localStorage.getItem('cerebras_api_key');
-      default: return null;
-    }
-  };
+  const getApiKey = (p: ProviderId) => getProviderApiKey(p);
 
   const getAllApiKeys = () => {
     return {

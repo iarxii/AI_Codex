@@ -20,6 +20,39 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# ── LiteRT Cloud Config ────────────────────────────────────────────────
+# The Lite Chat portal loads cloud models live from each provider API via the
+# existing /api/models logic (_list_models_raw). There is deliberately NO
+# curated fallback catalog: showing models for a provider with no saved API
+# key would only mislead the user into sending requests that fail upstream.
+# The /cloud-config endpoint reports which providers are actually usable, and
+# /chat/quick returns a clear "no API key saved" message when one is missing.
+
+# Providers the Lite Chat portal may offer. `litert` and `local` are excluded
+# because they are client-side / on-device, not served by the backend.
+LITE_CLOUD_PROVIDERS: list[str] = [
+    "ollama_cloud",
+    "groq",
+    "openrouter",
+    "gemini",
+    "anthropic",
+    "azure",
+    "cloudflare_ai_gateway",
+    "workers_ai",
+    "colab_bridge",
+    "deepseek",
+    "xai",
+    "together",
+    "fireworks",
+    "nvidia",
+    "perplexity",
+    "cohere",
+    "mistral",
+    "huggingface",
+    "cerebras",
+]
+
+
 async def generate_cloud_chat_title(conversation_id: int, first_message: str, provider: str, model: str, api_key: str, account_id: str = None, gateway_id: str = None):
     """Generates a 3-5 word title using the cloud LLM and updates the Conversation."""
     try:
@@ -793,21 +826,110 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 async def quick_chat(payload: dict, current_user = Depends(get_current_user)):
     system_context = payload.get("system_context", "")
     message = payload.get("message", "")
-    
+
     provider = (payload.get("provider") or "ollama_cloud").lower()
     model_name = payload.get("model") or "default"
     api_key = payload.get("api_key", None)
-    
+
+    # Connection params forwarded so providers that require them (Ollama Cloud
+    # base URL, Cloudflare AI Gateway / Workers AI account & gateway IDs, Colab
+    # bridge URL) resolve correctly. Falls back to stored user settings / .env.
+    base_url = payload.get("base_url", None)
+    account_id = payload.get("account_id", None)
+    gateway_id = payload.get("gateway_id", None)
+
+    # If no explicit API key was sent, try the user's saved provider keys.
+    if not api_key and current_user and getattr(current_user, "settings_json", None):
+        try:
+            import json
+            saved = json.loads(current_user.settings_json).get("api_keys", {})
+            api_key = saved.get(provider)
+        except Exception:
+            api_key = None
+
+    # Providers that can never respond without a user-supplied API key. Ollama
+    # Cloud and Colab bridge are excluded: they can talk to local/self-hosted
+    # instances that require no credentials.
+    PROVIDERS_REQUIRING_KEY = {
+        "groq", "openrouter", "gemini", "anthropic", "azure",
+        "cloudflare_ai_gateway", "workers_ai",
+        "deepseek", "xai", "together", "fireworks", "nvidia", "perplexity",
+        "cohere", "mistral", "huggingface", "cerebras",
+    }
+    if provider in PROVIDERS_REQUIRING_KEY and not api_key:
+        return {
+            "reply": (
+                f"No API key saved for provider '{provider}'. Add your "
+                f"{provider} API key in Settings → Providers, then try again."
+            )
+        }
+
     try:
         from backend.agent.models import get_llm
-        model = get_llm(provider=provider, model=model_name, api_key=api_key)
+        model = get_llm(
+            provider=provider,
+            model=model_name,
+            api_key=api_key,
+            base_url=base_url,
+            account_id=account_id,
+            gateway_id=gateway_id,
+        )
         messages = [
             {"role": "system", "content": system_context},
             {"role": "user", "content": message}
         ]
-        
+
         response = await model.ainvoke(messages)
         return {"reply": response.content}
     except Exception as e:
         log_error(f"Quick Chat Error: {str(e)}", e)
         return {"reply": f"Sorry, I encountered an error: {str(e)}"}
+
+
+@router.post("/cloud-config")
+async def cloud_config(payload: dict = None, current_user = Depends(get_current_user)):
+    """
+    Returns the live cloud provider + model catalog for the Lite Chat portal.
+
+    The frontend forwards the per-provider config it holds in localStorage
+    (api_key / base_url / account_id / gateway_id) so _list_models_raw can
+    live-list each provider with the user's actual credentials — exactly like
+    the Workspace UI's /api/models calls, which send X-API-Key etc. headers.
+
+    There is NO curated fallback: a provider that can't be live-listed (missing
+    key, unreachable host, or missing connection params) simply returns an empty
+    model list. The portal UI is responsible for telling the user which
+    provider needs an API key to be configured.
+    """
+    from backend.api.models import _list_models_raw
+
+    provider_configs = (payload or {}).get("providers") or {}
+
+    providers = []
+    for provider in LITE_CLOUD_PROVIDERS:
+        cfg = provider_configs.get(provider) or {}
+        live: list = []
+        try:
+            live = await _list_models_raw(
+                provider=provider,
+                x_api_key=cfg.get("api_key"),
+                x_base_url=cfg.get("base_url"),
+                x_account_id=cfg.get("account_id"),
+                x_gateway_id=cfg.get("gateway_id"),
+                current_user=current_user,
+                db=None,
+            )
+        except Exception as e:
+            log_error(f"Cloud config live listing failed for {provider}: {e}", e)
+            live = []
+
+        # Filter to well-formed entries only.
+        live = [m for m in live if isinstance(m, dict) and m.get("id")]
+
+        providers.append({
+            "id": provider,
+            "models": live,
+            "source": "live" if live else "none",
+        })
+
+    return {"providers": providers}

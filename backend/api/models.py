@@ -62,6 +62,30 @@ async def _list_models_raw(
             actual_key = os.environ.get("CLOUDFLARE_AI_GATEWAY_API_KEY")
         elif provider == "workers_ai":
             actual_key = os.environ.get("WORKERS_AI_API_KEY")
+        elif provider == "deepseek":
+            actual_key = os.environ.get("DEEPSEEK_API_KEY")
+        elif provider == "xai":
+            actual_key = os.environ.get("XAI_API_KEY")
+        elif provider == "together":
+            actual_key = os.environ.get("TOGETHER_API_KEY")
+        elif provider == "fireworks":
+            actual_key = os.environ.get("FIREWORKS_API_KEY")
+        elif provider == "nvidia":
+            actual_key = os.environ.get("NVIDIA_API_KEY")
+        elif provider == "perplexity":
+            actual_key = os.environ.get("PERPLEXITY_API_KEY")
+        elif provider == "cohere":
+            actual_key = os.environ.get("COHERE_API_KEY")
+        elif provider == "mistral":
+            actual_key = os.environ.get("MISTRAL_API_KEY")
+        elif provider == "huggingface":
+            actual_key = os.environ.get("HUGGINGFACE_API_KEY")
+        elif provider == "cerebras":
+            actual_key = os.environ.get("CEREBRAS_API_KEY")
+        elif provider == "anthropic":
+            actual_key = os.environ.get("ANTHROPIC_API_KEY")
+        elif provider == "azure":
+            actual_key = os.environ.get("AZURE_OPENAI_API_KEY")
     async with httpx.AsyncClient(timeout=10.0) as client:
         if provider == "local":
             local_mode = x_local_backend_mode or settings.LOCAL_BACKEND_MODE
@@ -268,6 +292,42 @@ async def _list_models_raw(
                 return []
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Workers AI error: {str(e)}")
+
+        # ── OpenAI-compatible cloud providers (More Providers) ──
+        # DeepSeek, xAI, Together, Fireworks, NVIDIA, Perplexity, Cohere,
+        # Mistral, Hugging Face and Cerebras all expose an OpenAI-compatible
+        # /v1/models endpoint. Anthropic & Azure OpenAI are handled separately
+        # below because of their non-OpenAI / endpoint-specific contracts.
+        elif provider in (
+            "deepseek", "xai", "together", "fireworks", "nvidia",
+            "perplexity", "cohere", "mistral", "huggingface", "cerebras",
+        ):
+            default_base = {
+                "deepseek": "https://api.deepseek.com/v1",
+                "xai": "https://api.x.ai/v1",
+                "together": "https://api.together.xyz/v1",
+                "fireworks": "https://api.fireworks.ai/inference/v1",
+                "nvidia": "https://integrate.api.nvidia.com/v1",
+                "perplexity": "https://api.perplexity.ai",
+                "cohere": "https://api.cohere.com",
+                "mistral": "https://api.mistral.ai/v1",
+                "huggingface": "https://router.huggingface.co/v1",
+                "cerebras": "https://api.cerebras.ai/v1",
+            }.get(provider, "")
+            base_url = x_base_url or default_base
+            if not actual_key:
+                return []
+            if not base_url:
+                return []
+            try:
+                headers = {"Authorization": f"Bearer {actual_key}"}
+                response = await client.get(f"{base_url.rstrip('/')}/models", headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    return [{"id": m.get("id", m.get("name")), "name": m.get("name") or m.get("id")} for m in data.get("data", []) if m.get("id")]
+                return []
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"{provider} error: {str(e)}")
 
         return []
 

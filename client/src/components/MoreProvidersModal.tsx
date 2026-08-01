@@ -1,7 +1,7 @@
 import React, { Fragment, useState, useEffect } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { XMarkIcon, CheckCircleIcon, ExclamationCircleIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
-import { type ProviderId, type ProviderInfo } from "./providerMeta";
+import { type ProviderId, MORE_PROVIDERS } from "./providerMeta";
 import { useAI } from "../contexts/AIContext";
 import ProviderIcon from "./ProviderIcon";
 import { config, getApiUrl } from "../config";
@@ -10,129 +10,6 @@ interface MoreProvidersModalProps {
   isOpen: boolean;
   setIsOpen: (val: boolean) => void;
 }
-
-const MORE_PROVIDERS: ProviderInfo[] = [
-  {
-    id: 'anthropic',
-    label: 'Anthropic',
-    description: 'Claude models direct',
-    color: '#D4A574',
-    icon: '/media/brand-icons/claude-logo_svgstack_com_36971777229669.svg',
-    iconType: 'svg-file',
-    brand: 'Anthropic',
-    class: 'pro',
-  },
-  {
-    id: 'azure',
-    label: 'Azure OpenAI',
-    description: 'Enterprise OpenAI on Azure',
-    color: '#0078D4',
-    icon: '/media/brand-icons/microsoft.svg',
-    iconType: 'svg-file',
-    brand: 'Microsoft',
-    class: 'expert',
-  },
-  {
-    id: 'deepseek',
-    label: 'DeepSeek',
-    description: 'Open-source reasoning models',
-    color: '#1A1A2E',
-    icon: '/media/brand-icons/deepseek-logo_svgstack_com_37061777229678.svg',
-    iconType: 'svg-file',
-    brand: 'DeepSeek',
-    class: 'pro',
-  },
-  {
-    id: 'xai',
-    label: 'xAI',
-    description: 'Grok models',
-    color: '#000000',
-    icon: '/media/brand-icons/white-grok-logo_svgstack_com_37181777229567.svg',
-    iconType: 'svg-file',
-    brand: 'XAI',
-    class: 'pro',
-  },
-  {
-    id: 'together',
-    label: 'Together AI',
-    description: 'Open-source model hosting',
-    color: '#F58A07',
-    icon: null,
-    iconType: 'inline',
-    brand: 'Together',
-    class: 'expert',
-  },
-  {
-    id: 'fireworks',
-    label: 'Fireworks AI',
-    description: 'Fast open-source inference',
-    color: '#FF6B35',
-    icon: null,
-    iconType: 'inline',
-    brand: 'Fireworks',
-    class: 'expert',
-  },
-  {
-    id: 'nvidia',
-    label: 'NVIDIA NIM',
-    description: 'Optimized enterprise models',
-    color: '#76B900',
-    icon: null,
-    iconType: 'inline',
-    brand: 'Nvidia',
-    class: 'expert',
-  },
-  {
-    id: 'perplexity',
-    label: 'Perplexity',
-    description: 'Search-augmented models',
-    color: '#20808D',
-    icon: null,
-    iconType: 'inline',
-    brand: 'Perplexity',
-    class: 'pro',
-  },
-  {
-    id: 'cohere',
-    label: 'Cohere',
-    description: 'Enterprise LLMs',
-    color: '#0047FF',
-    icon: null,
-    iconType: 'inline',
-    brand: 'Cohere',
-    class: 'expert',
-  },
-  {
-    id: 'mistral',
-    label: 'Mistral AI',
-    description: 'Open-weight models',
-    color: '#FF6B35',
-    icon: null,
-    iconType: 'inline',
-    brand: 'Mistral',
-    class: 'pro',
-  },
-  {
-    id: 'huggingface',
-    label: 'Hugging Face',
-    description: 'Inference endpoints',
-    color: '#FFD21F',
-    icon: null,
-    iconType: 'inline',
-    brand: 'HuggingFace',
-    class: 'expert',
-  },
-  {
-    id: 'cerebras',
-    label: 'Cerebras',
-    description: 'Ultra-fast inference',
-    color: '#00D4AA',
-    icon: null,
-    iconType: 'inline',
-    brand: 'Cerebras',
-    class: 'pro',
-  },
-];
 
 const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOpen }) => {
   const { provider, setProvider, model, setModel, activeSpace, isPremiumSpace } = useAI();

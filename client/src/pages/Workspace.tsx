@@ -5,6 +5,7 @@ import Sidebar from "../components/Sidebar";
 import AgentCanvas from "../components/AgentCanvas";
 import SettingsModal from "../components/SettingsModal";
 import { PROVIDER_MAP, getLocalBackendMode } from "../components/providerMeta";
+import { getProviderConnectionParams as getProviderConnectionParamsShared } from "../config/providerConfig";
 import { useAI } from "../contexts/AIContext";
 import { config, getApiUrl, getWsUrl } from "../config";
 import WorkspaceOnboardingModal from "../components/WorkspaceOnboardingModal";
@@ -935,32 +936,7 @@ const workspace: React.FC = () => {
     }
   };
 
-  const getProviderConnectionParams = (prov: string) => {
-    let baseUrl = "";
-    if (prov === "ollama_cloud")
-      baseUrl = localStorage.getItem("ollama_cloud_url") || "";
-    else if (prov === "colab_bridge")
-      baseUrl = localStorage.getItem("colab_bridge_url") || "";
-    else if (prov === "cloudflare_ai_gateway")
-      baseUrl = localStorage.getItem("cloudflare_ai_gateway_url") || "";
-
-    const accountId =
-      prov === "cloudflare_ai_gateway"
-        ? localStorage.getItem("cloudflare_ai_gateway_account_id") || ""
-        : prov === "workers_ai"
-          ? localStorage.getItem("workers_ai_account_id") || ""
-          : "";
-    const gatewayId =
-      prov === "cloudflare_ai_gateway"
-        ? localStorage.getItem("cloudflare_ai_gateway_gateway_id") || ""
-        : "";
-
-    return {
-      base_url: baseUrl,
-      account_id: accountId || undefined,
-      gateway_id: gatewayId || undefined,
-    };
-  };
+  const getProviderConnectionParams = (prov: string) => getProviderConnectionParamsShared(prov);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
