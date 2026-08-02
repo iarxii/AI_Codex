@@ -39,6 +39,7 @@ import { LocalModelDownloadPanel } from '../components/chat/LocalModelDownloadPa
 import { PROVIDERS, MORE_PROVIDERS } from '../components/providerMeta';
 import type { ProviderId } from '../components/providerMeta';
 import ProviderIcon from '../components/ProviderIcon';
+import ProviderBadgeIcon from '../components/chat/ProviderBadgeIcon';
 import type { SystemCapabilities, ModelMetadata } from '../services/liteRtService';
 import type { ArtifactDownloadState, DownloadReadiness } from '../services/localModelDownloadService';
 import {
@@ -639,9 +640,7 @@ const LiteChat: React.FC = () => {
                 }`}
                 title={`Provider: ${providerInfo.label} — Click to change`}
               >
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white shadow-sm shrink-0">
-                  <ProviderIcon provider={providerInfo} size={14} />
-                </span>
+                  <ProviderBadgeIcon provider={providerInfo} size={14} />
                 <span className="hidden md:flex text-[10px] font-bold uppercase tracking-tight text-white">
                   {providerInfo.label} API
                 </span>

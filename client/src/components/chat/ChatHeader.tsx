@@ -1,9 +1,9 @@
 import React from "react";
 import AgentPulse from "../AgentPulse";
 import { useNavigate } from "react-router-dom";
-import ProviderIcon from "../ProviderIcon";
 import { useAI } from "../../contexts/AIContext";
 import NeuralFunctionSwitch from "./NeuralFunctionSwitch";
+import ProviderBadgeIcon from "./ProviderBadgeIcon";
 
 interface ChatHeaderProps {
   isSidebarOpen: boolean;
@@ -212,9 +212,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             }`}
             title={`Provider: ${activeProviderInfo.label} — Click to change`}
           >
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white shadow-sm shrink-0">
-              <ProviderIcon provider={activeProviderInfo} size={14} />
-            </span>
+            <ProviderBadgeIcon provider={activeProviderInfo} size={16} />
             <span
               className="hidden md:flex text-[10px] font-bold uppercase tracking-tight text-white"
             >
