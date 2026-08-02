@@ -74,9 +74,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     touchStartX.current = null;
     touchCurrentX.current = null;
   };
-  
+
   // Display name logic
-  const displayName = userProfile?.first_name 
+  const displayName = userProfile?.first_name
     ? `${userProfile.first_name} ${userProfile.surname || ''}`.trim()
     : (localStorage.getItem("username") || "Neural Architect");
 
@@ -132,60 +132,60 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     if (activeTab === 'spaces') {
-        if (activeSpace) {
-            fetchSpaceConversations(activeSpace.slug);
-        } else {
-            fetchAllSpaceConversations();
-        }
+      if (activeSpace) {
+        fetchSpaceConversations(activeSpace.slug);
+      } else {
+        fetchAllSpaceConversations();
+      }
     }
   }, [activeSpace, activeTab]);
 
   const fetchSpaces = async () => {
-      try {
-          const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/spaces/`, {
-              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-          });
-          if (res.ok) {
-              const data = await res.json();
-              setAvailableSpaces(data);
-          }
-      } catch (e) {
-          console.error("Failed to fetch spaces", e);
+    try {
+      const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/spaces/`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableSpaces(data);
       }
+    } catch (e) {
+      console.error("Failed to fetch spaces", e);
+    }
   }
 
   const fetchSpaceConversations = async (slug: string) => {
-      setLoading(true);
-      try {
-          const res = await fetch(`${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/spaces/${slug}/conversations`, {
-              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-          });
-          if (res.ok) {
-              const data = await res.json();
-              setSpaceConversations(data);
-          }
-      } catch (e) {
-          console.error("Failed to fetch space conversations", e);
-      } finally {
-          setLoading(false);
+    setLoading(true);
+    try {
+      const res = await fetch(`${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/spaces/${slug}/conversations`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSpaceConversations(data);
       }
+    } catch (e) {
+      console.error("Failed to fetch space conversations", e);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const fetchAllSpaceConversations = async () => {
-      setLoading(true);
-      try {
-          const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/spaces/conversations/all`, {
-              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-          });
-          if (res.ok) {
-              const data = await res.json();
-              setSpaceConversations(data);
-          }
-      } catch (e) {
-          console.error("Failed to fetch all space conversations", e);
-      } finally {
-          setLoading(false);
+    setLoading(true);
+    try {
+      const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/spaces/conversations/all`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSpaceConversations(data);
       }
+    } catch (e) {
+      console.error("Failed to fetch all space conversations", e);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const fetchConversations = async () => {
@@ -225,15 +225,15 @@ const Sidebar: React.FC<SidebarProps> = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         className={`
-        fixed lg:static top-0 left-0 h-full w-full sm:w-80 lg:w-72 flex flex-col bg-[var(--bg-surface)]/40 backdrop-blur-2xl border-r border-black/[0.06] z-50 safe-area-top
+        workspace-sidebar fixed lg:static top-0 left-0 h-full w-full sm:w-80 lg:w-72 flex flex-col backdrop-blur-2xl border-r border-black/[0.06] z-50 safe-area-top
         transition-all duration-500 ease-in-out
         ${isOpen ? "translate-x-0 opacity-100" : "-translate-x-full lg:hidden lg:opacity-0"}
       `}
       >
-        <div className="bg-gradient-to-b from-white to-transparent">
+        <div className="workspace-sidebar-hero">
           <div className="px-6 py-4 sm:py-6 lg:py-8 flex flex-col items-center justify-center text-center group relative">
             {/* Close button for mobile */}
-            <button 
+            <button
               onClick={onClose}
               className="absolute top-4 right-4 p-2 rounded-xl bg-black/5 hover:bg-black/10 text-gray-455 hover:text-gray-800 transition-colors lg:hidden"
               title="Close Sidebar"
@@ -258,12 +258,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <div>
-              <h1 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+              <h1 className="text-lg font-semibold tracking-tight text-[#000] [var(--text-primary)]">
                 AI<span className="text-[var(--accent)]">Codex</span>
               </h1>
               <div className="flex flex-col items-center gap-1.5 justify-center mt-1">
                 {isPremiumSpace && (
-                  <div 
+                  <div
                     className={`flex items-center gap-1.5 mb-1 px-2 py-0.5 rounded-full border transition-all duration-500 ${isPremiumBackendOnline ? 'bg-green-500/10 border-green-500/30' : 'bg-orange-500/10 border-orange-500/30'}`}
                     title={isPremiumBackendOnline ? "T4 GPU Backend is active" : "Premium instances are synchronizing..."}
                   >
@@ -329,24 +329,24 @@ const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Tabs */}
           <div className="flex p-2 gap-1.5 bg-[var(--bg-primary)]/50 border-b border-black/[0.06]">
-              <button
-                  onClick={() => {
-                      setActiveTab('workspaces');
-                      setActiveSpace(null);
-                      setViewSpacesCatalog(false);
-                  }}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 sm:py-2 lg:py-1.5 rounded-lg text-sm sm:text-xs font-semibold transition-all ${activeTab === 'workspaces' ? 'bg-white shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
-              >
-                  <RectangleStackIcon className="w-5 h-5 sm:w-4 sm:h-4" />
-                  Standard
-              </button>
-              <button
-                  onClick={() => setActiveTab('spaces')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 sm:py-2 lg:py-1.5 rounded-lg text-sm sm:text-xs font-semibold transition-all ${activeTab === 'spaces' ? 'bg-[var(--accent)]/10 text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
-              >
-                  <CubeTransparentIcon className="w-5 h-5 sm:w-4 sm:h-4" />
-                  Spaces
-              </button>
+            <button
+              onClick={() => {
+                setActiveTab('workspaces');
+                setActiveSpace(null);
+                setViewSpacesCatalog(false);
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 sm:py-2 lg:py-1.5 rounded-lg text-sm sm:text-xs font-semibold transition-all ${activeTab === 'workspaces' ? 'sidebar-active-surface shadow-sm text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
+            >
+              <RectangleStackIcon className="w-5 h-5 sm:w-4 sm:h-4" />
+              Standard
+            </button>
+            <button
+              onClick={() => setActiveTab('spaces')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 sm:py-2 lg:py-1.5 rounded-lg text-sm sm:text-xs font-semibold transition-all ${activeTab === 'spaces' ? 'bg-[var(--accent)]/10 text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
+            >
+              <CubeTransparentIcon className="w-5 h-5 sm:w-4 sm:h-4" />
+              Spaces
+            </button>
           </div>
         </div>
 
@@ -402,7 +402,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </p>
             </div>
           )}
-          
+
           {!loading && activeTab === 'spaces' && activeSpace && spaceConversations.length === 0 && (
             <div className="text-center py-10 px-4">
               <p className="text-xs text-[var(--text-muted)] font-medium">
@@ -412,18 +412,18 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {!loading && activeTab === 'spaces' && spaceConversations.length === 0 && (
-             <div className="text-center py-10 px-4">
-               <CubeTransparentIcon className="w-8 h-8 text-[var(--text-muted)]/50 mx-auto mb-2" />
-               <p className="text-xs text-[var(--text-muted)] font-medium leading-relaxed">
-                 No active space sessions.<br/>Browse the catalog to start one.
-               </p>
-               <button 
+            <div className="text-center py-10 px-4">
+              <CubeTransparentIcon className="w-8 h-8 text-[var(--text-muted)]/50 mx-auto mb-2" />
+              <p className="text-xs text-[var(--text-muted)] font-medium leading-relaxed">
+                No active space sessions.<br />Browse the catalog to start one.
+              </p>
+              <button
                 onClick={() => setViewSpacesCatalog(true)}
                 className="mt-4 text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] hover:underline"
-               >
-                 Browse Catalog
-               </button>
-             </div>
+              >
+                Browse Catalog
+              </button>
+            </div>
           )}
 
           {(activeTab === 'workspaces' ? conversations : spaceConversations).map((conv) => (
@@ -437,11 +437,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onSelectConversation(conv.id);
                 if (window.innerWidth < 1024) onClose();
               }}
-              className={`w-full text-left p-4 sm:p-3 rounded-xl transition-all group relative overflow-hidden ${
-                currentConversationId === conv.id
+              className={`w-full text-left p-4 sm:p-3 rounded-xl transition-all group relative overflow-hidden ${currentConversationId === conv.id
                   ? "bg-[var(--accent)]/12 border border-[var(--accent)]/25 shadow-sm"
                   : "hover:bg-black/[0.04] border border-transparent"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-3">
                 <div

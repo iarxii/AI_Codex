@@ -944,7 +944,7 @@ const workspace: React.FC = () => {
     if (!outboundMessage || !connected || loading || isProcessing.current) return;
 
     if (!currentConvId) {
-      handleNewChat().then(() => {});
+      handleNewChat().then(() => { });
       alert("Please select or create a workspace first.");
       isProcessing.current = false;
       return;
@@ -1205,7 +1205,7 @@ const workspace: React.FC = () => {
         ) : (
           <div className="flex-1 flex flex-row overflow-hidden relative">
             {/* Left Column: Chat Stream */}
-            <div className="flex-1 flex flex-col min-w-0 relative">
+            <div className="workspace-chat-surface flex-1 flex flex-col min-w-0 relative">
               <MessageList
                 messages={messages}
                 loading={loading}
@@ -1303,11 +1303,11 @@ const workspace: React.FC = () => {
                           {["code-lab", "health-tech"].includes(
                             activeSpace.slug,
                           ) && (
-                            <GemmaSandboxHarness
-                              thoughtLog={thoughtLog}
-                              telemetry={telemetry}
-                            />
-                          )}
+                              <GemmaSandboxHarness
+                                thoughtLog={thoughtLog}
+                                telemetry={telemetry}
+                              />
+                            )}
                           {activeSpace.slug === "microsoft-agent-lab" && (
                             <MicrosoftAgentHarness
                               onArtifactReady={(art) =>
@@ -1385,8 +1385,8 @@ const workspace: React.FC = () => {
                               </div>
                             </>
                           ) : ["code-lab", "health-tech"].includes(
-                              activeSpace.slug,
-                            ) ? (
+                            activeSpace.slug,
+                          ) ? (
                             <>
                               <div
                                 className="w-8 h-8 rounded-lg bg-[#446EFF]/10 flex items-center justify-center border border-[#446EFF]/20 text-[#446EFF] cursor-pointer"
@@ -1520,11 +1520,11 @@ const workspace: React.FC = () => {
                           {["code-lab", "health-tech"].includes(
                             activeSpace.slug,
                           ) && (
-                            <GemmaSandboxHarness
-                              thoughtLog={thoughtLog}
-                              telemetry={telemetry}
-                            />
-                          )}
+                              <GemmaSandboxHarness
+                                thoughtLog={thoughtLog}
+                                telemetry={telemetry}
+                              />
+                            )}
                           {activeSpace.slug === "microsoft-agent-lab" && (
                             <MicrosoftAgentHarness
                               onArtifactReady={(art) =>

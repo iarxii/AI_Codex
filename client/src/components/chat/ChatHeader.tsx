@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAI } from "../../contexts/AIContext";
 import NeuralFunctionSwitch from "./NeuralFunctionSwitch";
 import ProviderBadgeIcon from "./ProviderBadgeIcon";
+import InterfaceThemeToggle from "../layout/InterfaceThemeToggle";
 
 interface ChatHeaderProps {
   isSidebarOpen: boolean;
@@ -45,14 +46,14 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const { activeSpace } = useAI();
 
   return (
-    <header className="h-14 flex items-stretch justify-between bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-40 shadow-sm w-full safe-area-top overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <header className="workspace-header h-14 flex items-stretch justify-between backdrop-blur-xl border-b border-black/[0.06] z-40 shadow-sm w-full safe-area-top overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {/* items justified to the left */}
       <div className="flex items-center justify-start gap-3 shrink-0 h-full mr-8">
-        <div className="sticky left-0 z-10 flex items-center gap-1 bg-gradient-to-r from-[#D8DCE4] via-[#D8DCE4]/95 to-transparent pl-4 pr-2 h-full shrink-0">
+        <div className="workspace-header-start sticky left-0 z-10 flex items-center gap-1 pl-4 pr-2 h-full shrink-0">
           {/* Sidebar Toggle */}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2.5 sm:p-1.5 text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95 shrink-0"
+            className="workspace-header-left-control p-2.5 sm:p-1.5 hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95 shrink-0"
             title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
           >
             <svg
@@ -71,7 +72,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           {onNewChat && (
             <button
               onClick={onNewChat}
-              className="p-2.5 sm:p-1.5 text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95 shrink-0"
+              className="workspace-header-left-control p-2.5 sm:p-1.5 hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95 shrink-0"
               title="Start a New Workspace"
               aria-label="New Workspace"
             >
@@ -96,7 +97,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               alt="AICodex Logo"
               className="p-1 w-7 h-7 bg-[#fd3b12] shrink-0 object-contain rounded-lg border border-[var(--accent)]"
             />
-            <span className="text-sm font-bold tracking-tight text-[var(--text-primary)] hidden sm:block">
+            <span className="workspace-brand-label text-sm font-bold tracking-tight hidden sm:block">
               AI<span className="text-[var(--accent)]">Codex</span> Workspace
             </span>
           </div>
@@ -111,7 +112,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           }}
           className="text-left group/card hover:bg-black/5 p-1.5 rounded-lg transition-colors flex-1 min-w-0 max-w-[200px] sm:max-w-[250px] md:max-w-none"
         >
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-[#4A4D5E] group-hover/card:text-[#fd3b12] flex items-center gap-2">
+          <h2 className="workspace-profile-label text-xs font-semibold uppercase tracking-widest group-hover/card:text-[#fd3b12] flex items-center gap-2">
             {activeSpace ? (
               <span className="flex items-center gap-1 truncate w-full">
                 <span className="text-[var(--accent)] font-bold truncate">
@@ -139,16 +140,15 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
       {/* items justified to the right */}
       <div className="flex items-center justify-end gap-3 shrink-0 h-full">
-        
+
         {/* Spirit Bird Interaction Harness Toggle — only for trading space on < lg screens */}
         {activeSpace?.slug === "trading-space" && setIsHarnessOpen && (
           <button
             onClick={() => setIsHarnessOpen(!isHarnessOpen)}
-            className={`lg:hidden p-2.5 rounded-2xl border transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-sm ${
-              isHarnessOpen
+            className={`lg:hidden p-2.5 rounded-2xl border transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-sm ${isHarnessOpen
                 ? "bg-[#fd3b12]/15 text-[#fd3b12] border-[#fd3b12]/30 shadow-[#fd3b12]/10"
                 : "bg-white/40 border-black/[0.05] text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-white/60"
-            }`}
+              }`}
             title="Toggle Spirit Bird Interaction Harness"
           >
             <svg
@@ -175,6 +175,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         )}
 
         <div className="sticky right-0 z-10 flex items-center gap-3 bg-gradient-to-r from-transparent via-[#fd3b12]/90 to-[#fd3b12] pl-10 pr-4 h-full shrink-0">
+          <InterfaceThemeToggle />
           {/* System Function Shifter Dropdown */}
           <NeuralFunctionSwitch
             isCanvasOpen={isCanvasOpen}
@@ -189,11 +190,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             {/* Latency */}
             {currentLatency && (
               <div
-                className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
-                  loading 
-                    ? "bg-white/20 border-white/30 text-white" 
+                className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${loading
+                    ? "bg-white/20 border-white/30 text-white"
                     : "bg-white/10 border-white/20 text-white/90"
-                }`}
+                  }`}
               >
                 <span className="text-[10px] font-semibold uppercase tracking-tight">
                   {currentLatency.toFixed(2)}s
@@ -205,11 +205,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           {/* Provider Badge — clickable, opens SettingsModal */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
-              connected
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${connected
                 ? "bg-white/20 border-white/25 hover:bg-white/30 text-white"
                 : "bg-red-500/30 border-red-500/40 text-red-100"
-            }`}
+              }`}
             title={`Provider: ${activeProviderInfo.label} — Click to change`}
           >
             <ProviderBadgeIcon provider={activeProviderInfo} size={16} />

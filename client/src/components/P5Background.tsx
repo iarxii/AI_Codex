@@ -69,7 +69,7 @@ const P5Background: React.FC<P5BackgroundProps> = ({
   // Carousel timer
   useEffect(() => {
     if (currentSpaceConfig) return; // Disable carousel if a specific static image is active
-    
+
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % CAROUSEL_IMAGES.length);
     }, 12000); // 12 second transition
@@ -465,7 +465,7 @@ const P5Background: React.FC<P5BackgroundProps> = ({
   }, [visualSettings, isDynamic]);
 
   return (
-    <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden bg-[#E2E8F0]">
+    <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden bg-[var(--wallpaper-base)]">
       <style>{`
         @media (min-width: 1024px) {
           .mobile-bg { display: none; }
@@ -573,16 +573,14 @@ const P5Background: React.FC<P5BackgroundProps> = ({
       )}
       {/* Mandatory Watermark Mask - Radial Gradient from Bottom-Right */}
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none wallpaper-mask"
         style={{
-          background:
-            "radial-gradient(circle at bottom right, #E2E8F0 0%, #E2E8F0 12%, transparent 35%)",
           opacity: 0.95,
         }}
       />
       {/* Shifting Gradient Overlay (The "Energy Wave") */}
       <div
-        className="absolute inset-0 bg-gradient-to-tr from-[#fd3b12]/5 via-transparent to-white/10 mix-blend-overlay"
+        className="absolute inset-0 wallpaper-energy-overlay mix-blend-overlay"
         style={{
           animation: "none",
         }}
@@ -642,7 +640,7 @@ const P5Background: React.FC<P5BackgroundProps> = ({
             className="absolute inset-[-100%] w-[300%] h-[300%] mix-blend-overlay pointer-events-none opacity-40"
             style={{
               background:
-                "linear-gradient(to bottom, transparent, rgba(192, 204, 218, 0.5), transparent)",
+                "linear-gradient(to bottom, transparent, var(--wallpaper-silver-wave), transparent)",
               animation: isDynamic ? "wave-silver 12s linear infinite" : "none",
               filter: "blur(40px)",
             }}
@@ -665,8 +663,9 @@ const P5Background: React.FC<P5BackgroundProps> = ({
         {/* Rolling Scanline (The "Refresh" bar) */}
         {showScanlines && (
           <div
-            className="absolute w-full h-20 bg-white/10 opacity-30 pointer-events-none"
+            className="absolute w-full h-20 opacity-30 pointer-events-none"
             style={{
+              backgroundColor: "var(--wallpaper-scanline-wash)",
               animation: isDynamic
                 ? "scanline-roll 10s linear infinite"
                 : "none",

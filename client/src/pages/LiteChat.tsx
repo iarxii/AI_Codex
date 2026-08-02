@@ -5,13 +5,13 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import { 
-  Cpu, 
-  Zap, 
-  Trash2, 
-  Send, 
-  Cloud, 
-  CheckCircle, 
+import {
+  Cpu,
+  Zap,
+  Trash2,
+  Send,
+  Cloud,
+  CheckCircle,
   AlertTriangle,
   ChevronDown,
   SlidersHorizontal,
@@ -34,6 +34,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 import { useLiteRtChat } from '../hooks/useLiteRtChat';
 import PortalSwitcher from '../components/layout/PortalSwitcher';
+import InterfaceThemeToggle from '../components/layout/InterfaceThemeToggle';
 import SettingsModal from '../components/SettingsModal';
 import { LocalModelDownloadPanel } from '../components/chat/LocalModelDownloadPanel';
 import { PROVIDERS, MORE_PROVIDERS } from '../components/providerMeta';
@@ -216,21 +217,21 @@ const SidePanelContent: React.FC<SidePanelContentProps> = ({
   downloadLocalModels,
   cancelLocalModelDownload,
 }) => (
-  <div className="space-y-6">
+  <div className="lite-config-panel space-y-6">
     <div>
-      <h4 className="text-xs font-bold text-[var(--text-h)] uppercase tracking-wider mb-4 flex items-center gap-2">
+      <h4 className="lite-config-heading text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
         <LiteRtMark className="w-4 h-4" />
         Model Configuration
       </h4>
 
       <div className="space-y-3">
-        <label className="block text-[11px] text-[var(--text-muted)] font-semibold uppercase tracking-wider">
+        <label className="lite-config-muted block text-[11px] font-semibold uppercase tracking-wider">
           Select Local Model
         </label>
         <select
           value={activeModelId}
           onChange={(e) => selectModel(e.target.value)}
-          className="w-full bg-white/80 border border-black/[0.08] rounded-xl px-3 py-2.5 text-xs text-[var(--text)] outline-none focus:border-[#fd3b12]/40 transition-colors elev-1"
+          className="lite-config-select w-full border border-black/[0.08] rounded-xl px-3 py-2.5 text-xs outline-none focus:border-[#fd3b12]/40 transition-colors elev-1"
           disabled={loading}
         >
           {modelsList.map((m) => (
@@ -239,7 +240,7 @@ const SidePanelContent: React.FC<SidePanelContentProps> = ({
             </option>
           ))}
         </select>
-        <p className="text-[10px] text-[var(--text-muted)] leading-relaxed">
+        <p className="lite-config-muted text-[10px] leading-relaxed">
           Gemma generates local replies. Gecko is an optional embedding model for retrieval and cannot generate chat responses.
         </p>
       </div>
@@ -254,13 +255,13 @@ const SidePanelContent: React.FC<SidePanelContentProps> = ({
     />
 
     <div className="border-t border-black/[0.04] pt-5">
-      <h4 className="text-xs font-bold text-[var(--text-h)] uppercase tracking-wider mb-4 flex items-center justify-between">
+      <h4 className="lite-config-heading text-xs font-bold uppercase tracking-wider mb-4 flex items-center justify-between">
         <span>Capabilities Checklist</span>
       </h4>
 
       <div className="space-y-3 font-mono text-xs">
         <div className="flex items-center justify-between p-2.5 rounded-xl glass-surface material-state">
-          <span className="text-[var(--text-muted)]">WebGPU:</span>
+          <span className="lite-config-muted">WebGPU:</span>
           {capabilities?.webgpu ? (
             <span className="flex items-center gap-1 text-emerald-600 font-bold">
               <CheckCircle className="w-3.5 h-3.5" /> SUPPORTED
@@ -273,7 +274,7 @@ const SidePanelContent: React.FC<SidePanelContentProps> = ({
         </div>
 
         <div className="flex items-center justify-between p-2.5 rounded-xl glass-surface material-state">
-          <span className="text-[var(--text-muted)]">WASM Runtime:</span>
+          <span className="lite-config-muted">WASM Runtime:</span>
           {capabilities?.wasm ? (
             <span className="flex items-center gap-1 text-emerald-600 font-bold">
               <CheckCircle className="w-3.5 h-3.5" /> READY
@@ -286,13 +287,13 @@ const SidePanelContent: React.FC<SidePanelContentProps> = ({
         </div>
 
         <div className="flex items-center justify-between p-2.5 rounded-xl glass-surface material-state">
-          <span className="text-[var(--text-muted)]">WebNN API:</span>
+          <span className="lite-config-muted">WebNN API:</span>
           {capabilities?.webnn ? (
             <span className="flex items-center gap-1 text-emerald-600 font-bold">
               <CheckCircle className="w-3.5 h-3.5" /> AVAILABLE
             </span>
           ) : (
-            <span className="text-[var(--text-muted)]">UNAVAILABLE</span>
+            <span className="lite-config-muted">UNAVAILABLE</span>
           )}
         </div>
       </div>
@@ -301,11 +302,11 @@ const SidePanelContent: React.FC<SidePanelContentProps> = ({
     <div className="border-t border-black/[0.04] pt-5">
       <div className="rounded-2xl glass-surface p-4 border border-[#8B5CF6]/15">
         <img src="/media/brand-icons/LiteRT_Blog4.jpg" alt="LiteRT.js" className="img-fluid rounded-md mb-2" />
-        <h5 className="text-xs font-bold text-[var(--text-h)] mb-2 flex items-center gap-1.5"> 
+        <h5 className="lite-config-heading text-xs font-bold mb-2 flex items-center gap-1.5">
           {/* <LiteRtMark className="w-3.5 h-3.5" /> */}
           Edge AI Telemetry powered by LiteRT.js
         </h5>
-        <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+        <p className="lite-config-muted text-[11px] leading-relaxed">
           Gemma 3n uses LiteRT-LM for local text generation. Gecko adds optional local embeddings for retrieval. Model weights are never bundled in this app; download and cache them only after explicit confirmation.
         </p>
       </div>
@@ -571,14 +572,14 @@ const LiteChat: React.FC = () => {
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#8B5CF6]/10 blur-[150px] pointer-events-none" />
 
       {/* Header */}
-      <header className="relative h-14 flex items-center justify-between px-4 sm:px-6 bg-gradient-to-r from-white via-[#fd3b12]/40 to-[#fd3b12] border-b border-[#fd3b12]/30 z-30 shrink-0 safe-area-top overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <header className="portal-header relative h-14 flex items-center justify-between px-4 sm:px-6 border-b border-[#fd3b12]/30 z-30 shrink-0 safe-area-top overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#fd3b12]/40 to-transparent pointer-events-none" />
 
-        <div className="flex items-center gap-3 h-full shrink-0 pe-2">
+        <div className="flex items-center gap-2 h-full shrink-0 pe-2">
           {/* New Chat */}
           <button
             onClick={startNewSession}
-            className="p-2.5 sm:p-1.5 text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95 shrink-0"
+            className="litechat-new-session p-2.5 sm:p-1.5 hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95 shrink-0 shadow-md"
             title="Start a New Session"
             aria-label="New Chat"
           >
@@ -596,23 +597,23 @@ const LiteChat: React.FC = () => {
           <img
             src="/media/aicodex-spirit-bird-white.png"
             alt="AICodex Logo"
-            className="w-7 h-7 p-1 bg-[#fd3b12] object-contain rounded-lg border border-[#fd3b12]/30 shadow-sm shadow-[#fd3b12]/10"
+            className="w-7 h-7 p-1 bg-[#fd3b12] object-contain rounded-lg border border-[#fd3b12]/30 shadow-sm shadow-[#fd3b12]/10 shadow-md"
             onError={(e) => {
               (e.target as HTMLElement).style.display = 'none';
             }}
           />
           <div className="flex flex-col leading-tight min-w-0">
-            <span className="text-sm font-bold tracking-wider text-[var(--text-h)] truncate">
+            <span className="portal-brand-label text-sm font-bold tracking-wider truncate">
               AI<span className="text-[#fd3b12]">Codex</span> Chat
             </span>
             <span className="text-[8px] uppercase tracking-widest text-[var(--text-muted)] font-semibold truncate">
-              LiteRT Web AI Engine
+              Web AI Engine
             </span>
           </div>
 
           <button
             onClick={() => setIsSessionsPanelOpen(true)}
-            className="hidden md:flex items-center rounded-full border border-white/25 bg-white/15 hover:bg-white/25 px-3 py-1 text-[10px] font-semibold text-[#fd3b12] max-w-[260px] transition-colors"
+            className="hidden md:flex items-center rounded-full border border-white/25 bg-white/15 hover:bg-white/25 px-3 py-1 text-[10px] font-semibold text-[#fd3b12] max-w-[260px] transition-colors shadow-sm"
             title="Open Chat Sessions"
             aria-label="Open Chat Sessions"
           >
@@ -625,6 +626,7 @@ const LiteChat: React.FC = () => {
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 h-full">
           <PortalSwitcher isDark={true} />
+          <InterfaceThemeToggle />
 
           {/* Provider Badge — clickable, opens SettingsModal */}
           {(() => {
@@ -634,14 +636,13 @@ const LiteChat: React.FC = () => {
             return (
               <button
                 onClick={() => setIsSettingsOpen(true)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer shrink-0 ${
-                  isLive
-                    ? 'bg-white/20 border-white/25 hover:bg-white/30 text-white'
-                    : 'bg-red-500/30 border-red-500/40 text-red-100'
-                }`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer shrink-0 shadow-md ${isLive
+                  ? 'bg-white/20 border-white/25 hover:bg-white/30 text-white'
+                  : 'bg-red-500/30 border-red-500/40 text-red-100'
+                  }`}
                 title={`Provider: ${providerInfo.label} — Click to change`}
               >
-                  <ProviderBadgeIcon provider={providerInfo} size={14} />
+                <ProviderBadgeIcon provider={providerInfo} size={14} />
                 <span className="hidden md:flex text-[10px] font-bold uppercase tracking-tight text-white">
                   {providerInfo.label} API
                 </span>
@@ -657,7 +658,7 @@ const LiteChat: React.FC = () => {
               localStorage.removeItem("token");
               navigate("/login");
             }}
-            className="p-2 hover:bg-white/15 rounded-lg text-white/90 hover:text-white transition-colors touch-44"
+            className="p-2 hover:bg-white/15 rounded-lg text-white/90 hover:text-white transition-colors touch-44 shadow-md"
             title="Logout"
             aria-label="Logout"
           >
@@ -685,7 +686,7 @@ const LiteChat: React.FC = () => {
                   setIsPanelOpen(true);
                 }
               }}
-              className="p-2 rounded-xl bg-black/20 text-white hover:text-white hover:bg-black/30 transition-colors touch-44"
+              className="p-2 rounded-xl bg-black/20 text-white hover:text-white hover:bg-black/30 transition-colors touch-44 shadow-md"
               title={window.innerWidth >= 1024
                 ? (isDesktopPanelOpen ? 'Hide Model Configuration Panel' : 'Show Model Configuration Panel')
                 : 'Open AI Panel'}
@@ -726,178 +727,174 @@ const LiteChat: React.FC = () => {
             {messages.length === 0 ? (
               <div className="min-h-full flex flex-col items-center text-center max-w-3xl mx-auto px-4">
                 <div className="my-auto flex flex-col items-center w-full">
-                {/* Welcome hero — LiteRT mark + user greeting */}
-                <div className="mb-10">
-                  <div className="p-7 rounded-[2rem] bg-[#fd3b12] border border-[#fd3b12]/40 mb-6 shadow-2xl shadow-[#fd3b12]/40 inline-block">
-                    <div className="w-24 h-24 brightness-0 invert drop-shadow-lg" >
-                      <img src={LITERT_ICON_WHITE} alt="LiteRT" className="w-4 h-4 object-contain drop-shadow-sm" />
+                  {/* Welcome hero — LiteRT mark + user greeting */}
+                  <div className="mb-10">
+                    <div className="p-7 rounded-[2rem] bg-[#fd3b12] border border-[#fd3b12]/40 mb-6 shadow-2xl shadow-[#fd3b12]/40 inline-block">
+                      <img src={LITERT_ICON_WHITE} alt="LiteRT" className="w-24 h-24 object-contain drop-shadow-sm" />
                     </div>
+                    <h3 className="litechat-welcome-heading text-2xl font-bold tracking-tight">
+                      Welcome back, <span className="text-[#fd3b12]">{userName}</span>
+                    </h3>
+                    <p className="text-sm text-[var(--text-muted)] mt-2.5">
+                      Pick a model or load a prompt to start chatting.
+                    </p>
                   </div>
-                  <h3 className="text-2xl font-bold text-[var(--text-h)] tracking-tight">
-                    Welcome back, <span className="text-[#fd3b12]">{userName}</span>
-                  </h3>
-                  <p className="text-sm text-[var(--text-muted)] mt-2.5">
-                    Pick a model or load a prompt to start chatting.
-                  </p>
-                </div>
 
-                {/* Prompts / History pill toggle — auto-width when collapsed, full-width when open */}
-                <div className="flex justify-center w-full">
-                  <motion.button
-                    onClick={() => toggleSection('prompts')}
-                    layout
-                    transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-                    className={`flex items-center justify-between gap-3 px-5 py-3.5 rounded-full glass-surface material-state press-lift transition-colors ${
-                      openSection === 'prompts' ? 'border-[#fd3b12]/40 ring-2 ring-[#fd3b12]/20 w-full' : 'w-auto'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2.5 min-w-0">
-                      <MessagesSquare className="w-4 h-4 shrink-0 text-[#fd3b12]" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-h)]">Prompts / History</span>
-                    </span>
-                    <ChevronDown className={`w-4 h-4 shrink-0 text-[var(--text-muted)] transition-transform ${openSection === 'prompts' ? 'rotate-180 text-[#fd3b12]' : ''}`} />
-                  </motion.button>
-                </div>
-
-                {/* Prompts / History expanded panel */}
-                <AnimatePresence initial={false}>
-                  {openSection === 'prompts' && (
-                    <motion.div
-                      key="prompts-panel"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                      className="w-full overflow-hidden"
+                  {/* Prompts / History pill toggle — auto-width when collapsed, full-width when open */}
+                  <div className="flex justify-center w-full">
+                    <motion.button
+                      onClick={() => toggleSection('prompts')}
+                      layout
+                      transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+                      className={`flex items-center justify-between gap-3 px-5 py-3.5 rounded-full glass-surface material-state press-lift transition-colors ${openSection === 'prompts' ? 'border-[#fd3b12]/40 ring-2 ring-[#fd3b12]/20 w-full' : 'w-auto'
+                        }`}
                     >
-                      <div className="rounded-2xl glass-surface material-state p-4 text-left shadow-sm mt-3">
-                        <h4 className="flex items-center gap-2 text-xs font-bold text-[var(--text-h)] uppercase tracking-wider mb-3">
-                          <MessagesSquare className="w-4 h-4 text-[#fd3b12]" />
-                          Prompts / History
-                        </h4>
+                      <span className="flex items-center gap-2.5 min-w-0">
+                        <MessagesSquare className="w-4 h-4 shrink-0 text-[#fd3b12]" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-h)]">Prompts / History</span>
+                      </span>
+                      <ChevronDown className={`w-4 h-4 shrink-0 text-[var(--text-muted)] transition-transform ${openSection === 'prompts' ? 'rotate-180 text-[#fd3b12]' : ''}`} />
+                    </motion.button>
+                  </div>
 
-                        <div className="space-y-1.5 mb-3">
-                          {SUGGESTED_PROMPTS.map((prompt) => (
-                            <button
-                              key={prompt.text}
-                              onClick={() => setInputText(prompt.text)}
-                              className="flex w-full items-center gap-2.5 p-2.5 rounded-xl bg-white/70 border border-black/[0.06] hover:border-[#fd3b12]/30 hover:bg-white/90 text-left transition-all press-lift"
-                            >
-                              <prompt.icon className="w-4 h-4 shrink-0 text-[#fd3b12]" />
-                              <span className="text-xs text-[var(--text)] truncate">{prompt.text}</span>
-                            </button>
-                          ))}
-                        </div>
+                  {/* Prompts / History expanded panel */}
+                  <AnimatePresence initial={false}>
+                    {openSection === 'prompts' && (
+                      <motion.div
+                        key="prompts-panel"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                        className="w-full overflow-hidden"
+                      >
+                        <div className="rounded-2xl glass-surface material-state p-4 text-left shadow-sm mt-3">
+                          <h4 className="flex items-center gap-2 text-xs font-bold text-[var(--text-h)] uppercase tracking-wider mb-3">
+                            <MessagesSquare className="w-4 h-4 text-[#fd3b12]" />
+                            Prompts / History
+                          </h4>
 
-                        <div className="border-t border-black/[0.05] pt-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">
-                              <HistoryIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
-                              Recent Prompts
-                            </span>
-                            {promptHistory.length > 0 && (
+                          <div className="space-y-1.5 mb-3">
+                            {SUGGESTED_PROMPTS.map((prompt) => (
                               <button
-                                onClick={clearPromptHistory}
-                                className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[#fd3b12] transition-colors press-lift"
-                                title="Clear Prompt History"
+                                key={prompt.text}
+                                onClick={() => setInputText(prompt.text)}
+                                className="flex w-full items-center gap-2.5 p-2.5 rounded-xl bg-white/70 border border-black/[0.06] hover:border-[#fd3b12]/30 hover:bg-white/90 text-left transition-all press-lift"
                               >
-                                <Trash2 className="w-3 h-3" />
-                                Clear
+                                <prompt.icon className="w-4 h-4 shrink-0 text-[#fd3b12]" />
+                                <span className="text-xs text-[var(--text)] truncate">{prompt.text}</span>
                               </button>
-                            )}
+                            ))}
                           </div>
-                          {promptHistory.length === 0 ? (
-                            <p className="text-[11px] text-[var(--text-muted)]">
-                              No prompts yet — ask something to build your history.
-                            </p>
-                          ) : (
-                            <div className="space-y-1.5 max-h-36 overflow-y-auto scrollbar-hide">
-                              {promptHistory.map((prompt, i) => (
-                                <button
-                                  key={`${prompt}-${i}`}
-                                  onClick={() => setInputText(prompt)}
-                                  className="group flex w-full items-center gap-2 p-2 rounded-lg bg-white/50 border border-black/[0.05] hover:border-[#fd3b12]/30 hover:bg-white/85 text-left transition-all"
-                                  title="Load into composer"
-                                >
-                                  <MessageSquare className="w-3.5 h-3.5 shrink-0 text-[var(--text-muted)] group-hover:text-[#fd3b12]" />
-                                  <span className="text-[11px] text-[var(--text)] truncate">{prompt}</span>
-                                  <RotateCcw className="w-3 h-3 shrink-0 ml-auto text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </button>
-                              ))}
-                            </div>
-                          )}
 
-                          <div className="mt-3.5 border-t border-black/[0.05] pt-3">
+                          <div className="border-t border-black/[0.05] pt-3">
                             <div className="flex items-center justify-between mb-2">
                               <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">
                                 <HistoryIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
-                                Chat Sessions
+                                Recent Prompts
                               </span>
-                              <div className="flex items-center gap-1">
+                              {promptHistory.length > 0 && (
                                 <button
-                                  onClick={startNewSession}
-                                  className="text-[10px] text-[var(--text-muted)] hover:text-[#fd3b12] transition-colors press-lift"
-                                  title="Start a new persisted session"
+                                  onClick={clearPromptHistory}
+                                  className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[#fd3b12] transition-colors press-lift"
+                                  title="Clear Prompt History"
                                 >
-                                  New
+                                  <Trash2 className="w-3 h-3" />
+                                  Clear
                                 </button>
-                                <button
-                                  onClick={() => refreshSessions()}
-                                  className="text-[10px] text-[var(--text-muted)] hover:text-[#fd3b12] transition-colors press-lift"
-                                  title="Refresh sessions"
-                                >
-                                  Refresh
-                                </button>
-                              </div>
+                              )}
                             </div>
-
-                            {sessionsLoading ? (
-                              <p className="text-[11px] text-[var(--text-muted)]">Loading sessions...</p>
-                            ) : sessions.length === 0 ? (
-                              <p className="text-[11px] text-[var(--text-muted)]">No sessions yet. Start a new chat to persist history.</p>
+                            {promptHistory.length === 0 ? (
+                              <p className="text-[11px] text-[var(--text-muted)]">
+                                No prompts yet — ask something to build your history.
+                              </p>
                             ) : (
-                              <div className="space-y-1.5 max-h-44 overflow-y-auto scrollbar-hide">
-                                {sessions.map((session) => {
-                                  const isActive = session.id === activeConversationId;
-                                  return (
-                                    <div
-                                      key={session.id}
-                                      className={`group flex items-center gap-2 p-2 rounded-lg border transition-all ${
-                                        isActive
-                                          ? 'bg-[#fd3b12]/10 border-[#fd3b12]/35'
-                                          : 'bg-white/50 border-black/[0.05] hover:border-[#fd3b12]/25 hover:bg-white/85'
-                                      }`}
-                                    >
-                                      <button
-                                        onClick={() => loadConversation(session.id)}
-                                        className="min-w-0 flex-1 text-left"
-                                        title="Load chat session"
-                                      >
-                                        <div className="text-[11px] font-semibold text-[var(--text)] truncate">
-                                          {session.title || `Session #${session.id}`}
-                                        </div>
-                                        <div className="text-[10px] text-[var(--text-muted)] truncate">
-                                          {new Date(session.updated_at).toLocaleString()}
-                                        </div>
-                                      </button>
-                                      <button
-                                        onClick={() => deleteConversation(session.id)}
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--text-muted)] hover:text-red-500"
-                                        title="Delete session"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
-                                  );
-                                })}
+                              <div className="space-y-1.5 max-h-36 overflow-y-auto scrollbar-hide">
+                                {promptHistory.map((prompt, i) => (
+                                  <button
+                                    key={`${prompt}-${i}`}
+                                    onClick={() => setInputText(prompt)}
+                                    className="group flex w-full items-center gap-2 p-2 rounded-lg bg-white/50 border border-black/[0.05] hover:border-[#fd3b12]/30 hover:bg-white/85 text-left transition-all"
+                                    title="Load into composer"
+                                  >
+                                    <MessageSquare className="w-3.5 h-3.5 shrink-0 text-[var(--text-muted)] group-hover:text-[#fd3b12]" />
+                                    <span className="text-[11px] text-[var(--text)] truncate">{prompt}</span>
+                                    <RotateCcw className="w-3 h-3 shrink-0 ml-auto text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </button>
+                                ))}
                               </div>
                             )}
+
+                            <div className="mt-3.5 border-t border-black/[0.05] pt-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">
+                                  <HistoryIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
+                                  Chat Sessions
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={startNewSession}
+                                    className="text-[10px] text-[var(--text-muted)] hover:text-[#fd3b12] transition-colors press-lift"
+                                    title="Start a new persisted session"
+                                  >
+                                    New
+                                  </button>
+                                  <button
+                                    onClick={() => refreshSessions()}
+                                    className="text-[10px] text-[var(--text-muted)] hover:text-[#fd3b12] transition-colors press-lift"
+                                    title="Refresh sessions"
+                                  >
+                                    Refresh
+                                  </button>
+                                </div>
+                              </div>
+
+                              {sessionsLoading ? (
+                                <p className="text-[11px] text-[var(--text-muted)]">Loading sessions...</p>
+                              ) : sessions.length === 0 ? (
+                                <p className="text-[11px] text-[var(--text-muted)]">No sessions yet. Start a new chat to persist history.</p>
+                              ) : (
+                                <div className="space-y-1.5 max-h-44 overflow-y-auto scrollbar-hide">
+                                  {sessions.map((session) => {
+                                    const isActive = session.id === activeConversationId;
+                                    return (
+                                      <div
+                                        key={session.id}
+                                        className={`group flex items-center gap-2 p-2 rounded-lg border transition-all ${isActive
+                                          ? 'bg-[#fd3b12]/10 border-[#fd3b12]/35'
+                                          : 'bg-white/50 border-black/[0.05] hover:border-[#fd3b12]/25 hover:bg-white/85'
+                                          }`}
+                                      >
+                                        <button
+                                          onClick={() => loadConversation(session.id)}
+                                          className="min-w-0 flex-1 text-left"
+                                          title="Load chat session"
+                                        >
+                                          <div className="text-[11px] font-semibold text-[var(--text)] truncate">
+                                            {session.title || `Session #${session.id}`}
+                                          </div>
+                                          <div className="text-[10px] text-[var(--text-muted)] truncate">
+                                            {new Date(session.updated_at).toLocaleString()}
+                                          </div>
+                                        </button>
+                                        <button
+                                          onClick={() => deleteConversation(session.id)}
+                                          className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--text-muted)] hover:text-red-500"
+                                          title="Delete session"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
             ) : (
@@ -908,145 +905,144 @@ const LiteChat: React.FC = () => {
                 const contentForDisplay = parsedUserContent?.text || msg.content;
 
                 return (
-                <div
-                  key={msg.id}
-                  className={`flex gap-4 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {msg.sender === 'bot' && (
-                    <div className="w-8 h-8 rounded-lg bg-[#fd3b12]/10 border border-[#fd3b12]/20 flex items-center justify-center shrink-0 shadow-sm">
-                      <img src="/media/aicodex-spirit-bird.png" alt="AICodex Logo" className="w-4 h-4 object-contain" />
-                    </div>
-                  )}
+                  <div
+                    key={msg.id}
+                    className={`flex gap-4 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {msg.sender === 'bot' && (
+                      <div className="w-8 h-8 rounded-lg bg-[#fd3b12]/10 border border-[#fd3b12]/20 flex items-center justify-center shrink-0 shadow-sm">
+                        <img src="/media/aicodex-spirit-bird.png" alt="AICodex Logo" className="w-4 h-4 object-contain" />
+                      </div>
+                    )}
 
-                  <div className={`max-w-[85%] px-5 py-3.5 text-sm leading-relaxed relative ${
-                    msg.sender === 'user'
+                    <div className={`max-w-[85%] px-5 py-3.5 text-sm leading-relaxed relative ${msg.sender === 'user'
                       ? 'bg-gradient-to-br from-[#fd3b12] to-[#e8480a] text-white rounded-2xl rounded-tr-sm rounded-bl-sm shadow-md shadow-[#fd3b12]/10 user-corner-glow'
                       : 'bg-white border border-black/[0.06] text-[#334155] rounded-2xl rounded-tl-sm rounded-br-sm shadow-md bot-corner-glow'
-                  }`}>
-                    {msg.sender === 'user' ? (
-                      <div className="absolute inset-0 pointer-events-none user-corner-glow-secondary rounded-2xl rounded-tr-sm rounded-bl-sm overflow-hidden"></div>
-                    ) : (
-                      <div className="absolute inset-0 pointer-events-none bot-corner-glow-secondary rounded-2xl rounded-tl-sm rounded-br-sm overflow-hidden"></div>
-                    )}
-
-                    {/* Message Content */}
-                    <div className="font-sans relative z-10 prose prose-sm max-w-none prose-pre:my-2 prose-code:text-inherit">
-                      {contentForDisplay ? (
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm, remarkMath]}
-                          rehypePlugins={[rehypeKatex]}
-                          components={{
-                            pre: ({ children }) => (
-                              <pre className="rounded-lg border border-black/[0.08] bg-black/[0.03] p-3 overflow-x-auto text-[12px]">{children}</pre>
-                            ),
-                            code: ({ inline, children, ...props }: any) => (
-                              inline ? (
-                                <code className="px-1 py-0.5 rounded bg-black/[0.05]" {...props}>{children}</code>
-                              ) : (
-                                <code {...props}>{children}</code>
-                              )
-                            ),
-                          }}
-                        >
-                          {contentForDisplay}
-                        </ReactMarkdown>
+                      }`}>
+                      {msg.sender === 'user' ? (
+                        <div className="absolute inset-0 pointer-events-none user-corner-glow-secondary rounded-2xl rounded-tr-sm rounded-bl-sm overflow-hidden"></div>
                       ) : (
-                        <span className="flex items-center gap-2 text-[var(--text-muted)]">
-                          <AgentPulse
-                            mode={loading ? 'thinking' : 'idle'}
-                            showText={false}
-                            className="scale-90 origin-left"
-                          />
-                          <span className="text-[11px] font-semibold tracking-wide">
-                            {loading ? 'Thinking...' : 'Ready'}
+                        <div className="absolute inset-0 pointer-events-none bot-corner-glow-secondary rounded-2xl rounded-tl-sm rounded-br-sm overflow-hidden"></div>
+                      )}
+
+                      {/* Message Content */}
+                      <div className="font-sans relative z-10 prose prose-sm max-w-none prose-pre:my-2 prose-code:text-inherit">
+                        {contentForDisplay ? (
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm, remarkMath]}
+                            rehypePlugins={[rehypeKatex]}
+                            components={{
+                              pre: ({ children }) => (
+                                <pre className="rounded-lg border border-black/[0.08] bg-black/[0.03] p-3 overflow-x-auto text-[12px]">{children}</pre>
+                              ),
+                              code: ({ inline, children, ...props }: any) => (
+                                inline ? (
+                                  <code className="px-1 py-0.5 rounded bg-black/[0.05]" {...props}>{children}</code>
+                                ) : (
+                                  <code {...props}>{children}</code>
+                                )
+                              ),
+                            }}
+                          >
+                            {contentForDisplay}
+                          </ReactMarkdown>
+                        ) : (
+                          <span className="flex items-center gap-2 text-[var(--text-muted)]">
+                            <AgentPulse
+                              mode={loading ? 'thinking' : 'idle'}
+                              showText={false}
+                              className="scale-90 origin-left"
+                            />
+                            <span className="text-[11px] font-semibold tracking-wide">
+                              {loading ? 'Thinking...' : 'Ready'}
+                            </span>
                           </span>
-                        </span>
+                        )}
+                      </div>
+
+                      {msg.sender === 'user' && parsedUserContent && parsedUserContent.attachments.length > 0 && (
+                        <div className="mt-3 space-y-2 relative z-10">
+                          {parsedUserContent.attachments.map((attachment) => {
+                            const isImage = attachment.mimeType.startsWith('image/');
+                            const isPdf = attachment.mimeType === 'application/pdf';
+
+                            return (
+                              <div
+                                key={attachment.id}
+                                className="rounded-xl border border-white/20 bg-black/35 backdrop-blur-sm p-2.5 text-white"
+                              >
+                                <div className="flex items-start gap-2.5">
+                                  <div className="w-8 h-8 rounded-lg bg-black/35 border border-white/20 flex items-center justify-center shrink-0">
+                                    {isImage ? (
+                                      <ImageIcon className="w-4 h-4" />
+                                    ) : (
+                                      <FileText className="w-4 h-4" />
+                                    )}
+                                  </div>
+
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-[11px] font-semibold truncate" title={attachment.name}>
+                                      {attachment.name}
+                                    </div>
+                                    <div className="text-[10px] text-white/75 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                      <span className="px-1.5 py-0.5 rounded-full bg-black/45 border border-white/20">
+                                        {isImage ? 'Image' : isPdf ? 'PDF' : 'Document'}
+                                      </span>
+                                      {attachment.sizeLabel && <span>{attachment.sizeLabel}</span>}
+                                      <span className="truncate">{attachment.mimeType}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {attachment.extractedText && (
+                                  <div className="mt-2 rounded-lg bg-black/45 border border-white/15 p-2">
+                                    <div className="text-[10px] uppercase tracking-wider text-white/80 mb-1">Extracted Text</div>
+                                    <p className="text-[11px] text-white/95 whitespace-pre-wrap line-clamp-4">
+                                      {attachment.extractedText}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Metadata Footer */}
+                      {msg.sender === 'bot' && (
+                        <div className="mt-2.5 pt-2 border-t border-black/[0.04] flex items-center justify-between gap-2 text-[10px] text-[var(--text-muted)] select-none relative z-10">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {msg.metadata?.provider && msg.metadata.provider !== 'local' ? (
+                              (() => {
+                                const providerInfo = [...PROVIDERS, ...MORE_PROVIDERS].find((p) => p.id === msg.metadata?.provider);
+                                return providerInfo ? (
+                                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white shadow-sm shrink-0">
+                                    <ProviderIcon provider={providerInfo} size={12} />
+                                  </span>
+                                ) : (
+                                  <Cloud className="w-3.5 h-3.5 shrink-0" />
+                                );
+                              })()
+                            ) : (
+                              <Cpu className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                            )}
+                            <span className="truncate">
+                              {msg.metadata?.provider || msg.engine}
+                            </span>
+                            <span>|</span>
+                            <span className="truncate text-[var(--text-primary)] font-semibold">{msg.metadata?.model || activeModelId}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 text-right">
+                            <span>{formatDuration(msg.metadata?.durationMs)}</span>
+                            <span>•</span>
+                            <span>{msg.metadata?.tokens ?? 0} tokens</span>
+                          </div>
+                        </div>
                       )}
                     </div>
-
-                    {msg.sender === 'user' && parsedUserContent && parsedUserContent.attachments.length > 0 && (
-                      <div className="mt-3 space-y-2 relative z-10">
-                        {parsedUserContent.attachments.map((attachment) => {
-                          const isImage = attachment.mimeType.startsWith('image/');
-                          const isPdf = attachment.mimeType === 'application/pdf';
-
-                          return (
-                            <div
-                              key={attachment.id}
-                              className="rounded-xl border border-white/20 bg-black/35 backdrop-blur-sm p-2.5 text-white"
-                            >
-                              <div className="flex items-start gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-black/35 border border-white/20 flex items-center justify-center shrink-0">
-                                  {isImage ? (
-                                    <ImageIcon className="w-4 h-4" />
-                                  ) : (
-                                    <FileText className="w-4 h-4" />
-                                  )}
-                                </div>
-
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-[11px] font-semibold truncate" title={attachment.name}>
-                                    {attachment.name}
-                                  </div>
-                                  <div className="text-[10px] text-white/75 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                    <span className="px-1.5 py-0.5 rounded-full bg-black/45 border border-white/20">
-                                      {isImage ? 'Image' : isPdf ? 'PDF' : 'Document'}
-                                    </span>
-                                    {attachment.sizeLabel && <span>{attachment.sizeLabel}</span>}
-                                    <span className="truncate">{attachment.mimeType}</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {attachment.extractedText && (
-                                <div className="mt-2 rounded-lg bg-black/45 border border-white/15 p-2">
-                                  <div className="text-[10px] uppercase tracking-wider text-white/80 mb-1">Extracted Text</div>
-                                  <p className="text-[11px] text-white/95 whitespace-pre-wrap line-clamp-4">
-                                    {attachment.extractedText}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Metadata Footer */}
-                    {msg.sender === 'bot' && (
-                      <div className="mt-2.5 pt-2 border-t border-black/[0.04] flex items-center justify-between gap-2 text-[10px] text-[var(--text-muted)] select-none relative z-10">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {msg.metadata?.provider && msg.metadata.provider !== 'local' ? (
-                            (() => {
-                              const providerInfo = [...PROVIDERS, ...MORE_PROVIDERS].find((p) => p.id === msg.metadata?.provider);
-                              return providerInfo ? (
-                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white shadow-sm shrink-0">
-                                  <ProviderIcon provider={providerInfo} size={12} />
-                                </span>
-                              ) : (
-                                <Cloud className="w-3.5 h-3.5 shrink-0" />
-                              );
-                            })()
-                          ) : (
-                            <Cpu className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                          )}
-                          <span className="truncate">
-                            {msg.metadata?.provider || msg.engine}
-                          </span>
-                          <span>|</span>
-                          <span className="truncate text-[var(--text-primary)] font-semibold">{msg.metadata?.model || activeModelId}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0 text-right">
-                          <span>{formatDuration(msg.metadata?.durationMs)}</span>
-                          <span>•</span>
-                          <span>{msg.metadata?.tokens ?? 0} tokens</span>
-                        </div>
-                      </div>
-                    )}
                   </div>
-                </div>
-              );
+                );
               })
             )}
           </div>
@@ -1094,10 +1090,9 @@ const LiteChat: React.FC = () => {
                                       key={option.id}
                                       value={option.id}
                                       className={({ active }) =>
-                                        `relative cursor-pointer select-none rounded-lg py-2 pl-2.5 pr-8 transition-colors ${
-                                          active
-                                            ? 'bg-[#fd3b12]/10 text-[#fd3b12]'
-                                            : 'text-[var(--text-primary)]'
+                                        `relative cursor-pointer select-none rounded-lg py-2 pl-2.5 pr-8 transition-colors ${active
+                                          ? 'bg-[#fd3b12]/10 text-[#fd3b12]'
+                                          : 'text-[var(--text-primary)]'
                                         }`
                                       }
                                     >
@@ -1143,8 +1138,8 @@ const LiteChat: React.FC = () => {
                                 {missingApiKey
                                   ? 'Add your API key to load models'
                                   : (cloudProviderStatus[provider] === 'live'
-                                      ? 'No models available'
-                                      : 'No models loaded — configure & refresh')}
+                                    ? 'No models available'
+                                    : 'No models loaded — configure & refresh')}
                               </option>
                             )}
                           </select>
@@ -1156,7 +1151,7 @@ const LiteChat: React.FC = () => {
                       </div>
                     </motion.div>
                   )}
-                  </AnimatePresence>
+                </AnimatePresence>
 
                 {/* Missing API Key Notice */}
                 {engineMode === 'cloud' && missingApiKey && (
@@ -1241,11 +1236,10 @@ const LiteChat: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setEngineMode(prev => prev === 'local' ? 'cloud' : 'local')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all press-lift ${
-                        engineMode === 'cloud'
-                          ? 'bg-[#fd3b12]/10 border-[#fd3b12]/30 text-[#fd3b12] hover:bg-[#fd3b12]/15 shadow-[0_6px_14px_-6px_rgba(253,59,18,0.45)]'
-                          : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/15 shadow-[0_6px_14px_-6px_rgba(16,185,129,0.45)]'
-                      }`}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all press-lift ${engineMode === 'cloud'
+                        ? 'bg-[#fd3b12]/10 border-[#fd3b12]/30 text-[#fd3b12] hover:bg-[#fd3b12]/15 shadow-[0_6px_14px_-6px_rgba(253,59,18,0.45)]'
+                        : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/15 shadow-[0_6px_14px_-6px_rgba(16,185,129,0.45)]'
+                        }`}
                       title={
                         engineMode === 'cloud'
                           ? "Currently querying the real AICodex Cloud Agent"
@@ -1270,11 +1264,10 @@ const LiteChat: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setCloudConfigOpen(o => !o)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all press-lift ${
-                          cloudConfigOpen
-                            ? 'bg-[#fd3b12]/10 border-[#fd3b12]/30 text-[#fd3b12] hover:bg-[#fd3b12]/15 shadow-[0_6px_14px_-6px_rgba(253,59,18,0.45)]'
-                            : 'bg-white/70 border-[#fd3b12]/25 text-[var(--text-muted)] hover:bg-white/90 hover:text-[#fd3b12] hover:border-[#fd3b12]/40'
-                        }`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all press-lift ${cloudConfigOpen
+                          ? 'bg-[#fd3b12]/10 border-[#fd3b12]/30 text-[#fd3b12] hover:bg-[#fd3b12]/15 shadow-[0_6px_14px_-6px_rgba(253,59,18,0.45)]'
+                          : 'bg-white/70 border-[#fd3b12]/25 text-[var(--text-muted)] hover:bg-white/90 hover:text-[#fd3b12] hover:border-[#fd3b12]/40'
+                          }`}
                         title="Toggle provider & model configuration"
                       >
                         <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -1394,7 +1387,7 @@ const LiteChat: React.FC = () => {
                       }}
                     />
                     <div className="flex flex-col leading-tight min-w-0">
-                      <span className="text-sm font-bold tracking-wider text-[var(--text-h)] truncate">
+                      <span className="portal-brand-label text-sm font-bold tracking-wider truncate">
                         AI<span className="text-[#fd3b12]">Codex</span> Chat
                       </span>
                       <span className="text-[8px] uppercase tracking-widest text-[var(--text-muted)] font-semibold truncate">
@@ -1485,11 +1478,10 @@ const LiteChat: React.FC = () => {
                       return (
                         <div
                           key={session.id}
-                          className={`group rounded-xl border p-3 transition-colors ${
-                            isActive
-                              ? 'border-[#fd3b12]/40 bg-[#fd3b12]/8'
-                              : 'border-black/[0.08] bg-white hover:border-[#fd3b12]/30'
-                          }`}
+                          className={`group rounded-xl border p-3 transition-colors ${isActive
+                            ? 'border-[#fd3b12]/40 bg-[#fd3b12]/8'
+                            : 'border-black/[0.08] bg-white hover:border-[#fd3b12]/30'
+                            }`}
                         >
                           <button
                             onClick={() => {

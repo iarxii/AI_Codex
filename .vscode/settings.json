@@ -27,5 +27,8 @@
   },
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
   }
 }

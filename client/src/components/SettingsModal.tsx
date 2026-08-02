@@ -42,16 +42,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const [cfGatewayUrl, setCfGatewayUrl] = useState("");
   const [cfGatewayAccountId, setCfGatewayAccountId] = useState("");
   const [cfGatewayGatewayId, setCfGatewayGatewayId] = useState("");
-const [workersAiKey, setWorkersAiKey] = useState("");
-const [workersAiAccountId, setWorkersAiAccountId] = useState("");
-const [anthropicKey, setAnthropicKey] = useState("");
-const [anthropicBaseUrl, setAnthropicBaseUrl] = useState("");
-const [huggingfaceKey, setHuggingfaceKey] = useState("");
-const [huggingfaceBaseUrl, setHuggingfaceBaseUrl] = useState("");
-const [enableLangsmith, setEnableLangsmith] = useState(false);
-const [langsmithApiKey, setLangsmithApiKey] = useState("");
-const [langsmithProject, setLangsmithProject] = useState("");
-const [privateWorkspace, setPrivateWorkspace] = useState(true);
+  const [workersAiKey, setWorkersAiKey] = useState("");
+  const [workersAiAccountId, setWorkersAiAccountId] = useState("");
+  const [anthropicKey, setAnthropicKey] = useState("");
+  const [anthropicBaseUrl, setAnthropicBaseUrl] = useState("");
+  const [huggingfaceKey, setHuggingfaceKey] = useState("");
+  const [huggingfaceBaseUrl, setHuggingfaceBaseUrl] = useState("");
+  const [enableLangsmith, setEnableLangsmith] = useState(false);
+  const [langsmithApiKey, setLangsmithApiKey] = useState("");
+  const [langsmithProject, setLangsmithProject] = useState("");
+  const [privateWorkspace, setPrivateWorkspace] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
@@ -89,19 +89,19 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
       setCfGatewayGatewayId(
         localStorage.getItem("cloudflare_ai_gateway_gateway_id") || "",
       );
-       setWorkersAiKey(localStorage.getItem("workers_ai_key") || "");
-       setWorkersAiAccountId(
-         localStorage.getItem("workers_ai_account_id") || "",
-       );
-       setAnthropicKey(localStorage.getItem("anthropic_api_key") || "");
+      setWorkersAiKey(localStorage.getItem("workers_ai_key") || "");
+      setWorkersAiAccountId(
+        localStorage.getItem("workers_ai_account_id") || "",
+      );
+      setAnthropicKey(localStorage.getItem("anthropic_api_key") || "");
       setAnthropicBaseUrl(getStoredProviderBaseUrl("anthropic"));
-        setHuggingfaceKey(localStorage.getItem("huggingface_api_key") || "");
+      setHuggingfaceKey(localStorage.getItem("huggingface_api_key") || "");
       setHuggingfaceBaseUrl(getStoredProviderBaseUrl("huggingface"));
-       setEnableLangsmith(localStorage.getItem("enable_langsmith") === "true");
+      setEnableLangsmith(localStorage.getItem("enable_langsmith") === "true");
       setLangsmithApiKey(localStorage.getItem("langsmith_api_key") || "");
       setLangsmithProject(
         localStorage.getItem("langsmith_project") ||
-          "aicodex-agent-react-benchmarks",
+        "aicodex-agent-react-benchmarks",
       );
       setPrivateWorkspace(
         localStorage.getItem("private_workspace") !== "false",
@@ -196,52 +196,52 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
     }
   };
 
-    const testAnthropic = async () => {
-      setIsTesting(true);
-      setTestResult(null);
-      try {
-        const token = localStorage.getItem("token");
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-        if (anthropicKey) headers["X-API-Key"] = anthropicKey;
-        if (anthropicBaseUrl) headers["X-Base-Url"] = anthropicBaseUrl;
-        if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
-        headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
+  const testAnthropic = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const token = localStorage.getItem("token");
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      if (anthropicKey) headers["X-API-Key"] = anthropicKey;
+      if (anthropicBaseUrl) headers["X-Base-Url"] = anthropicBaseUrl;
+      if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
+      headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
 
-        const response = await fetch(
-          `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=anthropic`,
-          {
-            headers,
-          },
-        );
+      const response = await fetch(
+        `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=anthropic`,
+        {
+          headers,
+        },
+      );
 
-        if (response.ok) {
-          const models = await response.json();
-          setTestResult({
-            success: true,
-            message:
-              models.length > 0
-                ? `Connected! Found ${models.length} models.`
-                : "Connected, but no models found.",
-          });
-        } else {
-          const err = await response.json();
-          setTestResult({
-            success: false,
-            message: err.detail || "Connection failed.",
-          });
-        }
-      } catch (e) {
+      if (response.ok) {
+        const models = await response.json();
+        setTestResult({
+          success: true,
+          message:
+            models.length > 0
+              ? `Connected! Found ${models.length} models.`
+              : "Connected, but no models found.",
+        });
+      } else {
+        const err = await response.json();
         setTestResult({
           success: false,
-          message: "Network error. Check configuration.",
+          message: err.detail || "Connection failed.",
         });
-      } finally {
-        setIsTesting(false);
       }
-    };
+    } catch (e) {
+      setTestResult({
+        success: false,
+        message: "Network error. Check configuration.",
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   const testColabBridge = async () => {
     setIsTesting(true);
@@ -335,96 +335,96 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
     }
   };
 
-   const testWorkersAI = async () => {
-     setIsTesting(true);
-     setTestResult(null);
-     try {
-       const token = localStorage.getItem("token");
-       const headers: Record<string, string> = {};
-       if (token) {
-         headers["Authorization"] = `Bearer ${token}`;
-       }
-       if (workersAiKey) headers["X-API-Key"] = workersAiKey;
-       if (workersAiAccountId) headers["X-Account-Id"] = workersAiAccountId;
-       if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
-       headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
+  const testWorkersAI = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const token = localStorage.getItem("token");
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      if (workersAiKey) headers["X-API-Key"] = workersAiKey;
+      if (workersAiAccountId) headers["X-Account-Id"] = workersAiAccountId;
+      if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
+      headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
 
-       const response = await fetch(
-         `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=workers_ai`,
-         {
-           headers,
-         }
-       );
+      const response = await fetch(
+        `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=workers_ai`,
+        {
+          headers,
+        }
+      );
 
-       if (response.ok) {
-         const models = await response.json();
-         setTestResult({
-           success: true,
-           message:
-             models.length > 0
-               ? `Connected! Found ${models.length} models.`
-               : "Connected, but no models found.",
-         });
-       } else {
-         const err = await response.json();
-         setTestResult({
-           success: false,
-           message: err.detail || "Connection failed.",
-         });
-       }
-     } catch (e) {
-       setTestResult({
-         success: false,
-         message: "Network error. Check configuration.",
-       });
-     } finally {
-       setIsTesting(false);
-     }
-   };
+      if (response.ok) {
+        const models = await response.json();
+        setTestResult({
+          success: true,
+          message:
+            models.length > 0
+              ? `Connected! Found ${models.length} models.`
+              : "Connected, but no models found.",
+        });
+      } else {
+        const err = await response.json();
+        setTestResult({
+          success: false,
+          message: err.detail || "Connection failed.",
+        });
+      }
+    } catch (e) {
+      setTestResult({
+        success: false,
+        message: "Network error. Check configuration.",
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
-   const testHuggingFace = async () => {
-     setIsTesting(true);
-     setTestResult(null);
-     try {
-       const token = localStorage.getItem("token");
-       const headers: Record<string, string> = {};
-       if (token) {
-         headers["Authorization"] = `Bearer ${token}`;
-       }
-       if (huggingfaceKey) headers["X-API-Key"] = huggingfaceKey;
-       if (huggingfaceBaseUrl) headers["X-Base-Url"] = huggingfaceBaseUrl;
-       if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
-       headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
+  const testHuggingFace = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const token = localStorage.getItem("token");
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      if (huggingfaceKey) headers["X-API-Key"] = huggingfaceKey;
+      if (huggingfaceBaseUrl) headers["X-Base-Url"] = huggingfaceBaseUrl;
+      if (activeSpace) headers["X-Space-Slug"] = activeSpace.slug;
+      headers["X-Is-Premium"] = isPremiumSpace ? "true" : "false";
 
-       const response = await fetch(
-         `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=huggingface`,
-         {
-           headers,
-         }
-       );
+      const response = await fetch(
+        `${config.API_BASE_URL}${config.API_V1_STR}/models?provider=huggingface`,
+        {
+          headers,
+        }
+      );
 
-       if (response.ok) {
-         const models = await response.json();
-         setTestResult({
-           success: true,
-           message:
-             models.length > 0
-               ? `Connected! Found ${models.length} models.`
-               : "Connected, but no models found.",
-         });
-       } else {
-         const err = await response.json();
-         setTestResult({
-           success: false,
-           message: err.detail || "Connection failed.",
-         });
-       }
-     } catch (e) {
-       setTestResult({ success: false, message: "Network error. Check configuration." });
-     } finally {
-       setIsTesting(false);
-     }
-   };
+      if (response.ok) {
+        const models = await response.json();
+        setTestResult({
+          success: true,
+          message:
+            models.length > 0
+              ? `Connected! Found ${models.length} models.`
+              : "Connected, but no models found.",
+        });
+      } else {
+        const err = await response.json();
+        setTestResult({
+          success: false,
+          message: err.detail || "Connection failed.",
+        });
+      }
+    } catch (e) {
+      setTestResult({ success: false, message: "Network error. Check configuration." });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   const handleSave = () => {
     try {
@@ -459,28 +459,28 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
         "cloudflare_ai_gateway_gateway_id",
         (cfGatewayGatewayId || "").trim(),
       );
-       localStorage.setItem("workers_ai_key", (workersAiKey || "").trim());
-       localStorage.setItem(
-         "workers_ai_account_id",
-         (workersAiAccountId || "").trim(),
-       );
-       localStorage.setItem("anthropic_api_key", (anthropicKey || "").trim());
-       localStorage.setItem("anthropic_base_url", (anthropicBaseUrl || "").trim());
-       localStorage.setItem("huggingface_api_key", (huggingfaceKey || "").trim());
-       localStorage.setItem("huggingface_base_url", (huggingfaceBaseUrl || "").trim());
-       localStorage.setItem(
-         "enable_langsmith",
-         enableLangsmith ? "true" : "false",
-       );
-       localStorage.setItem("langsmith_api_key", (langsmithApiKey || "").trim());
-       localStorage.setItem(
-         "langsmith_project",
-         (langsmithProject || "").trim(),
-       );
-       localStorage.setItem(
-         "private_workspace",
-         privateWorkspace ? "true" : "false",
-       );
+      localStorage.setItem("workers_ai_key", (workersAiKey || "").trim());
+      localStorage.setItem(
+        "workers_ai_account_id",
+        (workersAiAccountId || "").trim(),
+      );
+      localStorage.setItem("anthropic_api_key", (anthropicKey || "").trim());
+      localStorage.setItem("anthropic_base_url", (anthropicBaseUrl || "").trim());
+      localStorage.setItem("huggingface_api_key", (huggingfaceKey || "").trim());
+      localStorage.setItem("huggingface_base_url", (huggingfaceBaseUrl || "").trim());
+      localStorage.setItem(
+        "enable_langsmith",
+        enableLangsmith ? "true" : "false",
+      );
+      localStorage.setItem("langsmith_api_key", (langsmithApiKey || "").trim());
+      localStorage.setItem(
+        "langsmith_project",
+        (langsmithProject || "").trim(),
+      );
+      localStorage.setItem(
+        "private_workspace",
+        privateWorkspace ? "true" : "false",
+      );
 
       // Dispatch custom event for parts of the app not yet using Context
       window.dispatchEvent(new Event("ai-settings-changed"));
@@ -566,34 +566,31 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                         <button
                           key={provider.id}
                           onClick={() => setActiveProvider(provider.id)}
-                          className={`relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${
-                            isActive
+                          className={`relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${isActive
                               ? isLiteRt
                                 ? "bg-white/60 backdrop-blur-md border-[#3B82F6]/60 shadow-lg shadow-[#3B82F6]/20"
                                 : "bg-[#fd3b12]/10 border-[#fd3b12] shadow-md shadow-[#fd3b12]/10"
                               : isLiteRt
                                 ? "bg-white/35 backdrop-blur-md border-[#3B82F6]/20 hover:bg-white/55 hover:border-[#3B82F6]/40"
                                 : "bg-[#D8DCE4] border-transparent hover:bg-[#D0D4DC] hover:border-black/[0.08]"
-                          }`}
+                            }`}
                         >
                           {isActive && (
                             <div
-                              className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${
-                                isLiteRt
+                              className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${isLiteRt
                                   ? "bg-[#3B82F6] shadow-[0_0_8px_rgba(59,130,246,0.75)]"
                                   : "bg-[#fd3b12] shadow-[0_0_6px_rgba(255,102,0,0.7)]"
-                              }`}
+                                }`}
                             />
                           )}
                           <ProviderIcon provider={provider} size={28} />
                           <span
-                            className={`text-[11px] font-semibold ${
-                              isActive
+                            className={`text-[11px] font-semibold ${isActive
                                 ? isLiteRt
                                   ? "text-[#1D4ED8]"
                                   : "text-[#fd3b12]"
                                 : "text-[#4A4D5E]"
-                            }`}
+                              }`}
                           >
                             {provider.label}
                           </span>
@@ -720,11 +717,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                         <button
                           onClick={testOllamaCloud}
                           disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                            isTesting
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
                               ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
                               : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                          }`}
+                            }`}
                         >
                           {isTesting ? (
                             <ArrowPathIcon className="w-4 h-4 animate-spin" />
@@ -736,11 +732,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
 
                         {testResult && (
                           <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
-                              testResult.success
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
                                 ? "bg-green-100 text-green-700"
                                 : "bg-red-100 text-red-700"
-                            }`}
+                              }`}
                           >
                             {testResult.success ? (
                               <CheckCircleIcon className="w-4 h-4" />
@@ -785,11 +780,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                         <button
                           onClick={testColabBridge}
                           disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                            isTesting
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
                               ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
                               : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                          }`}
+                            }`}
                         >
                           {isTesting ? (
                             <ArrowPathIcon className="w-4 h-4 animate-spin" />
@@ -801,11 +795,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
 
                         {testResult && (
                           <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
-                              testResult.success
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
                                 ? "bg-green-100 text-green-700"
                                 : "bg-red-100 text-red-700"
-                            }`}
+                              }`}
                           >
                             {testResult.success ? (
                               <CheckCircleIcon className="w-4 h-4" />
@@ -850,11 +843,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                         <button
                           onClick={testOpenAI}
                           disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                            isTesting
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
                               ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
                               : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                          }`}
+                            }`}
                         >
                           {isTesting ? (
                             <ArrowPathIcon className="w-4 h-4 animate-spin" />
@@ -866,11 +858,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
 
                         {testResult && (
                           <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
-                              testResult.success
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
                                 ? "bg-green-100 text-green-700"
                                 : "bg-red-100 text-red-700"
-                            }`}
+                              }`}
                           >
                             {testResult.success ? (
                               <CheckCircleIcon className="w-4 h-4" />
@@ -909,22 +900,20 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                           <button
                             type="button"
                             onClick={() => setGeminiAuthMethod("api_key")}
-                            className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                              geminiAuthMethod === "api_key"
+                            className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${geminiAuthMethod === "api_key"
                                 ? "bg-[#1A1D2E] text-white shadow-sm"
                                 : "text-[#4A4D5E] hover:text-[#1A1D2E]"
-                            }`}
+                              }`}
                           >
                             Google AI Studio
                           </button>
                           <button
                             type="button"
                             onClick={() => setGeminiAuthMethod("vertex")}
-                            className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                              geminiAuthMethod === "vertex"
+                            className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${geminiAuthMethod === "vertex"
                                 ? "bg-[#1A1D2E] text-white shadow-sm"
                                 : "text-[#4A4D5E] hover:text-[#1A1D2E]"
-                            }`}
+                              }`}
                           >
                             Vertex AI (ADC)
                           </button>
@@ -1055,11 +1044,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                         <button
                           onClick={testCloudflareAIGateway}
                           disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                            isTesting
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
                               ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
                               : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                          }`}
+                            }`}
                         >
                           {isTesting ? (
                             <ArrowPathIcon className="w-4 h-4 animate-spin" />
@@ -1071,11 +1059,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
 
                         {testResult && (
                           <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
-                              testResult.success
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
                                 ? "bg-green-100 text-green-700"
                                 : "bg-red-100 text-red-700"
-                            }`}
+                              }`}
                           >
                             {testResult.success ? (
                               <CheckCircleIcon className="w-4 h-4" />
@@ -1122,11 +1109,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                         <button
                           onClick={testWorkersAI}
                           disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                            isTesting
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
                               ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
                               : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                          }`}
+                            }`}
                         >
                           {isTesting ? (
                             <ArrowPathIcon className="w-4 h-4 animate-spin" />
@@ -1138,11 +1124,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
 
                         {testResult && (
                           <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
-                              testResult.success
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
                                 ? "bg-green-100 text-green-700"
                                 : "bg-red-100 text-red-700"
-                            }`}
+                              }`}
                           >
                             {testResult.success ? (
                               <CheckCircleIcon className="w-4 h-4" />
@@ -1187,11 +1172,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                         <button
                           onClick={testAnthropic}
                           disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                            isTesting
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
                               ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
                               : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                          }`}
+                            }`}
                         >
                           {isTesting ? (
                             <ArrowPathIcon className="w-4 h-4 animate-spin" />
@@ -1203,11 +1187,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
 
                         {testResult && (
                           <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
-                              testResult.success
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
                                 ? "bg-green-100 text-green-700"
                                 : "bg-red-100 text-red-700"
-                            }`}
+                              }`}
                           >
                             {testResult.success ? (
                               <CheckCircleIcon className="w-4 h-4" />
@@ -1252,11 +1235,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                         <button
                           onClick={testHuggingFace}
                           disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                            isTesting
+                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
                               ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
                               : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                          }`}
+                            }`}
                         >
                           {isTesting ? (
                             <ArrowPathIcon className="w-4 h-4 animate-spin" />
@@ -1268,11 +1250,10 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
 
                         {testResult && (
                           <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
-                              testResult.success
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
                                 ? "bg-green-100 text-green-700"
                                 : "bg-red-100 text-red-700"
-                            }`}
+                              }`}
                           >
                             {testResult.success ? (
                               <CheckCircleIcon className="w-4 h-4" />
@@ -1299,14 +1280,12 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                       </span>
                       <button
                         onClick={() => setEnableLangsmith(!enableLangsmith)}
-                        className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          enableLangsmith ? "bg-[#fd3b12]" : "bg-[#D8DCE4]"
-                        }`}
+                        className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${enableLangsmith ? "bg-[#fd3b12]" : "bg-[#D8DCE4]"
+                          }`}
                       >
                         <span
-                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            enableLangsmith ? "translate-x-5" : "translate-x-0"
-                          }`}
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${enableLangsmith ? "translate-x-5" : "translate-x-0"
+                            }`}
                         />
                       </button>
                     </div>
@@ -1353,16 +1332,14 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                             onClick={() =>
                               setPrivateWorkspace(!privateWorkspace)
                             }
-                            className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                              privateWorkspace ? "bg-[#fd3b12]" : "bg-[#D8DCE4]"
-                            }`}
+                            className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${privateWorkspace ? "bg-[#fd3b12]" : "bg-[#D8DCE4]"
+                              }`}
                           >
                             <span
-                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                privateWorkspace
+                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${privateWorkspace
                                   ? "translate-x-5"
                                   : "translate-x-0"
-                              }`}
+                                }`}
                             />
                           </button>
                         </div>
@@ -1415,18 +1392,16 @@ const [privateWorkspace, setPrivateWorkspace] = useState(true);
                               !visualSettings[item.key as keyof VisualSettings],
                             )
                           }
-                          className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            visualSettings[item.key as keyof VisualSettings]
+                          className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${visualSettings[item.key as keyof VisualSettings]
                               ? "bg-[#fd3b12]"
                               : "bg-[#D8DCE4]"
-                          }`}
+                            }`}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              visualSettings[item.key as keyof VisualSettings]
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${visualSettings[item.key as keyof VisualSettings]
                                 ? "translate-x-5"
                                 : "translate-x-0"
-                            }`}
+                              }`}
                           />
                         </button>
                       </div>

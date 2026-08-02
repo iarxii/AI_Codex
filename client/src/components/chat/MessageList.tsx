@@ -143,7 +143,7 @@ const MessageList: React.FC<MessageListProps> = ({
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="mt-12 flex flex-col items-center gap-4">
                   <div className="flex items-center gap-2 px-4 py-2 bg-[#1A1D27] rounded-full border border-white/10 shadow-lg">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -220,9 +220,8 @@ const MessageList: React.FC<MessageListProps> = ({
           return (
             <div className="h-full flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95 duration-700">
               <div
-                className={`w-24 h-24 rounded-3xl flex items-center justify-center mb-8 border transition-all duration-500 shadow-xl rotate-3 hover:rotate-0 ${
-                  activeSpace ? "border-white/10" : "bg-white border-black/[0.04] shadow-black/[0.02]"
-                }`}
+                className={`w-24 h-24 rounded-3xl flex items-center justify-center mb-8 border transition-all duration-500 shadow-xl rotate-3 hover:rotate-0 ${activeSpace ? "border-white/10" : "bg-white border-black/[0.04] shadow-black/[0.02]"
+                  }`}
                 style={activeSpace ? {
                   backgroundColor: activeSpace.color || 'var(--accent)',
                   boxShadow: `0 20px 40px -12px ${activeSpace.color || 'var(--accent)'}60`
@@ -252,7 +251,7 @@ const MessageList: React.FC<MessageListProps> = ({
                   </svg>
                 )}
               </div>
-              <h2 className="text-3xl font-bold text-[#1A1D2E] mb-3 tracking-tighter">
+              <h2 className="workspace-intro-heading text-3xl font-bold mb-3 tracking-tighter">
                 Initialize{" "}
                 <span className="text-[#fd3b12]">{config.label}</span>
               </h2>
@@ -397,17 +396,17 @@ const MessageList: React.FC<MessageListProps> = ({
                         this key is used only for isolated neural experiments."
                       </p>
                       <div className="flex items-center gap-4 pt-2 border-t border-amber-200/30">
-                        <a 
-                          href="/terms-of-use" 
-                          target="_blank" 
+                        <a
+                          href="/terms-of-use"
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-[9px] font-black uppercase tracking-widest text-amber-700 hover:text-amber-900 transition-colors"
                         >
                           Terms of Use
                         </a>
-                        <a 
-                          href="/disclaimers" 
-                          target="_blank" 
+                        <a
+                          href="/disclaimers"
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-[9px] font-black uppercase tracking-widest text-amber-700 hover:text-amber-900 transition-colors"
                         >

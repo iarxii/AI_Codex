@@ -39,6 +39,63 @@
   /* Liquid motion easing */
   --ease-liquid: cubic-bezier(0.34, 1.4, 0.64, 1);
   --ease-material: cubic-bezier(0.2, 0, 0, 1);
+  --page-silver: #D8DCE4;
+  --header-silver: rgba(216, 220, 228, 0.6);
+  --header-silver-solid: #D8DCE4;
+  --header-brand-text: #1A1D2E;
+  --portal-brand-text: #1A1D2E;
+  --portal-header-start: #ffffff;
+  --chat-surface-end: #ffffff;
+  --workspace-chat-surface-end: #ffffff;
+  --composer-surface-start: rgba(255, 255, 255, 0.95);
+  --composer-surface-end: rgba(255, 243, 236, 0.78);
+  --workspace-sidebar-bg: rgba(226, 230, 236, 0.4);
+  --workspace-sidebar-hero-start: #ffffff;
+  --workspace-sidebar-hero-end: transparent;
+  --workspace-header-left-text: #4A4D5E;
+  --lite-config-heading: #1A1D2E;
+  --lite-config-copy: #4A4D5E;
+  --lite-config-muted: #7A7D8E;
+  --lite-config-select: rgba(255, 255, 255, 0.8);
+  --workspace-input-text: #1A1D2E;
+  --workspace-input-placeholder: #7A7D8E;
+  --wallpaper-base: #E2E8F0;
+  --wallpaper-mask: #E2E8F0;
+  --wallpaper-energy-highlight: rgba(255, 255, 255, 0.1);
+  --wallpaper-grid-line: rgba(255, 255, 255, 0.4);
+  --wallpaper-silver-wave: rgba(192, 204, 218, 0.5);
+  --wallpaper-scanline-wash: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-interface-theme="dark"] {
+  color-scheme: dark;
+  --page-silver: #252a33;
+  --header-silver: rgba(53, 59, 70, 0.78);
+  --header-silver-solid: #353b46;
+  --header-brand-text: #1A1D2E;
+  --portal-brand-text: #ffffff;
+  --portal-header-start: #353b46;
+  --chat-surface-end: #252a33;
+  --workspace-chat-surface-end: #252a33;
+  --composer-surface-start: rgba(62, 69, 81, 0.96);
+  --composer-surface-end: rgba(42, 47, 57, 0.88);
+  --workspace-sidebar-bg: rgba(37, 42, 51, 0.76);
+  --workspace-sidebar-hero-start: #ffffff;
+  --workspace-sidebar-hero-end: transparent;
+  --workspace-header-left-text: #ffffff;
+  --lite-config-heading: #ffffff;
+  --lite-config-copy: #e2e8f0;
+  --lite-config-muted: #cbd5e1;
+  --lite-config-select: rgba(62, 69, 81, 0.9);
+  --workspace-input-text: #ffffff;
+  --workspace-input-placeholder: #cbd5e1;
+  --glass-bg: rgba(53, 59, 70, 0.72);
+  --wallpaper-base: #252a33;
+  --wallpaper-mask: #252a33;
+  --wallpaper-energy-highlight: rgba(192, 204, 218, 0.1);
+  --wallpaper-grid-line: rgba(192, 204, 218, 0.16);
+  --wallpaper-silver-wave: rgba(192, 204, 218, 0.24);
+  --wallpaper-scanline-wash: rgba(192, 204, 218, 0.08);
 }
 
 /* ============================================
@@ -58,7 +115,7 @@
    gradient (transparent at the top, solid orange at the bottom) so the animated
    P5 graphics behind remain visible through the frosted top half */
 .chat-surface {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 60%, rgba(255, 255, 255, 1) 100%);
+  background: linear-gradient(180deg, transparent 0%, transparent 60%, var(--chat-surface-end) 100%);
   /* backdrop-filter: blur(2px) saturate(1.15); */
   -webkit-backdrop-filter: blur(2px) saturate(1.15);
   /* border: 1px solid rgba(255, 255, 255, 0.35); */
@@ -142,7 +199,7 @@
 /* Floating composer pill with a solid bottom-right orange offset shadow
    and a thin AdaptivOrange border that lifts on focus */
 .composer {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(255, 243, 236, 0.78));
+  background: linear-gradient(160deg, var(--composer-surface-start), var(--composer-surface-end));
   backdrop-filter: blur(24px) saturate(1.3);
   -webkit-backdrop-filter: blur(24px) saturate(1.3);
   border: 1px solid rgba(253, 59, 18, 0.38);
@@ -162,12 +219,140 @@
   box-shadow: var(--elev-1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
+.portal-header {
+  background: linear-gradient(to right, var(--portal-header-start), rgba(253, 59, 18, 0.4), #fd3b12);
+}
+
+.workspace-header {
+  background-color: var(--header-silver);
+}
+
+.workspace-header-start {
+  background: linear-gradient(to right, var(--header-silver-solid), color-mix(in srgb, var(--header-silver-solid) 95%, transparent), transparent);
+}
+
+.workspace-sidebar {
+  background-color: var(--workspace-sidebar-bg);
+  --text-primary: #1A1D2E;
+  --text-secondary: #4A4D5E;
+  --text-muted: #7A7D8E;
+}
+
+:root[data-interface-theme="dark"] .workspace-sidebar {
+  --text-primary: #ffffff;
+  --text-secondary: #e2e8f0;
+  --text-muted: #cbd5e1;
+}
+
+.workspace-sidebar-hero {
+  background: linear-gradient(to bottom, var(--workspace-sidebar-hero-start), var(--workspace-sidebar-hero-end));
+}
+
+.sidebar-active-surface {
+  background-color: #ffffff;
+}
+
+:root[data-interface-theme="dark"] .sidebar-active-surface {
+  background-color: rgba(62, 69, 81, 0.92);
+}
+
+.workspace-header-left-control,
+.workspace-profile-label {
+  color: var(--workspace-header-left-text);
+}
+
+.lite-config-panel .lite-config-heading {
+  color: var(--lite-config-heading);
+}
+
+.lite-config-panel .lite-config-copy {
+  color: var(--lite-config-copy);
+}
+
+.lite-config-panel .lite-config-muted {
+  color: var(--lite-config-muted);
+}
+
+.lite-config-panel .lite-config-select {
+  background-color: var(--lite-config-select);
+  color: var(--lite-config-copy);
+}
+
+.workspace-composer {
+  background: linear-gradient(160deg, var(--composer-surface-start), var(--composer-surface-end));
+}
+
+.workspace-chat-surface {
+  isolation: isolate;
+}
+
+.workspace-chat-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 0%, transparent 60%, var(--workspace-chat-surface-end) 100%);
+}
+
+.workspace-intro-heading {
+  color: #1A1D2E;
+}
+
+:root[data-interface-theme="dark"] .workspace-intro-heading {
+  color: #ffffff;
+}
+
+.litechat-welcome-heading {
+  color: var(--text-h);
+}
+
+:root[data-interface-theme="dark"] .litechat-welcome-heading {
+  color: #ffffff;
+}
+
+.workspace-input-text {
+  color: var(--workspace-input-text);
+}
+
+.workspace-input-text::placeholder {
+  color: var(--workspace-input-placeholder);
+}
+
+:root[data-interface-theme="dark"] .workspace-composer .workspace-function-button {
+  color: #ffffff;
+}
+
+.litechat-new-session {
+  color: #4A4D5E;
+}
+
+:root[data-interface-theme="dark"] .litechat-new-session {
+  color: #ffffff;
+}
+
+.portal-brand-label {
+  color: var(--portal-brand-text);
+}
+
+.workspace-brand-label {
+  color: var(--header-brand-text);
+}
+
+.wallpaper-mask {
+  background: radial-gradient(circle at bottom right, var(--wallpaper-mask) 0%, var(--wallpaper-mask) 12%, transparent 35%);
+}
+
+.wallpaper-energy-overlay {
+  background: linear-gradient(to top right, rgba(253, 59, 18, 0.05), transparent, var(--wallpaper-energy-highlight));
+}
+
 body {
   margin: 0;
-  background-color: #D8DCE4;
+  background-color: var(--page-silver);
   background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.4) 1px, transparent 1px);
+    linear-gradient(var(--wallpaper-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--wallpaper-grid-line) 1px, transparent 1px);
   background-size: 40px 40px;
   color: #1A1D2E;
   font-family: 'Poppins', sans-serif;

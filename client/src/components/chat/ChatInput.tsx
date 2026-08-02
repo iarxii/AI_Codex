@@ -195,66 +195,32 @@ const ChatInput: React.FC<ChatInputProps> = ({
       <form onSubmit={handleSendWithAttachments} className="max-w-4xl mx-auto">
         <Brain className="hidden" aria-hidden="true" />
         {/* Main Input Container */}
-        <div className="relative bg-[#E2E6EC] border border-black/[0.08] rounded-2xl shadow-md transition-all focus-within:border-[#fd3b12]/40 focus-within:shadow-lg focus-within:shadow-[#fd3b12]/5">
+        <div className="workspace-composer relative border border-black/[0.08] rounded-2xl shadow-md transition-all focus-within:border-[#fd3b12]/40 focus-within:shadow-lg focus-within:shadow-[#fd3b12]/5">
           {/* Function Buttons Row */}
           <div className="flex items-center gap-1 px-3 pt-2.5 pb-0">
             {/* Provider Selector Toggle */}
             <button
               type="button"
               onClick={() => setIsProviderBarExpanded(!isProviderBarExpanded)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
-                isProviderBarExpanded
-                  ? "bg-[#fd3b12]/15 text-[#fd3b12] shadow-sm shadow-[#fd3b12]/5"
-                  : "text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/[0.05]"
-              }`}
+              className={`workspace-function-button flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${isProviderBarExpanded
+                ? "bg-[#fd3b12]/15 text-[#fd3b12] shadow-sm shadow-[#fd3b12]/5"
+                : "text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/[0.05]"
+                }`}
               title="Toggle provider selector bar"
             >
               <Bot className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
               <span>Provider</span>
             </button>
 
-            {/* Attachments */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[#4A4D5E] hover:text-[#1A1D2E] hover:bg-black/[0.05] transition-all"
-              title="Attach files"
-            >
-              <svg
-                className="w-4 h-4 sm:w-3.5 sm:h-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                />
-              </svg>
-              <span className="hidden sm:inline">Attach</span>
-            </button>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              accept=".png,.jpg,.jpeg,.webp,.gif,.md,.txt,.pdf,image/*,text/markdown,text/plain,application/pdf"
-              onChange={handleAttachmentPick}
-            />
-
             {/* Agent Specialization Dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsSpecializationOpen(!isSpecializationOpen)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
-                  agentMode
-                    ? "bg-[#fd3b12] text-white shadow-sm shadow-[#fd3b12]/20"
-                    : "text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-[#fd3b12]/8"
-                }`}
+                className={`workspace-function-button flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${agentMode
+                  ? "bg-[#fd3b12] text-white shadow-sm shadow-[#fd3b12]/20"
+                  : "text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-[#fd3b12]/8"
+                  }`}
                 title="Select agent specialization"
               >
                 {activeSpecialization.icon}
@@ -304,14 +270,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
                       <button
                         type="button"
                         onClick={() => setAgentMode(!agentMode)}
-                        className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus:outline-none ${
-                          agentMode ? "bg-[#10B981]" : "bg-[#EF4444]"
-                        }`}
+                        className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus:outline-none ${agentMode ? "bg-[#10B981]" : "bg-[#EF4444]"
+                          }`}
                       >
                         <span
-                          className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${
-                            agentMode ? "translate-x-[17px]" : "translate-x-1"
-                          }`}
+                          className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${agentMode ? "translate-x-[17px]" : "translate-x-1"
+                            }`}
                         />
                       </button>
                     </div>
@@ -320,12 +284,45 @@ const ChatInput: React.FC<ChatInputProps> = ({
               )}
             </div>
 
+            {/* Attachments */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="workspace-function-button flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[#4A4D5E] hover:text-[#1A1D2E] hover:bg-black/[0.05] transition-all"
+              title="Attach files"
+            >
+              <svg
+                className="w-4 h-4 sm:w-3.5 sm:h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                />
+              </svg>
+              <span className="hidden sm:inline">Attach</span>
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              accept=".png,.jpg,.jpeg,.webp,.gif,.md,.txt,.pdf,image/*,text/markdown,text/plain,application/pdf"
+              onChange={handleAttachmentPick}
+            />
+
+
             {/* Tools Dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsToolsOpen(!isToolsOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[#4A4D5E] hover:text-[#1A1D2E] hover:bg-black/[0.05] transition-all"
+                className="workspace-function-button flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[#4A4D5E] hover:text-[#1A1D2E] hover:bg-black/[0.05] transition-all"
                 title="Select tools"
               >
                 <svg
@@ -401,11 +398,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
               <button
                 type="button"
                 onClick={() => setIsConfigOpen(!isConfigOpen)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
-                  isConfigOpen
-                    ? "bg-black/[0.08] text-[#1A1D2E]"
-                    : "text-[#4A4D5E] hover:text-[#1A1D2E] hover:bg-black/[0.05]"
-                }`}
+                className={`workspace-function-button flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${isConfigOpen
+                  ? "bg-black/[0.08] text-[#1A1D2E]"
+                  : "text-[#4A4D5E] hover:text-[#1A1D2E] hover:bg-black/[0.05]"
+                  }`}
                 title="Engine Parameters"
               >
                 <svg
@@ -432,7 +428,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             <button
               type="button"
               onClick={onExport}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[#4A4D5E] hover:text-[#1A1D2E] hover:bg-black/[0.05] transition-all"
+              className="workspace-function-button flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[#4A4D5E] hover:text-[#1A1D2E] hover:bg-black/[0.05] transition-all"
               title="Export session data"
             >
               <svg
@@ -499,18 +495,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   : "Select a workspace to begin..."
               }
               disabled={!currentConvId}
-              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-2 py-2 text-sm text-[#1A1D2E] placeholder:text-[#7A7D8E] resize-none min-h-[44px] max-h-[120px] sm:max-h-[160px]"
+              className="workspace-input-text flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-2 py-2 text-sm resize-none min-h-[44px] max-h-[120px] sm:max-h-[160px]"
               rows={1}
             />
             {/* Send Button — Prominent Round Orange */}
             <button
               type="submit"
               disabled={loading || !input.trim() || !currentConvId}
-              className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
-                loading || !input.trim() || !currentConvId
-                  ? "bg-[#BFC4CC] text-[#7A7D8E] cursor-not-allowed"
-                  : "bg-[#fd3b12] text-white hover:bg-[#E65C00] shadow-lg shadow-[#fd3b12]/30 hover:shadow-[#fd3b12]/50 active:scale-95"
-              }`}
+              className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${loading || !input.trim() || !currentConvId
+                ? "bg-[#BFC4CC] text-[#7A7D8E] cursor-not-allowed"
+                : "bg-[#fd3b12] text-white hover:bg-[#E65C00] shadow-lg shadow-[#fd3b12]/30 hover:shadow-[#fd3b12]/50 active:scale-95"
+                }`}
             >
               <svg
                 className="w-5 h-5"
