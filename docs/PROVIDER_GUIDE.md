@@ -2,6 +2,8 @@
 
 AICodex supports 5 major LLM providers. Each has specific requirements and common failure modes.
 
+For the VS Code extension's expanded provider selector, secure SecretStorage-backed API key handling, and extension-specific troubleshooting, see [vscode-extension/docs/PROVIDER_MODEL_SETUP.md](../vscode-extension/docs/PROVIDER_MODEL_SETUP.md).
+
 ## 1. Local Neural Core (llama-server.exe / Ollama)
 
 This is your primary development provider. It uses the `ChatOpenAI` adapter for maximum tool-calling compatibility.
