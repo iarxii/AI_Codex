@@ -7,6 +7,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { getApiUrl } from '../../config';
+import { clearAuthSession, getValidToken } from '../../utils/authToken';
 
 interface MiniContextChatProps {
   symbol: string;
@@ -41,7 +42,7 @@ export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol, onInte
       // Inject chart context as a SystemMessage-style hidden prefix with financial disclaimer instruction
       const systemContext = `[SYSTEM CONTEXT — DO NOT REPEAT TO USER]\nUser is viewing the trading chart modal.\nActive Symbol: ${symbol}\nAnalyst sidebar is active. Answer concisely and in the context of this instrument.\nAlways append a disclaimer stating that we are not providing financial advice and all trades are based on the user's sole consent.\n[END SYSTEM CONTEXT]`;
       
-      const token = localStorage.getItem('token');
+      const token = getValidToken();
       const baseUrl = getApiUrl();
       
       const response = await fetch(`${baseUrl}/api/chat/quick`, {
@@ -59,6 +60,11 @@ export const MiniContextChat: React.FC<MiniContextChatProps> = ({ symbol, onInte
           api_key: getApiKey(provider)
         })
       });
+
+      if (response.status === 401) {
+        clearAuthSession();
+        throw new Error('Session expired. Please log in again.');
+      }
 
       if (response.ok) {
         const data = await response.json();

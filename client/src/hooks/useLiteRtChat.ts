@@ -36,6 +36,25 @@ const PROVIDERS_REQUIRING_KEY: ReadonlySet<string> = new Set([
 ]);
 
 type CloudModel = { id: string; name: string };
+type ConversationSummary = {
+  id: number;
+  title: string;
+  updated_at: string;
+};
+
+type ConversationDetail = {
+  id: number;
+  title: string;
+  updated_at: string;
+  messages: Array<{
+    id: number;
+    role: string;
+    content: string;
+    created_at: string;
+  }>;
+};
+
+type ActiveSession = ConversationSummary | null;
 
 const DEFAULT_CLOUD_PROVIDER: ProviderId = 'ollama_cloud';
 
@@ -50,6 +69,9 @@ const readPersistedModelFor = (prov: ProviderId): string =>
 
 export const useLiteRtChat = () => {
   const [messages, setMessages] = useState<LiteMessage[]>([]);
+  const [sessions, setSessions] = useState<ConversationSummary[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [capabilities, setCapabilities] = useState<SystemCapabilities | null>(null);
   const [provider, setProviderState] = useState<ProviderId>(resolveCloudProvider);
@@ -63,6 +85,132 @@ export const useLiteRtChat = () => {
   const [cloudProviderStatus, setCloudProviderStatus] = useState<Record<string, 'live' | 'none'>>({});
   const [downloadReadiness, setDownloadReadiness] = useState<DownloadReadiness | null>(null);
   const [cloudConfigRevision, setCloudConfigRevision] = useState(0);
+
+  const mapDbMessagesToLite = useCallback((rows: ConversationDetail['messages']): LiteMessage[] => (
+    rows
+      .filter((row) => row.role === 'user' || row.role === 'assistant')
+      .map((row) => ({
+        id: `db-${row.id}`,
+        sender: row.role === 'assistant' ? 'bot' : 'user',
+        content: row.content,
+        timestamp: Date.parse(row.created_at) || Date.now(),
+        engine: 'cloud',
+      }))
+  ), []);
+
+  const getAuthHeadersOptional = useCallback((): Record<string, string> => {
+    const token = getValidToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, []);
+
+  const hasValidAuth = useCallback(() => Boolean(getValidToken()), []);
+
+  const refreshSessions = useCallback(async (): Promise<ConversationSummary[]> => {
+    if (!hasValidAuth()) {
+      setSessions([]);
+      return [];
+    }
+    setSessionsLoading(true);
+    try {
+      const baseUrl = getApiUrl(false);
+      const response = await fetch(`${baseUrl}${config.API_V1_STR}/conversations/`, {
+        headers: getAuthHeadersOptional(),
+      });
+
+      if (response.status === 401) {
+        clearAuthSession();
+        setSessions([]);
+        return [];
+      }
+      if (!response.ok) throw new Error(`Failed to load sessions (${response.status})`);
+
+      const data = await response.json();
+      const list: ConversationSummary[] = Array.isArray(data) ? data : [];
+      setSessions(list);
+      return list;
+    } catch (error) {
+      console.error('Failed to refresh LiteChat sessions:', error);
+      setSessions([]);
+      return [];
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [getAuthHeadersOptional, hasValidAuth]);
+
+  const loadConversation = useCallback(async (conversationId: number) => {
+    if (!hasValidAuth()) return;
+    const baseUrl = getApiUrl(false);
+    const response = await fetch(`${baseUrl}${config.API_V1_STR}/conversations/${conversationId}`, {
+      headers: getAuthHeadersOptional(),
+    });
+
+    if (response.status === 401) {
+      clearAuthSession();
+      return;
+    }
+    if (!response.ok) throw new Error(`Failed to load conversation (${response.status})`);
+
+    const detail = await response.json() as ConversationDetail;
+    setActiveConversationId(detail.id);
+    setMessages(mapDbMessagesToLite(detail.messages || []));
+  }, [getAuthHeadersOptional, hasValidAuth, mapDbMessagesToLite]);
+
+  const createConversation = useCallback(async (): Promise<number | null> => {
+    if (!hasValidAuth()) return null;
+    try {
+      const baseUrl = getApiUrl(false);
+      const response = await fetch(`${baseUrl}${config.API_V1_STR}/conversations/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeadersOptional(),
+        },
+        body: JSON.stringify({ title: 'New Conversation' }),
+      });
+
+      if (response.status === 401) {
+        clearAuthSession();
+        return null;
+      }
+      if (!response.ok) throw new Error(`Failed to create conversation (${response.status})`);
+
+      const created = await response.json() as ConversationSummary;
+      setActiveConversationId(created.id);
+      setMessages([]);
+      await refreshSessions();
+      return created.id;
+    } catch (error) {
+      console.error('Failed to create LiteChat conversation:', error);
+      return null;
+    }
+  }, [getAuthHeadersOptional, hasValidAuth, refreshSessions]);
+
+  const deleteConversation = useCallback(async (conversationId: number) => {
+    if (!hasValidAuth()) return;
+    try {
+      const baseUrl = getApiUrl(false);
+      const response = await fetch(`${baseUrl}${config.API_V1_STR}/conversations/${conversationId}`, {
+        method: 'DELETE',
+        headers: getAuthHeadersOptional(),
+      });
+      if (!response.ok) throw new Error(`Failed to delete conversation (${response.status})`);
+
+      const remaining = await refreshSessions();
+      if (activeConversationId === conversationId) {
+        if (remaining[0]?.id) {
+          await loadConversation(remaining[0].id);
+        } else {
+          setActiveConversationId(null);
+          setMessages([]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete LiteChat conversation:', error);
+    }
+  }, [activeConversationId, getAuthHeadersOptional, hasValidAuth, loadConversation, refreshSessions]);
+
+  const activeSession: ActiveSession =
+    sessions.find((session) => session.id === activeConversationId) || null;
 
   // Whether the currently selected provider needs an API key that the user
   // hasn't saved yet. Surfaced in the UI so the user knows to configure it
@@ -179,6 +327,26 @@ export const useLiteRtChat = () => {
     };
     fetchCapabilities();
   }, []);
+
+  // Hydrate conversation sessions and load the latest one by default.
+  useEffect(() => {
+    let cancelled = false;
+    const hydrateSessions = async () => {
+      if (!hasValidAuth()) {
+        setSessions([]);
+        return;
+      }
+      const list = await refreshSessions();
+      if (cancelled || activeConversationId || !list[0]?.id) return;
+      try {
+        await loadConversation(list[0].id);
+      } catch (error) {
+        console.error('Failed to load latest LiteChat session:', error);
+      }
+    };
+    hydrateSessions();
+    return () => { cancelled = true; };
+  }, [refreshSessions, loadConversation, activeConversationId, hasValidAuth]);
 
   useEffect(() => {
     getCachedArtifactIds().then((cachedIds) => {
@@ -333,18 +501,25 @@ export const useLiteRtChat = () => {
     if (isCloudRequest) {
       // Query the real AICodex Cloud Agent via the lightweight /chat/quick endpoint.
       try {
-        const token = localStorage.getItem('token');
+        const headers = getAuthHeadersOptional();
+        const isAuthenticated = hasValidAuth();
+        let conversationId = activeConversationId;
+        if (isAuthenticated && !conversationId) {
+          conversationId = await createConversation();
+        }
+
         const baseUrl = getApiUrl(false); // Base deployment endpoint
 
         const response = await fetch(`${baseUrl}${config.API_V1_STR}/chat/quick`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            ...headers,
           },
           body: JSON.stringify({
             system_context: 'You are the AICodex Chat assistant, a fast, friendly conversational agent embedded in the AICodex Chat (LiteRT) portal. Keep replies concise, clear, and helpful.',
             message: content,
+            ...(conversationId ? { conversation_id: conversationId } : {}),
             provider: provider,
             model: activeModelId,
             api_key: getProviderApiKey(provider) || undefined,
@@ -352,8 +527,16 @@ export const useLiteRtChat = () => {
           })
         });
 
+        if (response.status === 401) {
+          clearAuthSession();
+          throw new Error('Authentication required. Please log in to enable persisted chat sessions.');
+        }
+
         if (response.ok) {
           const data = await response.json();
+          if (data?.conversation_id && Number.isFinite(Number(data.conversation_id))) {
+            setActiveConversationId(Number(data.conversation_id));
+          }
           const reply = data.reply || 'Sorry, I could not generate a response.';
           if (typeof reply === 'string' && /^Sorry, I (encountered an error|could not)/i.test(reply.trim())) {
             throw new Error(reply);
@@ -367,6 +550,7 @@ export const useLiteRtChat = () => {
               ? { ...msg, content: reply, engine: 'cloud', tps: calculatedTps }
               : msg
           ));
+          if (isAuthenticated) await refreshSessions();
         } else {
           throw new Error(`Cloud inference failed with status ${response.status}`);
         }
@@ -384,7 +568,19 @@ export const useLiteRtChat = () => {
       // Local Mode: LiteRT.js Edge inference
       await runLocalInference(content, botMessageId, startTime);
     }
-  }, [loading, engineMode, provider, capabilities, selectModel, activeModelId]);
+  }, [
+    loading,
+    engineMode,
+    provider,
+    capabilities,
+    selectModel,
+    activeModelId,
+    activeConversationId,
+    hasValidAuth,
+    createConversation,
+    getAuthHeadersOptional,
+    refreshSessions,
+  ]);
 
   const runLocalInference = async (content: string, botMessageId: string, startTime: number) => {
     let tokenCount = 0;
@@ -420,6 +616,10 @@ export const useLiteRtChat = () => {
 
   return {
     messages,
+    sessions,
+    sessionsLoading,
+    activeConversationId,
+    activeSession,
     loading,
     capabilities,
     activeModelId,
@@ -429,6 +629,10 @@ export const useLiteRtChat = () => {
     selectModel,
     sendMessage,
     clearChat,
+    refreshSessions,
+    loadConversation,
+    createConversation,
+    deleteConversation,
     modelsList: AVAILABLE_MODELS,
     downloadStates,
     downloadTotalBytes: LOCAL_ARTIFACT_TOTAL_BYTES,

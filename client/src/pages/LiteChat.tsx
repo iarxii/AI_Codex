@@ -189,6 +189,7 @@ const LiteChat: React.FC = () => {
   const navigate = useNavigate();
   const [inputText, setInputText] = useState('');
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [isSessionsPanelOpen, setIsSessionsPanelOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [promptHistory, setPromptHistory] = useState<string[]>(loadPromptHistory);
   const [openSection, setOpenSection] = useState<'prompts' | null>(null);
@@ -199,6 +200,10 @@ const LiteChat: React.FC = () => {
 
   const {
     messages,
+    sessions,
+    sessionsLoading,
+    activeConversationId,
+    activeSession,
     loading,
     capabilities,
     activeModelId,
@@ -208,6 +213,10 @@ const LiteChat: React.FC = () => {
     selectModel,
     sendMessage,
     clearChat,
+    refreshSessions,
+    loadConversation,
+    createConversation,
+    deleteConversation,
     modelsList,
     downloadStates,
     downloadTotalBytes,
@@ -221,6 +230,11 @@ const LiteChat: React.FC = () => {
     cloudConfigSource,
     missingApiKey,
   } = useLiteRtChat();
+
+  const startNewSession = async () => {
+    clearChat();
+    await createConversation();
+  };
 
   // Auto scroll to bottom on new messages (skip when there are none, otherwise
   // scrollIntoView on mount can scroll the whole page and crop the header)
@@ -239,7 +253,10 @@ const LiteChat: React.FC = () => {
   // Close the mobile drawer on Escape, or when resizing up to desktop width
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsPanelOpen(false);
+      if (e.key === 'Escape') {
+        setIsPanelOpen(false);
+        setIsSessionsPanelOpen(false);
+      }
     };
     const onResize = () => {
       if (window.innerWidth >= 1024) setIsPanelOpen(false);
@@ -336,9 +353,9 @@ const LiteChat: React.FC = () => {
         <div className="flex items-center gap-3 h-full shrink-0">
           {/* New Chat */}
           <button
-            onClick={clearChat}
+            onClick={startNewSession}
             className="p-2.5 sm:p-1.5 text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-black/5 rounded-lg transition-all active:scale-95 shrink-0"
-            title="Start a New Chat"
+            title="Start a New Session"
             aria-label="New Chat"
           >
             <svg
@@ -368,9 +385,25 @@ const LiteChat: React.FC = () => {
               LiteRT Web AI Engine
             </span>
           </div>
+
+          <div className="hidden md:flex items-center rounded-full border border-white/25 bg-white/15 px-3 py-1 text-[10px] font-semibold text-white/95 max-w-[260px]">
+            <HistoryIcon className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+            <span className="truncate">
+              {activeSession?.title || 'Guest Session'}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 h-full">
+          <button
+            onClick={() => setIsSessionsPanelOpen(true)}
+            className="p-2 rounded-lg bg-white/15 hover:bg-white/25 text-white transition-colors"
+            title="Open Chat Sessions"
+            aria-label="Open Chat Sessions"
+          >
+            <HistoryIcon className="w-4.5 h-4.5" />
+          </button>
+
           {/* Provider Badge — clickable, opens SettingsModal */}
           {(() => {
             const providerInfo = [...PROVIDERS, ...MORE_PROVIDERS].find((p) => p.id === provider);
@@ -556,6 +589,73 @@ const LiteChat: React.FC = () => {
                               ))}
                             </div>
                           )}
+
+                          <div className="mt-3.5 border-t border-black/[0.05] pt-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">
+                                <HistoryIcon className="w-3.5 h-3.5 text-[#fd3b12]" />
+                                Chat Sessions
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={startNewSession}
+                                  className="text-[10px] text-[var(--text-muted)] hover:text-[#fd3b12] transition-colors press-lift"
+                                  title="Start a new persisted session"
+                                >
+                                  New
+                                </button>
+                                <button
+                                  onClick={() => refreshSessions()}
+                                  className="text-[10px] text-[var(--text-muted)] hover:text-[#fd3b12] transition-colors press-lift"
+                                  title="Refresh sessions"
+                                >
+                                  Refresh
+                                </button>
+                              </div>
+                            </div>
+
+                            {sessionsLoading ? (
+                              <p className="text-[11px] text-[var(--text-muted)]">Loading sessions...</p>
+                            ) : sessions.length === 0 ? (
+                              <p className="text-[11px] text-[var(--text-muted)]">No sessions yet. Start a new chat to persist history.</p>
+                            ) : (
+                              <div className="space-y-1.5 max-h-44 overflow-y-auto scrollbar-hide">
+                                {sessions.map((session) => {
+                                  const isActive = session.id === activeConversationId;
+                                  return (
+                                    <div
+                                      key={session.id}
+                                      className={`group flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                                        isActive
+                                          ? 'bg-[#fd3b12]/10 border-[#fd3b12]/35'
+                                          : 'bg-white/50 border-black/[0.05] hover:border-[#fd3b12]/25 hover:bg-white/85'
+                                      }`}
+                                    >
+                                      <button
+                                        onClick={() => loadConversation(session.id)}
+                                        className="min-w-0 flex-1 text-left"
+                                        title="Load chat session"
+                                      >
+                                        <div className="text-[11px] font-semibold text-[var(--text)] truncate">
+                                          {session.title || `Session #${session.id}`}
+                                        </div>
+                                        <div className="text-[10px] text-[var(--text-muted)] truncate">
+                                          {new Date(session.updated_at).toLocaleString()}
+                                        </div>
+                                      </button>
+                                      <button
+                                        onClick={() => deleteConversation(session.id)}
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--text-muted)] hover:text-red-500"
+                                        title="Delete session"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </motion.div>
@@ -915,6 +1015,112 @@ const LiteChat: React.FC = () => {
                 </div>
                 <div className="flex-1 overflow-y-auto p-5 select-none">
                   <SidePanelContent {...panelContentProps} />
+                </div>
+              </motion.aside>
+            </>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isSessionsPanelOpen && (
+            <>
+              <motion.div
+                className="fixed inset-0 z-50 bg-black/35 backdrop-blur-sm"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsSessionsPanelOpen(false)}
+              />
+              <motion.aside
+                className="fixed top-0 right-0 z-[60] h-full w-[92vw] max-w-md flex flex-col bg-white/95 backdrop-blur-2xl border-l border-black/[0.08] shadow-2xl"
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Chat Sessions"
+              >
+                <div className="h-14 px-4 flex items-center justify-between border-b border-black/[0.08]">
+                  <div>
+                    <h3 className="text-sm font-bold text-[var(--text-h)]">Chat Sessions</h3>
+                    <p className="text-[10px] text-[var(--text-muted)]">Persistent history and AI-generated titles</p>
+                  </div>
+                  <button
+                    onClick={() => setIsSessionsPanelOpen(false)}
+                    className="p-2 rounded-lg hover:bg-black/5 text-[var(--text-muted)] hover:text-[#fd3b12]"
+                    title="Close Sessions"
+                  >
+                    <X className="w-4.5 h-4.5" />
+                  </button>
+                </div>
+
+                <div className="p-4 border-b border-black/[0.06] flex items-center gap-2">
+                  <button
+                    onClick={startNewSession}
+                    className="px-3 py-1.5 rounded-lg bg-[#fd3b12] text-white text-xs font-semibold hover:bg-[#e63a16] transition-colors"
+                  >
+                    New Session
+                  </button>
+                  <button
+                    onClick={() => refreshSessions()}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-black/[0.08] text-xs font-semibold text-[var(--text-primary)] hover:border-[#fd3b12]/40 hover:text-[#fd3b12] transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                  {!activeConversationId && (
+                    <div className="rounded-lg border border-dashed border-black/[0.14] bg-black/[0.02] px-3 py-2 text-[11px] text-[var(--text-muted)]">
+                      Guest session active. Log in to persist chat sessions.
+                    </div>
+                  )}
+
+                  {sessionsLoading ? (
+                    <p className="text-sm text-[var(--text-muted)]">Loading sessions...</p>
+                  ) : sessions.length === 0 ? (
+                    <p className="text-sm text-[var(--text-muted)]">No persisted sessions found.</p>
+                  ) : (
+                    sessions.map((session) => {
+                      const isActive = session.id === activeConversationId;
+                      return (
+                        <div
+                          key={session.id}
+                          className={`group rounded-xl border p-3 transition-colors ${
+                            isActive
+                              ? 'border-[#fd3b12]/40 bg-[#fd3b12]/8'
+                              : 'border-black/[0.08] bg-white hover:border-[#fd3b12]/30'
+                          }`}
+                        >
+                          <button
+                            onClick={() => {
+                              loadConversation(session.id);
+                              setIsSessionsPanelOpen(false);
+                            }}
+                            className="w-full text-left"
+                            title="Open session"
+                          >
+                            <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
+                              {session.title || `Session #${session.id}`}
+                            </div>
+                            <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                              {new Date(session.updated_at).toLocaleString()}
+                            </div>
+                          </button>
+                          <div className="flex justify-end mt-2">
+                            <button
+                              onClick={() => deleteConversation(session.id)}
+                              className="text-[11px] text-[var(--text-muted)] hover:text-red-600 transition-colors"
+                              title="Delete session"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </motion.aside>
             </>

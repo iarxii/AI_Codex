@@ -7,6 +7,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { getApiUrl } from '../../config';
+import { clearAuthSession, getValidToken } from '../../utils/authToken';
 
 export const SpiritBirdChatHarness: React.FC = () => {
   const { provider, model, getApiKey } = useAI();
@@ -42,7 +43,7 @@ export const SpiritBirdChatHarness: React.FC = () => {
     try {
       const systemContext = `You are Spirit Bird, the friendly and supportive agentic mascot of the AI Codex workspace. Your goal is to help the user casually yet professionally. Assist with organization, productivity, mental health breaks, habit building, and general professional feedback. Keep your tone encouraging, professional, structured, and helpful. You must remain a restrained assistant (no financial advice, keep responses relatively brief, clear, and highly readable). Always maintain professional boundaries.`;
       
-      const token = localStorage.getItem('token');
+      const token = getValidToken();
       const baseUrl = getApiUrl();
       
       const response = await fetch(`${baseUrl}/api/chat/quick`, {
@@ -59,6 +60,11 @@ export const SpiritBirdChatHarness: React.FC = () => {
           api_key: getApiKey(provider)
         })
       });
+
+      if (response.status === 401) {
+        clearAuthSession();
+        throw new Error('Session expired. Please log in again.');
+      }
 
       if (response.ok) {
         const data = await response.json();

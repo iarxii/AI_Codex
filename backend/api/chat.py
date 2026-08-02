@@ -2,12 +2,12 @@ import json
 import time
 import logging
 import asyncio
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, HTTPException
 from typing import List, Annotated, Set
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from backend.utils.logger import log_debug, log_error
-from backend.api.auth import get_user_from_token, get_current_user
+from backend.api.auth import get_user_from_token, get_current_user, get_current_user_optional
 from backend.utils.telemetry import get_model_capabilities, estimate_tokens
 
 from datetime import datetime
@@ -824,9 +824,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         manager.disconnect(websocket)
 
 @router.post("/quick")
-async def quick_chat(payload: dict, current_user = Depends(get_current_user)):
+async def quick_chat(
+    payload: dict,
+    current_user = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+):
     system_context = payload.get("system_context", "")
     message = payload.get("message", "")
+    conversation_id = payload.get("conversation_id")
 
     provider = (payload.get("provider") or "ollama_cloud").lower()
     model_name = payload.get("model") or "default"
@@ -865,6 +870,53 @@ async def quick_chat(payload: dict, current_user = Depends(get_current_user)):
             )
         }
 
+    # Resolve conversation ownership/persistence only for authenticated users.
+    conversation = None
+    history_msgs = []
+    history_len = 0
+    if current_user:
+        if conversation_id is not None:
+            result = await db.execute(
+                select(Conversation).filter_by(id=conversation_id, user_id=current_user.id)
+            )
+            conversation = result.scalar_one_or_none()
+            if not conversation:
+                raise HTTPException(status_code=404, detail="Conversation not found")
+        else:
+            conversation = Conversation(
+                title="New Conversation",
+                user_id=current_user.id,
+                space_type="general",
+            )
+            db.add(conversation)
+            await db.commit()
+            await db.refresh(conversation)
+
+        history_result = await db.execute(
+            select(Message)
+            .filter_by(conversation_id=conversation.id)
+            .order_by(Message.created_at)
+        )
+        history_msgs = history_result.scalars().all()
+        history_len = len([m for m in history_msgs if m.role in ("user", "assistant")])
+
+    user_message_str = str(message or "")
+    if user_message_str and conversation is not None:
+        db.add(
+            Message(
+                conversation_id=conversation.id,
+                role="user",
+                content=user_message_str,
+                model=model_name,
+            )
+        )
+        await db.execute(
+            update(Conversation)
+            .where(Conversation.id == conversation.id)
+            .values(updated_at=datetime.utcnow())
+        )
+        await db.commit()
+
     try:
         from backend.agent.models import get_llm
         model = get_llm(
@@ -875,13 +927,51 @@ async def quick_chat(payload: dict, current_user = Depends(get_current_user)):
             account_id=account_id,
             gateway_id=gateway_id,
         )
-        messages = [
-            {"role": "system", "content": system_context},
-            {"role": "user", "content": message}
-        ]
+        messages = []
+        if system_context:
+            messages.append({"role": "system", "content": system_context})
+
+        # Keep context lightweight for quick chat.
+        # When authenticated, include recent persisted turns for continuity.
+        for m in history_msgs[-20:]:
+            if m.role in ("user", "assistant"):
+                messages.append({"role": m.role, "content": m.content})
+        messages.append({"role": "user", "content": user_message_str})
 
         response = await model.ainvoke(messages)
-        return {"reply": response.content}
+        reply_text = str(response.content)
+
+        if conversation is not None:
+            db.add(
+                Message(
+                    conversation_id=conversation.id,
+                    role="assistant",
+                    content=reply_text,
+                    model=model_name,
+                )
+            )
+            await db.execute(
+                update(Conversation)
+                .where(Conversation.id == conversation.id)
+                .values(updated_at=datetime.utcnow())
+            )
+            await db.commit()
+
+            if history_len == 0 and conversation.title == "New Conversation" and user_message_str:
+                asyncio.create_task(
+                    generate_cloud_chat_title(
+                        conversation.id,
+                        user_message_str,
+                        provider,
+                        model_name,
+                        api_key,
+                        account_id,
+                        gateway_id,
+                    )
+                )
+            return {"reply": reply_text, "conversation_id": conversation.id}
+
+        return {"reply": reply_text}
     except Exception as e:
         log_error(f"Quick Chat Error: {str(e)}", e)
         return {"reply": f"Sorry, I encountered an error: {str(e)}"}
