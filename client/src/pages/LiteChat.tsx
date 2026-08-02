@@ -40,6 +40,7 @@ import { PROVIDERS, MORE_PROVIDERS } from '../components/providerMeta';
 import type { ProviderId } from '../components/providerMeta';
 import ProviderIcon from '../components/ProviderIcon';
 import ProviderBadgeIcon from '../components/chat/ProviderBadgeIcon';
+import AgentPulse from '../components/AgentPulse';
 import type { SystemCapabilities, ModelMetadata } from '../services/liteRtService';
 import type { ArtifactDownloadState, DownloadReadiness } from '../services/localModelDownloadService';
 import {
@@ -950,9 +951,15 @@ const LiteChat: React.FC = () => {
                           {contentForDisplay}
                         </ReactMarkdown>
                       ) : (
-                        <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#fd3b12] animate-ping"></span>
-                          Thinking...
+                        <span className="flex items-center gap-2 text-[var(--text-muted)]">
+                          <AgentPulse
+                            mode={loading ? 'thinking' : 'idle'}
+                            showText={false}
+                            className="scale-90 origin-left"
+                          />
+                          <span className="text-[11px] font-semibold tracking-wide">
+                            {loading ? 'Thinking...' : 'Ready'}
+                          </span>
                         </span>
                       )}
                     </div>
@@ -1391,7 +1398,7 @@ const LiteChat: React.FC = () => {
                         AI<span className="text-[#fd3b12]">Codex</span> Chat
                       </span>
                       <span className="text-[8px] uppercase tracking-widest text-[var(--text-muted)] font-semibold truncate">
-                        LiteRT Web AI Engine
+                        Web AI Engine
                       </span>
                     </div>
                   </div>

@@ -19,7 +19,16 @@ interface BridgeContextType {
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
 export const BridgeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { activeSpace, isPremiumSpace } = useAI();
+  let activeSpace: ReturnType<typeof useAI>['activeSpace'] = null;
+  let isPremiumSpace = false;
+  try {
+    const ai = useAI();
+    activeSpace = ai.activeSpace;
+    isPremiumSpace = ai.isPremiumSpace;
+  } catch {
+    // If AI context is not mounted yet, keep bridge features disabled
+    // instead of crashing the entire application tree.
+  }
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [pingLatency, setPingLatency] = useState<number | null>(null);
