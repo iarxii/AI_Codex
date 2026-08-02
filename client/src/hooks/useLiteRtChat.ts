@@ -64,10 +64,20 @@ type ConversationDetail = {
 type ActiveSession = ConversationSummary | null;
 
 const DEFAULT_CLOUD_PROVIDER: ProviderId = 'ollama_cloud';
+const LAST_CLOUD_PROVIDER_KEY = 'ai_last_cloud_provider';
+const LITERT_ENGINE_MODE_KEY = 'litert_engine_mode';
+
+const readLastCloudProvider = (): ProviderId | null => {
+  const persisted = localStorage.getItem(LAST_CLOUD_PROVIDER_KEY) as ProviderId | null;
+  if (persisted && ALL_CLOUD_PROVIDERS.includes(persisted)) return persisted;
+  return null;
+};
 
 const resolveCloudProvider = (): ProviderId => {
   const persisted = localStorage.getItem('ai_provider') as ProviderId | null;
   if (persisted && ALL_CLOUD_PROVIDERS.includes(persisted)) return persisted;
+  const lastCloud = readLastCloudProvider();
+  if (lastCloud) return lastCloud;
   return DEFAULT_CLOUD_PROVIDER;
 };
 
@@ -86,7 +96,10 @@ export const useLiteRtChat = () => {
   const [tps, setTps] = useState<number>(0);
   const [downloadStates, setDownloadStates] = useState<ArtifactDownloadState[]>(createInitialDownloadState);
   const downloadAbortRef = useRef<AbortController | null>(null);
-  const [engineMode, setEngineMode] = useState<'local' | 'cloud'>('cloud');
+  const [engineMode, setEngineMode] = useState<'local' | 'cloud'>(() => {
+    const persisted = localStorage.getItem(LITERT_ENGINE_MODE_KEY);
+    return persisted === 'local' ? 'local' : 'cloud';
+  });
   const [cloudModels, setCloudModels] = useState<Record<string, CloudModel[]>>({});
   const [cloudConfigSource, setCloudConfigSource] = useState<'backend' | 'fallback'>('fallback');
   const [cloudProviderStatus, setCloudProviderStatus] = useState<Record<string, 'live' | 'none'>>({});
@@ -274,6 +287,16 @@ export const useLiteRtChat = () => {
     };
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem(LITERT_ENGINE_MODE_KEY, engineMode);
+  }, [engineMode]);
+
+  useEffect(() => {
+    if (ALL_CLOUD_PROVIDERS.includes(provider)) {
+      localStorage.setItem(LAST_CLOUD_PROVIDER_KEY, provider);
+    }
+  }, [provider]);
+
   // Load models for the selected provider directly. This matches the Settings
   // connection test and avoids holding model selection hostage to a bulk
   // request for every configured provider.
@@ -453,10 +476,12 @@ export const useLiteRtChat = () => {
   const setProvider = useCallback((nextProvider: ProviderId) => {
     const normalized = ALL_CLOUD_PROVIDERS.includes(nextProvider)
       ? nextProvider
-      : DEFAULT_CLOUD_PROVIDER;
+      : (readLastCloudProvider() || DEFAULT_CLOUD_PROVIDER);
 
     setProviderState(normalized);
     localStorage.setItem('ai_provider', normalized);
+    localStorage.setItem(LAST_CLOUD_PROVIDER_KEY, normalized);
+    window.dispatchEvent(new Event('ai-settings-changed'));
 
     const persistedModel = readPersistedModelFor(normalized);
     setActiveModelId(persistedModel);
@@ -466,6 +491,7 @@ export const useLiteRtChat = () => {
     setActiveModelId(modelId);
     localStorage.setItem(`ai_model_${provider}`, modelId);
     localStorage.setItem('ai_model', modelId);
+    window.dispatchEvent(new Event('ai-settings-changed'));
   }, [provider]);
 
   const clearChat = useCallback(() => {

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, type ReactNode }
 import { config, getApiUrl } from '../config';
 import { getProviderApiKey } from '../config/providerConfig';
 import type { ProviderId } from '../components/providerMeta';
+import { PROVIDER_MAP } from '../components/providerMeta';
 import { clearAuthSession, getValidToken } from '../utils/authToken';
 
 export type { ProviderId };
@@ -180,6 +181,24 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   const activeModel = models[provider];
 
+  const hydrateSelectionFromStorage = () => {
+    const storedProvider = localStorage.getItem('ai_provider') as ProviderId | null;
+    if (storedProvider && PROVIDER_MAP[storedProvider]) {
+      setProviderState(storedProvider);
+    }
+
+    setModels((prev) => {
+      const next = { ...prev };
+      (Object.keys(prev) as ProviderId[]).forEach((prov) => {
+        const persisted = localStorage.getItem(`ai_model_${prov}`);
+        if (typeof persisted === 'string') {
+          next[prov] = persisted;
+        }
+      });
+      return next;
+    });
+  };
+
   const refreshProfile = async () => {
     const token = getValidToken();
     if (!token) return;
@@ -233,6 +252,24 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     refreshProfile();
+  }, []);
+
+  useEffect(() => {
+    const onSettingsChanged = () => {
+      hydrateSelectionFromStorage();
+    };
+
+    const onStorageChanged = (event: StorageEvent) => {
+      if (!event.key || (event.key !== 'ai_provider' && !event.key.startsWith('ai_model_'))) return;
+      hydrateSelectionFromStorage();
+    };
+
+    window.addEventListener('ai-settings-changed', onSettingsChanged);
+    window.addEventListener('storage', onStorageChanged);
+    return () => {
+      window.removeEventListener('ai-settings-changed', onSettingsChanged);
+      window.removeEventListener('storage', onStorageChanged);
+    };
   }, []);
 
   // Premium Backend Pulse (Neural Keep-Alive)
