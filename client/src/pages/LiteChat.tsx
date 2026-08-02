@@ -1,6 +1,10 @@
 import React, { Fragment, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Listbox, Transition } from '@headlessui/react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { 
   Cpu, 
   Zap, 
@@ -13,8 +17,9 @@ import {
   SlidersHorizontal,
   Bot,
   Microchip,
+  FileText,
+  Image as ImageIcon,
   X,
-  PanelRightOpen,
   Sparkles,
   ShieldCheck,
   History as HistoryIcon,
@@ -22,7 +27,9 @@ import {
   MessageSquare,
   MessagesSquare,
   BrainCircuit,
-  Check
+  Check,
+  Paperclip,
+  Download,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useLiteRtChat } from '../hooks/useLiteRtChat';
@@ -34,8 +41,16 @@ import type { ProviderId } from '../components/providerMeta';
 import ProviderIcon from '../components/ProviderIcon';
 import type { SystemCapabilities, ModelMetadata } from '../services/liteRtService';
 import type { ArtifactDownloadState, DownloadReadiness } from '../services/localModelDownloadService';
+import {
+  buildAttachmentPromptContext,
+  formatAttachmentSize,
+  normalizeAttachments,
+  type ChatAttachment,
+} from '../utils/chatAttachments';
+import 'katex/dist/katex.min.css';
 
 const LITERT_ICON = '/media/brand-icons/Litert_icon.svg';
+const LITERT_ICON_WHITE = '/media/brand-icons/Litert_icon_white.svg';
 
 const LiteRtMark: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
   <img src={LITERT_ICON} alt="LiteRT" className={`${className} object-contain drop-shadow-sm`} />
@@ -63,6 +78,116 @@ const SUGGESTED_PROMPTS: { text: string; icon: typeof Sparkles }[] = [
   { text: 'How does WebGPU accelerate on-device LLMs?', icon: BrainCircuit },
   { text: 'How do model weights stay private on-device?', icon: ShieldCheck },
 ];
+
+const formatDuration = (durationMs?: number): string => {
+  if (!durationMs || durationMs <= 0) return '-';
+  if (durationMs < 1000) return `${durationMs}ms`;
+  return `${(durationMs / 1000).toFixed(2)}s`;
+};
+
+interface ParsedMessageAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeLabel: string;
+  descriptor: string;
+  extractedText?: string;
+}
+
+interface ParsedMessageContent {
+  text: string;
+  attachments: ParsedMessageAttachment[];
+}
+
+const parseUserMessageContent = (content: string): ParsedMessageContent => {
+  const match = content.match(/\[ATTACHMENTS_CONTEXT\]([\s\S]*?)\[\/ATTACHMENTS_CONTEXT\]/);
+  if (!match) {
+    return { text: content, attachments: [] };
+  }
+
+  const contextBody = match[1] || '';
+  const cleanedText = content
+    .replace(match[0], '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  const lines = contextBody.split('\n');
+  const attachments: ParsedMessageAttachment[] = [];
+  let current: ParsedMessageAttachment | null = null;
+  let collectingExtractedText = false;
+  const extractedTextLines: string[] = [];
+
+  const flushCurrent = () => {
+    if (!current) return;
+    if (extractedTextLines.length > 0) {
+      current.extractedText = extractedTextLines.join('\n').trim();
+      extractedTextLines.length = 0;
+    }
+    attachments.push(current);
+    current = null;
+    collectingExtractedText = false;
+  };
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trimEnd();
+
+    if (line.startsWith('- File: ')) {
+      flushCurrent();
+      const fileLine = line.replace('- File: ', '').trim();
+      const fileMatch = fileLine.match(/^(.*?)\s*\((.*?),\s*(.*?)\)$/);
+      const name = fileMatch?.[1]?.trim() || fileLine;
+      const mimeType = fileMatch?.[2]?.trim() || 'unknown';
+      const sizeLabel = fileMatch?.[3]?.trim() || '';
+
+      current = {
+        id: `${name}-${attachments.length}`,
+        name,
+        mimeType,
+        sizeLabel,
+        descriptor: '',
+      };
+      return;
+    }
+
+    if (!current) return;
+
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    if (trimmed.startsWith('Content:')) {
+      current.descriptor = trimmed.replace('Content:', '').trim();
+      collectingExtractedText = false;
+      return;
+    }
+
+    if (trimmed === 'Extracted text:') {
+      current.descriptor = 'Extracted text included';
+      collectingExtractedText = false;
+      return;
+    }
+
+    if (trimmed === '```text') {
+      collectingExtractedText = true;
+      return;
+    }
+
+    if (trimmed === '```') {
+      collectingExtractedText = false;
+      return;
+    }
+
+    if (collectingExtractedText) {
+      extractedTextLines.push(line);
+    }
+  });
+
+  flushCurrent();
+
+  return {
+    text: cleanedText,
+    attachments,
+  };
+};
 
 interface SidePanelContentProps {
   capabilities: SystemCapabilities | null;
@@ -173,8 +298,9 @@ const SidePanelContent: React.FC<SidePanelContentProps> = ({
 
     <div className="border-t border-black/[0.04] pt-5">
       <div className="rounded-2xl glass-surface p-4 border border-[#8B5CF6]/15">
-        <h5 className="text-xs font-bold text-[var(--text-h)] mb-2 flex items-center gap-1.5">
-          <LiteRtMark className="w-3.5 h-3.5" />
+        <img src="/media/brand-icons/LiteRT_Blog4.jpg" alt="LiteRT.js" className="img-fluid rounded-md mb-2" />
+        <h5 className="text-xs font-bold text-[var(--text-h)] mb-2 flex items-center gap-1.5"> 
+          {/* <LiteRtMark className="w-3.5 h-3.5" /> */}
           Edge AI Telemetry powered by LiteRT.js
         </h5>
         <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
@@ -194,8 +320,12 @@ const LiteChat: React.FC = () => {
   const [promptHistory, setPromptHistory] = useState<string[]>(loadPromptHistory);
   const [openSection, setOpenSection] = useState<'prompts' | null>(null);
   const [cloudConfigOpen, setCloudConfigOpen] = useState(true);
+  const [isDesktopPanelOpen, setIsDesktopPanelOpen] = useState(true);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [attachmentWarning, setAttachmentWarning] = useState<string | null>(null);
   const messagesFeedRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const userName = localStorage.getItem('username') || 'Guest';
 
   const {
@@ -227,13 +357,85 @@ const LiteChat: React.FC = () => {
     setProvider,
     cloudModels,
     cloudProviderStatus,
-    cloudConfigSource,
     missingApiKey,
   } = useLiteRtChat();
 
   const startNewSession = async () => {
     clearChat();
+    setAttachments([]);
+    setAttachmentWarning(null);
     await createConversation();
+  };
+
+  const handleClearChat = () => {
+    const confirmed = window.confirm('Are you sure you want to clear chat? You will lose all chat history in this view.');
+    if (!confirmed) return;
+    clearChat();
+    setAttachments([]);
+    setAttachmentWarning(null);
+  };
+
+  const handleExportChat = () => {
+    const sessionData = {
+      sessionId: activeConversationId?.toString() || 'guest-session',
+      timestamp: new Date().toISOString(),
+      provider: {
+        name: provider,
+        class: engineMode,
+      },
+      turns: messages.map((msg) => ({
+        role: msg.sender === 'user' ? 'user' : 'model',
+        content: msg.content,
+        metadata: {
+          provider: msg.metadata?.provider,
+          model: msg.metadata?.model,
+          latencyMs: msg.metadata?.durationMs,
+          tokenCount: msg.metadata?.tokens,
+          timestamp: msg.metadata?.timestamp || msg.timestamp,
+          engine: msg.engine,
+        },
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(sessionData, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aicodex-litechat-${sessionData.sessionId}-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleAttachmentPick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { accepted, rejected, capped } = normalizeAttachments(event.target.files);
+    if (accepted.length) {
+      setAttachments((previous) => {
+        const merged = [...previous];
+        accepted.forEach((next) => {
+          if (!merged.some((item) => item.id === next.id)) {
+            merged.push(next);
+          }
+        });
+        return merged.slice(0, 6);
+      });
+    }
+
+    const warnings: string[] = [];
+    if (rejected.length) warnings.push(`Unsupported file type: ${rejected.join(', ')}`);
+    if (capped) warnings.push('Attachment limit reached (max 6 files).');
+    setAttachmentWarning(warnings.length ? warnings.join(' ') : null);
+
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((previous) => previous.filter((item) => item.id !== id));
   };
 
   // Auto scroll to bottom on new messages (skip when there are none, otherwise
@@ -269,6 +471,13 @@ const LiteChat: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (engineMode !== 'local') {
+      setIsPanelOpen(false);
+      setIsDesktopPanelOpen(false);
+    }
+  }, [engineMode]);
+
   const addPromptToHistory = (prompt: string) => {
     const trimmed = prompt.trim();
     if (!trimmed) return;
@@ -296,12 +505,21 @@ const LiteChat: React.FC = () => {
     setOpenSection((prev) => (prev === section ? null : section));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || loading) return;
-    sendMessage(inputText);
+
+    let outboundMessage = inputText;
+    if (attachments.length > 0) {
+      const attachmentContext = await buildAttachmentPromptContext(attachments);
+      outboundMessage = `${inputText}\n${attachmentContext}`;
+    }
+
+    sendMessage(outboundMessage);
     addPromptToHistory(inputText);
     setInputText('');
+    setAttachments([]);
+    setAttachmentWarning(null);
     if (composerRef.current) {
       composerRef.current.style.height = 'auto';
     }
@@ -316,7 +534,7 @@ const LiteChat: React.FC = () => {
   const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      void handleSubmit(e);
     }
   };
 
@@ -338,6 +556,10 @@ const LiteChat: React.FC = () => {
   );
   const selectedCloudProvider =
     cloudProviderOptions.find((p) => p.id === provider) || cloudProviderOptions[0];
+  const selectedCloudModelLabel =
+    cloudModels[provider]?.find((model) => model.id === activeModelId)?.name || activeModelId;
+  const selectedLocalModelLabel =
+    modelsList.find((model) => model.id === activeModelId)?.name || activeModelId;
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-transparent text-[var(--text-primary)] font-sans relative">
@@ -350,7 +572,7 @@ const LiteChat: React.FC = () => {
       <header className="relative h-14 flex items-center justify-between px-4 sm:px-6 bg-gradient-to-r from-white via-[#fd3b12]/40 to-[#fd3b12] border-b border-[#fd3b12]/30 z-30 shrink-0 safe-area-top overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#fd3b12]/40 to-transparent pointer-events-none" />
 
-        <div className="flex items-center gap-3 h-full shrink-0">
+        <div className="flex items-center gap-3 h-full shrink-0 pe-2">
           {/* New Chat */}
           <button
             onClick={startNewSession}
@@ -377,7 +599,7 @@ const LiteChat: React.FC = () => {
               (e.target as HTMLElement).style.display = 'none';
             }}
           />
-          <div className="flex flex-col leading-tight min-w-0 me-4">
+          <div className="flex flex-col leading-tight min-w-0">
             <span className="text-sm font-bold tracking-wider text-[var(--text-h)] truncate">
               AI<span className="text-[#fd3b12]">Codex</span> Chat
             </span>
@@ -386,23 +608,21 @@ const LiteChat: React.FC = () => {
             </span>
           </div>
 
-          <div className="hidden md:flex items-center rounded-full border border-white/25 bg-white/15 px-3 py-1 text-[10px] font-semibold text-white/95 max-w-[260px]">
-            <HistoryIcon className="w-3.5 h-3.5 mr-1.5 shrink-0" />
-            <span className="truncate">
-              {activeSession?.title || 'Guest Session'}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0 h-full">
           <button
             onClick={() => setIsSessionsPanelOpen(true)}
-            className="p-2 rounded-lg bg-white/15 hover:bg-white/25 text-white transition-colors"
+            className="hidden md:flex items-center rounded-full border border-white/25 bg-white/15 hover:bg-white/25 px-3 py-1 text-[10px] font-semibold text-[#fd3b12] max-w-[260px] transition-colors"
             title="Open Chat Sessions"
             aria-label="Open Chat Sessions"
           >
-            <HistoryIcon className="w-4.5 h-4.5" />
+            <HistoryIcon className="w-4 h-4 mr-1.5 shrink-0" />
+            <span className="truncate">
+              {activeSession?.title || 'Guest Session'}
+            </span>
           </button>
+        </div>
+
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0 h-full">
+          <PortalSwitcher isDark={true} />
 
           {/* Provider Badge — clickable, opens SettingsModal */}
           {(() => {
@@ -419,7 +639,9 @@ const LiteChat: React.FC = () => {
                 }`}
                 title={`Provider: ${providerInfo.label} — Click to change`}
               >
-                <ProviderIcon provider={providerInfo} size={16} />
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white shadow-sm shrink-0">
+                  <ProviderIcon provider={providerInfo} size={14} />
+                </span>
                 <span className="hidden md:flex text-[10px] font-bold uppercase tracking-tight text-white">
                   {providerInfo.label} API
                 </span>
@@ -429,8 +651,6 @@ const LiteChat: React.FC = () => {
               </button>
             );
           })()}
-
-          <PortalSwitcher isDark={true} />
 
           <button
             onClick={() => {
@@ -456,15 +676,30 @@ const LiteChat: React.FC = () => {
             </svg>
           </button>
 
-          {/* Panel drawer toggle — small screens only */}
-          <button
-            onClick={() => setIsPanelOpen(true)}
-            className="lg:hidden p-2 rounded-xl bg-black/20 text-white hover:text-white hover:bg-black/30 transition-colors touch-44"
-            title="Open AI Panel"
-            aria-label="Open AI Panel"
-          >
-            <PanelRightOpen className="w-5 h-5" />
-          </button>
+          {engineMode === 'local' && (
+            <button
+              onClick={() => {
+                if (window.innerWidth >= 1024) {
+                  setIsDesktopPanelOpen((open) => !open);
+                } else {
+                  setIsPanelOpen(true);
+                }
+              }}
+              className="p-2 rounded-xl bg-black/20 text-white hover:text-white hover:bg-black/30 transition-colors touch-44"
+              title={window.innerWidth >= 1024
+                ? (isDesktopPanelOpen ? 'Hide Model Configuration Panel' : 'Show Model Configuration Panel')
+                : 'Open AI Panel'}
+              aria-label={window.innerWidth >= 1024
+                ? (isDesktopPanelOpen ? 'Hide Model Configuration Panel' : 'Show Model Configuration Panel')
+                : 'Open AI Panel'}
+            >
+              <img
+                src="/media/brand-icons/Litert_icon_white.svg"
+                alt="LiteRT"
+                className={`w-5 h-5 object-contain transition-transform ${isDesktopPanelOpen ? 'rotate-90' : ''}`}
+              />
+            </button>
+          )}
         </div>
       </header>
 
@@ -494,7 +729,9 @@ const LiteChat: React.FC = () => {
                 {/* Welcome hero — LiteRT mark + user greeting */}
                 <div className="mb-10">
                   <div className="p-7 rounded-[2rem] bg-[#fd3b12] border border-[#fd3b12]/40 mb-6 shadow-2xl shadow-[#fd3b12]/40 inline-block">
-                    <LiteRtMark className="w-24 h-24 brightness-0 invert drop-shadow-lg" />
+                    <div className="w-24 h-24 brightness-0 invert drop-shadow-lg" >
+                      <img src={LITERT_ICON_WHITE} alt="LiteRT" className="w-4 h-4 object-contain drop-shadow-sm" />
+                    </div>
                   </div>
                   <h3 className="text-2xl font-bold text-[var(--text-h)] tracking-tight">
                     Welcome back, <span className="text-[#fd3b12]">{userName}</span>
@@ -664,7 +901,13 @@ const LiteChat: React.FC = () => {
                 </div>
               </div>
             ) : (
-              messages.map((msg) => (
+              messages.map((msg) => {
+                const parsedUserContent = msg.sender === 'user' && msg.content
+                  ? parseUserMessageContent(msg.content)
+                  : null;
+                const contentForDisplay = parsedUserContent?.text || msg.content;
+
+                return (
                 <div
                   key={msg.id}
                   className={`flex gap-4 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -687,36 +930,118 @@ const LiteChat: React.FC = () => {
                     )}
 
                     {/* Message Content */}
-                    <div className="whitespace-pre-wrap font-sans relative z-10">{msg.content || (
-                      <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#fd3b12] animate-ping"></span>
-                        Thinking...
-                      </span>
-                    )}</div>
+                    <div className="font-sans relative z-10 prose prose-sm max-w-none prose-pre:my-2 prose-code:text-inherit">
+                      {contentForDisplay ? (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm, remarkMath]}
+                          rehypePlugins={[rehypeKatex]}
+                          components={{
+                            pre: ({ children }) => (
+                              <pre className="rounded-lg border border-black/[0.08] bg-black/[0.03] p-3 overflow-x-auto text-[12px]">{children}</pre>
+                            ),
+                            code: ({ inline, children, ...props }: any) => (
+                              inline ? (
+                                <code className="px-1 py-0.5 rounded bg-black/[0.05]" {...props}>{children}</code>
+                              ) : (
+                                <code {...props}>{children}</code>
+                              )
+                            ),
+                          }}
+                        >
+                          {contentForDisplay}
+                        </ReactMarkdown>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#fd3b12] animate-ping"></span>
+                          Thinking...
+                        </span>
+                      )}
+                    </div>
+
+                    {msg.sender === 'user' && parsedUserContent && parsedUserContent.attachments.length > 0 && (
+                      <div className="mt-3 space-y-2 relative z-10">
+                        {parsedUserContent.attachments.map((attachment) => {
+                          const isImage = attachment.mimeType.startsWith('image/');
+                          const isPdf = attachment.mimeType === 'application/pdf';
+
+                          return (
+                            <div
+                              key={attachment.id}
+                              className="rounded-xl border border-white/20 bg-black/35 backdrop-blur-sm p-2.5 text-white"
+                            >
+                              <div className="flex items-start gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-black/35 border border-white/20 flex items-center justify-center shrink-0">
+                                  {isImage ? (
+                                    <ImageIcon className="w-4 h-4" />
+                                  ) : (
+                                    <FileText className="w-4 h-4" />
+                                  )}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[11px] font-semibold truncate" title={attachment.name}>
+                                    {attachment.name}
+                                  </div>
+                                  <div className="text-[10px] text-white/75 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                    <span className="px-1.5 py-0.5 rounded-full bg-black/45 border border-white/20">
+                                      {isImage ? 'Image' : isPdf ? 'PDF' : 'Document'}
+                                    </span>
+                                    {attachment.sizeLabel && <span>{attachment.sizeLabel}</span>}
+                                    <span className="truncate">{attachment.mimeType}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {attachment.extractedText && (
+                                <div className="mt-2 rounded-lg bg-black/45 border border-white/15 p-2">
+                                  <div className="text-[10px] uppercase tracking-wider text-white/80 mb-1">Extracted Text</div>
+                                  <p className="text-[11px] text-white/95 whitespace-pre-wrap line-clamp-4">
+                                    {attachment.extractedText}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
                     {/* Metadata Footer */}
-                    {msg.sender === 'bot' && (msg.accelerator || msg.tps || msg.engine) && (
-                      <div className="mt-2.5 pt-2 border-t border-black/[0.04] flex items-center gap-3 text-[10px] text-[var(--text-muted)] font-mono select-none relative z-10">
-                        <span className={`uppercase px-1.5 py-0.5 rounded font-bold ${
-                          msg.engine === 'local'
-                            ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
-                            : 'bg-blue-500/10 text-blue-600 border border-blue-500/20'
-                        }`}>
-                          {msg.engine === 'local' ? 'local preview' : 'cloud engine'}
-                        </span>
-                        {msg.accelerator && (
-                          <span className="bg-black/[0.04] px-1.5 py-0.5 rounded text-[var(--text-muted)]">
-                            {msg.accelerator}
+                    {msg.sender === 'bot' && (
+                      <div className="mt-2.5 pt-2 border-t border-black/[0.04] flex items-center justify-between gap-2 text-[10px] text-[var(--text-muted)] select-none relative z-10">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {msg.metadata?.provider && msg.metadata.provider !== 'local' ? (
+                            (() => {
+                              const providerInfo = [...PROVIDERS, ...MORE_PROVIDERS].find((p) => p.id === msg.metadata?.provider);
+                              return providerInfo ? (
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white shadow-sm shrink-0">
+                                  <ProviderIcon provider={providerInfo} size={12} />
+                                </span>
+                              ) : (
+                                <Cloud className="w-3.5 h-3.5 shrink-0" />
+                              );
+                            })()
+                          ) : (
+                            <Cpu className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                          )}
+                          <span className="truncate">
+                            {msg.metadata?.provider || msg.engine}
                           </span>
-                        )}
-                        {msg.tps && msg.tps > 0 && (
-                          <span>{msg.tps} tok/s</span>
-                        )}
+                          <span>|</span>
+                          <span className="truncate text-[var(--text-primary)] font-semibold">{msg.metadata?.model || activeModelId}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 text-right">
+                          <span>{formatDuration(msg.metadata?.durationMs)}</span>
+                          <span>•</span>
+                          <span>{msg.metadata?.tokens ?? 0} tokens</span>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
-              ))
+              );
+              })
             )}
           </div>
 
@@ -742,7 +1067,9 @@ const LiteChat: React.FC = () => {
                               <Listbox.Button className="relative w-full bg-white/60 hover:bg-white/85 border border-[#fd3b12]/40 rounded-xl pl-2.5 pr-8 py-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#fd3b12]/20 transition-all shadow-sm text-left">
                                 <span className="flex items-center gap-2.5 min-w-0">
                                   {selectedCloudProvider && (
-                                    <ProviderIcon provider={selectedCloudProvider} size={18} className="shrink-0" />
+                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white shadow-sm shrink-0">
+                                      <ProviderIcon provider={selectedCloudProvider} size={14} />
+                                    </span>
                                   )}
                                   <span className="truncate">{selectedCloudProvider?.label || provider}</span>
                                 </span>
@@ -771,7 +1098,9 @@ const LiteChat: React.FC = () => {
                                       {({ selected }) => (
                                         <>
                                           <span className="flex items-center gap-2.5 min-w-0">
-                                            <ProviderIcon provider={option} size={18} className="shrink-0" />
+                                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white shadow-sm shrink-0">
+                                              <ProviderIcon provider={option} size={14} />
+                                            </span>
                                             <span className={`truncate ${selected ? 'font-bold' : 'font-medium'}`}>
                                               {option.label}
                                             </span>
@@ -834,6 +1163,35 @@ const LiteChat: React.FC = () => {
                   </div>
                 )}
 
+                {(attachments.length > 0 || attachmentWarning) && (
+                  <div className="px-1 pb-2">
+                    {attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-1.5">
+                        {attachments.map((attachment) => (
+                          <span
+                            key={attachment.id}
+                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/70 border border-black/[0.08] text-[10px] text-[var(--text-primary)]"
+                          >
+                            <span className="max-w-[180px] truncate" title={attachment.name}>{attachment.name}</span>
+                            <span className="text-[var(--text-muted)]">{formatAttachmentSize(attachment.size)}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeAttachment(attachment.id)}
+                              className="text-[var(--text-muted)] hover:text-[#fd3b12]"
+                              title="Remove attachment"
+                            >
+                              x
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {attachmentWarning && (
+                      <p className="text-[10px] text-amber-700">{attachmentWarning}</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Composer Row */}
                 <div className="flex items-end gap-2">
                   <textarea
@@ -853,6 +1211,25 @@ const LiteChat: React.FC = () => {
                   />
 
                   <div className="flex items-center gap-2 shrink-0 pb-1.5">
+
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-black/[0.08] bg-white/70 text-[var(--text-muted)] hover:text-[#fd3b12] hover:border-[#fd3b12]/35 transition-all"
+                      title="Attach media or documents"
+                    >
+                      <Paperclip className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline text-xs font-semibold">Attach</span>
+                    </button>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      accept=".png,.jpg,.jpeg,.webp,.gif,.md,.txt,.pdf,image/*,text/markdown,text/plain,application/pdf"
+                      onChange={handleAttachmentPick}
+                    />
 
                     {/* Engine Mode Selector Badge */}
                     <button
@@ -911,19 +1288,25 @@ const LiteChat: React.FC = () => {
               </div>
             </form>
 
-            {/* Footer Telemetry Strip — Web Engine Online + Accelerator */}
+            {/* Footer Telemetry Strip */}
             <div className="max-w-4xl mx-auto flex items-center justify-between text-xs text-[var(--text-muted)] select-none gap-4 overflow-x-auto py-2.5">
               <div className="flex items-center gap-2.5">
-                <span className="material-chip flex items-center gap-1.5 px-2.5 py-1 rounded-full shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                  Web Engine Online
-                </span>
-                <span className="hidden sm:inline text-black/10">|</span>
-                <span className={`material-chip hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full shrink-0 ${
-                  cloudConfigSource === 'backend' ? 'text-emerald-700' : 'text-[var(--text-muted)]'
-                }`} title={cloudConfigSource === 'backend' ? 'Model catalog loaded from the backend' : 'Using bundled fallback model catalog'}>
-                  <Cloud className="w-3.5 h-3.5" />
-                  {cloudConfigSource === 'backend' ? 'Cloud Config: Live' : 'Cloud Config: Fallback'}
+                <span
+                  className="material-chip hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full shrink-0 text-[var(--text-muted)] max-w-[320px]"
+                  title={engineMode === 'cloud'
+                    ? `Cloud provider ${selectedCloudProvider?.label || provider} using ${selectedCloudModelLabel}`
+                    : `Local provider LiteRT using ${selectedLocalModelLabel}`}
+                >
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white shadow-sm shrink-0">
+                    {engineMode === 'cloud' ? (
+                      <ProviderIcon provider={selectedCloudProvider} size={12} />
+                    ) : (
+                      <LiteRtMark className="w-3 h-3" />
+                    )}
+                  </span>
+                  <span className="truncate max-w-[180px] text-[var(--text-primary)] font-semibold">
+                    {engineMode === 'cloud' ? selectedCloudModelLabel : selectedLocalModelLabel}
+                  </span>
                 </span>
                 <span className="material-chip hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full shrink-0">
                   <Microchip className="w-3.5 h-3.5 text-[#5bc6a0]" />
@@ -942,12 +1325,21 @@ const LiteChat: React.FC = () => {
                 )}
 
                 <button
-                  onClick={clearChat}
-                  className="flex items-center gap-1 text-[var(--text-muted)] hover:text-[#fd3b12] transition-colors press-lift"
+                  onClick={handleClearChat}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-black/[0.08] hover:border-[#fd3b12]/30 text-[var(--text-muted)] hover:text-[#fd3b12] transition-colors press-lift"
                   title="Clear Chat History"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Clear</span>
+                  <span>Clear Chat</span>
+                </button>
+
+                <button
+                  onClick={handleExportChat}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-black/[0.08] hover:border-[#fd3b12]/30 text-[var(--text-muted)] hover:text-[#fd3b12] transition-colors press-lift"
+                  title="Export Chat"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export Chat</span>
                 </button>
               </div>
             </div>
@@ -956,7 +1348,7 @@ const LiteChat: React.FC = () => {
         </div>
 
         {/* Sidebar Capabilities Monitor Panel — static right rail on desktop */}
-        <div className="hidden lg:flex flex-col w-80 bg-[var(--glass-bg)]/70 backdrop-blur-xl border-l border-black/[0.06] p-6 overflow-y-auto shrink-0 select-none relative">
+        <div className={`${engineMode === 'local' && isDesktopPanelOpen ? 'hidden lg:flex' : 'hidden'} flex-col w-80 bg-[var(--glass-bg)]/70 backdrop-blur-xl border-l border-black/[0.06] p-6 overflow-y-auto shrink-0 select-none relative`}>
           <div
             className="liquid-blob w-56 h-56 -top-10 -right-10 opacity-15"
             style={{ background: 'radial-gradient(circle, rgba(139, 92, 246, 0.5), transparent 70%)' }}
@@ -966,7 +1358,7 @@ const LiteChat: React.FC = () => {
 
         {/* Slide-over side drawer — small screens */}
         <AnimatePresence>
-          {isPanelOpen && (
+          {engineMode === 'local' && isPanelOpen && (
             <>
               <motion.div
                 className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden"

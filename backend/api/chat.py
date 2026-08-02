@@ -918,6 +918,7 @@ async def quick_chat(
         await db.commit()
 
     try:
+        request_started = time.perf_counter()
         from backend.agent.models import get_llm
         model = get_llm(
             provider=provider,
@@ -940,6 +941,16 @@ async def quick_chat(
 
         response = await model.ainvoke(messages)
         reply_text = str(response.content)
+        duration_ms = int((time.perf_counter() - request_started) * 1000)
+        estimated_tokens = estimate_tokens(reply_text)
+
+        response_payload = {
+            "reply": reply_text,
+            "provider": provider,
+            "model": model_name,
+            "duration_ms": duration_ms,
+            "tokens": estimated_tokens,
+        }
 
         if conversation is not None:
             db.add(
@@ -969,9 +980,10 @@ async def quick_chat(
                         gateway_id,
                     )
                 )
-            return {"reply": reply_text, "conversation_id": conversation.id}
+            response_payload["conversation_id"] = conversation.id
+            return response_payload
 
-        return {"reply": reply_text}
+        return response_payload
     except Exception as e:
         log_error(f"Quick Chat Error: {str(e)}", e)
         return {"reply": f"Sorry, I encountered an error: {str(e)}"}

@@ -48,7 +48,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
     <header className="h-14 flex items-stretch justify-between bg-[#D8DCE4]/60 backdrop-blur-xl border-b border-black/[0.06] z-40 shadow-sm w-full safe-area-top overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {/* items justified to the left */}
       <div className="flex items-center justify-start gap-3 shrink-0 h-full mr-8">
-        <div className="sticky left-0 z-10 flex items-center gap-3 bg-gradient-to-r from-[#D8DCE4] via-[#D8DCE4]/95 to-transparent pl-4 pr-2 h-full shrink-0">
+        <div className="sticky left-0 z-10 flex items-center gap-1 bg-gradient-to-r from-[#D8DCE4] via-[#D8DCE4]/95 to-transparent pl-4 pr-2 h-full shrink-0">
           {/* Sidebar Toggle */}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -212,7 +212,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             }`}
             title={`Provider: ${activeProviderInfo.label} — Click to change`}
           >
-            <ProviderIcon provider={activeProviderInfo} size={16} />
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white shadow-sm shrink-0">
+              <ProviderIcon provider={activeProviderInfo} size={14} />
+            </span>
             <span
               className="hidden md:flex text-[10px] font-bold uppercase tracking-tight text-white"
             >

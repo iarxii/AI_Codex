@@ -938,9 +938,10 @@ const workspace: React.FC = () => {
 
   const getProviderConnectionParams = (prov: string) => getProviderConnectionParamsShared(prov);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = (e: React.FormEvent, messageOverride?: string) => {
     e.preventDefault();
-    if (!input.trim() || !connected || loading || isProcessing.current) return;
+    const outboundMessage = (messageOverride ?? input).trim();
+    if (!outboundMessage || !connected || loading || isProcessing.current) return;
 
     if (!currentConvId) {
       handleNewChat().then(() => {});
@@ -953,7 +954,7 @@ const workspace: React.FC = () => {
     const userMsg: Message = {
       id: Date.now().toString(),
       sender: "user",
-      content: input,
+      content: outboundMessage,
     };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
@@ -974,7 +975,7 @@ const workspace: React.FC = () => {
       }
 
       const payload = {
-        message: input,
+        message: outboundMessage,
         conversation_id: currentConvId,
         provider: activeProvider,
         model: activeModel,

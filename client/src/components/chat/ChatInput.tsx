@@ -9,11 +9,17 @@ import {
   MagnifyingGlassIcon,
   PhotoIcon,
 } from "@heroicons/react/24/outline";
+import {
+  buildAttachmentPromptContext,
+  formatAttachmentSize,
+  normalizeAttachments,
+  type ChatAttachment,
+} from "../../utils/chatAttachments";
 
 interface ChatInputProps {
   input: string;
   setInput: (val: string) => void;
-  onSend: (e: React.FormEvent) => void;
+  onSend: (e: React.FormEvent, messageOverride?: string) => void;
   loading: boolean;
   currentConvId: number | null;
   showTelemetry: boolean;
@@ -105,6 +111,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [isConfigOpen, setIsConfigOpen] = React.useState(false);
   const [isSpecializationOpen, setIsSpecializationOpen] = React.useState(false);
   const [isToolsOpen, setIsToolsOpen] = React.useState(false);
+  const [attachments, setAttachments] = React.useState<ChatAttachment[]>([]);
+  const [attachmentWarning, setAttachmentWarning] = React.useState<string | null>(null);
   const [activeSpecialization, setActiveSpecialization] = React.useState(
     SPECIALIZATIONS[1],
   ); // Default to Coding
@@ -113,6 +121,51 @@ const ChatInput: React.FC<ChatInputProps> = ({
   });
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleAttachmentPick = React.useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const { accepted, rejected, capped } = normalizeAttachments(event.target.files);
+    if (accepted.length) {
+      setAttachments((previous) => {
+        const merged = [...previous];
+        accepted.forEach((next) => {
+          if (!merged.some((item) => item.id === next.id)) {
+            merged.push(next);
+          }
+        });
+        return merged.slice(0, 6);
+      });
+    }
+
+    const warnings: string[] = [];
+    if (rejected.length) warnings.push(`Unsupported file type: ${rejected.join(", ")}`);
+    if (capped) warnings.push("Attachment limit reached (max 6 files).");
+    setAttachmentWarning(warnings.length ? warnings.join(" ") : null);
+
+    if (event.target) {
+      event.target.value = "";
+    }
+  }, []);
+
+  const removeAttachment = React.useCallback((id: string) => {
+    setAttachments((previous) => previous.filter((item) => item.id !== id));
+  }, []);
+
+  const handleSendWithAttachments = React.useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    if (!attachments.length) {
+      onSend(e);
+      return;
+    }
+
+    const attachmentContext = await buildAttachmentPromptContext(attachments);
+    const messageWithContext = `${input}\n${attachmentContext}`;
+    onSend(e, messageWithContext);
+    setAttachments([]);
+    setAttachmentWarning(null);
+  }, [attachments, input, onSend]);
 
   // Sync specialization with agent mode
   React.useEffect(() => {
@@ -139,7 +192,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           setShowTelemetry={setShowTelemetry}
         />
       </div>
-      <form onSubmit={onSend} className="max-w-4xl mx-auto">
+      <form onSubmit={handleSendWithAttachments} className="max-w-4xl mx-auto">
         <Brain className="hidden" aria-hidden="true" />
         {/* Main Input Container */}
         <div className="relative bg-[#E2E6EC] border border-black/[0.08] rounded-2xl shadow-md transition-all focus-within:border-[#fd3b12]/40 focus-within:shadow-lg focus-within:shadow-[#fd3b12]/5">
@@ -163,7 +216,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             {/* Attachments */}
             <button
               type="button"
-              onClick={() => alert("File attachments — coming soon!")}
+              onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-[#4A4D5E] hover:text-[#1A1D2E] hover:bg-black/[0.05] transition-all"
               title="Attach files"
             >
@@ -182,6 +235,15 @@ const ChatInput: React.FC<ChatInputProps> = ({
               </svg>
               <span className="hidden sm:inline">Attach</span>
             </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              accept=".png,.jpg,.jpeg,.webp,.gif,.md,.txt,.pdf,image/*,text/markdown,text/plain,application/pdf"
+              onChange={handleAttachmentPick}
+            />
 
             {/* Agent Specialization Dropdown */}
             <div className="relative">
@@ -390,6 +452,35 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </button>
           </div>
 
+          {(attachments.length > 0 || attachmentWarning) && (
+            <div className="px-3 pb-2">
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-1.5">
+                  {attachments.map((attachment) => (
+                    <div
+                      key={attachment.id}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/70 border border-black/[0.08] text-[10px] text-[#4A4D5E]"
+                    >
+                      <span className="font-semibold max-w-[180px] truncate" title={attachment.name}>{attachment.name}</span>
+                      <span className="text-[#7A7D8E]">{formatAttachmentSize(attachment.size)}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(attachment.id)}
+                        className="text-[#7A7D8E] hover:text-[#fd3b12]"
+                        title="Remove attachment"
+                      >
+                        x
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {attachmentWarning && (
+                <p className="text-[10px] text-amber-700">{attachmentWarning}</p>
+              )}
+            </div>
+          )}
+
           {/* Textarea + Send Row */}
           <div className="flex items-end gap-3 px-3 pb-3 pt-1">
             <textarea
@@ -399,7 +490,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  onSend(e);
+                  void handleSendWithAttachments(e);
                 }
               }}
               placeholder={

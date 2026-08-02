@@ -3,12 +3,117 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import { FileText, Image as ImageIcon } from "lucide-react";
 import "katex/dist/katex.min.css";
 import type { Message, ThoughtLogEntry } from "../../types/chat";
 import ThinkingTrace from "./ThinkingTrace";
 import { PROVIDER_MAP, PROVIDERS, type ProviderId } from "../providerMeta";
 import { TradingChart } from "./TradingChart";
 import { useAI } from "../../contexts/AIContext";
+
+interface ParsedMessageAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeLabel: string;
+  descriptor: string;
+  extractedText?: string;
+}
+
+interface ParsedMessageContent {
+  text: string;
+  attachments: ParsedMessageAttachment[];
+}
+
+const parseUserMessageContent = (content: string): ParsedMessageContent => {
+  const match = content.match(/\[ATTACHMENTS_CONTEXT\]([\s\S]*?)\[\/ATTACHMENTS_CONTEXT\]/);
+  if (!match) {
+    return { text: content, attachments: [] };
+  }
+
+  const contextBody = match[1] || "";
+  const cleanedText = content
+    .replace(match[0], "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  const lines = contextBody.split("\n");
+  const attachments: ParsedMessageAttachment[] = [];
+  let current: ParsedMessageAttachment | null = null;
+  let collectingExtractedText = false;
+  const extractedTextLines: string[] = [];
+
+  const flushCurrent = () => {
+    if (!current) return;
+    if (extractedTextLines.length > 0) {
+      current.extractedText = extractedTextLines.join("\n").trim();
+      extractedTextLines.length = 0;
+    }
+    attachments.push(current);
+    current = null;
+    collectingExtractedText = false;
+  };
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trimEnd();
+
+    if (line.startsWith("- File: ")) {
+      flushCurrent();
+      const fileLine = line.replace("- File: ", "").trim();
+      const fileMatch = fileLine.match(/^(.*?)\s*\((.*?),\s*(.*?)\)$/);
+      const name = fileMatch?.[1]?.trim() || fileLine;
+      const mimeType = fileMatch?.[2]?.trim() || "unknown";
+      const sizeLabel = fileMatch?.[3]?.trim() || "";
+
+      current = {
+        id: `${name}-${attachments.length}`,
+        name,
+        mimeType,
+        sizeLabel,
+        descriptor: "",
+      };
+      return;
+    }
+
+    if (!current) return;
+
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    if (trimmed.startsWith("Content:")) {
+      current.descriptor = trimmed.replace("Content:", "").trim();
+      collectingExtractedText = false;
+      return;
+    }
+
+    if (trimmed === "Extracted text:") {
+      current.descriptor = "Extracted text included";
+      collectingExtractedText = false;
+      return;
+    }
+
+    if (trimmed === "```text") {
+      collectingExtractedText = true;
+      return;
+    }
+
+    if (trimmed === "```") {
+      collectingExtractedText = false;
+      return;
+    }
+
+    if (collectingExtractedText) {
+      extractedTextLines.push(line);
+    }
+  });
+
+  flushCurrent();
+
+  return {
+    text: cleanedText,
+    attachments,
+  };
+};
 
 interface MessageItemProps {
   msg: Message;
@@ -159,6 +264,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
   const isUser = msg.sender === "user";
   const isError = msg.content.startsWith("❌ Error:") || msg.content.startsWith("❌ Send Failed:");
   const [messageCopied, setMessageCopied] = React.useState(false);
+  const parsedUserContent = React.useMemo(() => {
+    if (!isUser || !msg.content) return null;
+    return parseUserMessageContent(msg.content);
+  }, [isUser, msg.content]);
 
   const { activeSpace } = useAI();
 
@@ -376,10 +485,60 @@ const MessageItem: React.FC<MessageItemProps> = ({
             <div className="bg-[#fd3b12] text-white px-5 py-3 rounded-2xl rounded-tr-none rounded-bl-none shadow-md shadow-[#fd3b12]/10 relative user-corner-glow w-full">
               {/* Secondary corner glow decorator */}
               <div className="absolute inset-0 pointer-events-none user-corner-glow-secondary rounded-2xl rounded-tr-none rounded-bl-none overflow-hidden"></div>
-              
-              <p className="text-[12px] leading-relaxed font-medium whitespace-pre-wrap relative z-10">
-                {msg.content}
-              </p>
+
+              {(parsedUserContent?.text || "").length > 0 && (
+                <p className="text-[12px] leading-relaxed font-medium whitespace-pre-wrap relative z-10">
+                  {parsedUserContent?.text || msg.content}
+                </p>
+              )}
+
+              {parsedUserContent && parsedUserContent.attachments.length > 0 && (
+                <div className="mt-3 space-y-2 relative z-10">
+                  {parsedUserContent.attachments.map((attachment) => {
+                    const isImage = attachment.mimeType.startsWith("image/");
+                    const isPdf = attachment.mimeType === "application/pdf";
+
+                    return (
+                      <div
+                        key={attachment.id}
+                        className="rounded-xl border border-white/20 bg-black/35 backdrop-blur-sm p-2.5 text-white"
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-black/35 border border-white/20 flex items-center justify-center shrink-0">
+                            {isImage ? (
+                              <ImageIcon className="w-4 h-4" />
+                            ) : (
+                              <FileText className="w-4 h-4" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[11px] font-semibold truncate" title={attachment.name}>
+                              {attachment.name}
+                            </div>
+                            <div className="text-[10px] text-white/75 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                              <span className="px-1.5 py-0.5 rounded-full bg-black/45 border border-white/20">
+                                {isImage ? "Image" : isPdf ? "PDF" : "Document"}
+                              </span>
+                              {attachment.sizeLabel && <span>{attachment.sizeLabel}</span>}
+                              <span className="truncate">{attachment.mimeType}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {attachment.extractedText && (
+                          <div className="mt-2 rounded-lg bg-black/45 border border-white/15 p-2">
+                            <div className="text-[10px] uppercase tracking-wider text-white/80 mb-1">Extracted Text</div>
+                            <p className="text-[11px] text-white/95 whitespace-pre-wrap line-clamp-4">
+                              {attachment.extractedText}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

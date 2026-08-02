@@ -23,6 +23,13 @@ export interface LiteMessage {
   engine: 'local' | 'cloud';
   accelerator?: AcceleratorType;
   tps?: number; // Tokens per second
+  metadata?: {
+    provider?: string;
+    model?: string;
+    tokens?: number;
+    durationMs?: number;
+    timestamp?: number;
+  };
 }
 
 /** Cloud providers that can never respond without a user-supplied API key.
@@ -95,6 +102,9 @@ export const useLiteRtChat = () => {
         content: row.content,
         timestamp: Date.parse(row.created_at) || Date.now(),
         engine: 'cloud',
+        metadata: {
+          timestamp: Date.parse(row.created_at) || Date.now(),
+        },
       }))
   ), []);
 
@@ -471,6 +481,9 @@ export const useLiteRtChat = () => {
       content,
       timestamp: Date.now(),
       engine: engineMode,
+      metadata: {
+        timestamp: Date.now(),
+      },
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -485,6 +498,11 @@ export const useLiteRtChat = () => {
       engine: engineMode,
       accelerator: capabilities?.preferredAccelerator,
       tps: 0,
+      metadata: {
+        provider: engineMode === 'cloud' ? provider : 'local',
+        model: activeModelId,
+        timestamp: Date.now(),
+      },
     };
 
     setMessages(prev => [...prev, botMessagePlaceholder]);
@@ -542,12 +560,30 @@ export const useLiteRtChat = () => {
             throw new Error(reply);
           }
           tokenCount = reply.split(/\s+/).length;
-          const elapsed = (Date.now() - startTime) / 1000;
+          const elapsedMs = Date.now() - startTime;
+          const elapsed = elapsedMs / 1000;
           const calculatedTps = elapsed > 0 ? Math.round(tokenCount / elapsed) : 0;
+
+          const responseTokens = Number(data?.tokens ?? data?.total_tokens ?? tokenCount) || tokenCount;
+          const responseDurationMs = Number(data?.duration_ms ?? data?.latency_ms ?? elapsedMs) || elapsedMs;
+          const responseProvider = String(data?.provider || provider);
+          const responseModel = String(data?.model || activeModelId);
 
           setMessages(prev => prev.map(msg =>
             msg.id === botMessageId
-              ? { ...msg, content: reply, engine: 'cloud', tps: calculatedTps }
+              ? {
+                  ...msg,
+                  content: reply,
+                  engine: 'cloud',
+                  tps: calculatedTps,
+                  metadata: {
+                    provider: responseProvider,
+                    model: responseModel,
+                    tokens: responseTokens,
+                    durationMs: responseDurationMs,
+                    timestamp: Date.now(),
+                  },
+                }
               : msg
           ));
           if (isAuthenticated) await refreshSessions();
@@ -558,7 +594,17 @@ export const useLiteRtChat = () => {
         console.error('Cloud query failure:', err);
         setMessages(prev => prev.map(msg => 
           msg.id === botMessageId 
-            ? { ...msg, content: `Cloud Agent request failed: ${err instanceof Error ? err.message : 'Unknown connection error.'}`, engine: 'cloud' } 
+            ? {
+                ...msg,
+                content: `Cloud Agent request failed: ${err instanceof Error ? err.message : 'Unknown connection error.'}`,
+                engine: 'cloud',
+                metadata: {
+                  provider,
+                  model: activeModelId,
+                  durationMs: Date.now() - startTime,
+                  timestamp: Date.now(),
+                },
+              }
             : msg
         ));
       } finally {
@@ -606,10 +652,35 @@ export const useLiteRtChat = () => {
       console.error(e);
       setMessages(prev => prev.map(msg => 
         msg.id === botMessageId 
-          ? { ...msg, content: `Local model unavailable: ${e instanceof Error ? e.message : 'Unknown inference error.'}` } 
+          ? {
+              ...msg,
+              content: `Local model unavailable: ${e instanceof Error ? e.message : 'Unknown inference error.'}`,
+              metadata: {
+                provider: 'local',
+                model: activeModelId,
+                durationMs: Date.now() - startTime,
+                tokens: tokenCount,
+                timestamp: Date.now(),
+              },
+            }
           : msg
       ));
     } finally {
+      const elapsedMs = Date.now() - startTime;
+      setMessages(prev => prev.map(msg =>
+        msg.id === botMessageId
+          ? {
+              ...msg,
+              metadata: {
+                provider: 'local',
+                model: activeModelId,
+                durationMs: elapsedMs,
+                tokens: tokenCount,
+                timestamp: Date.now(),
+              },
+            }
+          : msg
+      ));
       setLoading(false);
     }
   };
