@@ -37,100 +37,139 @@ const PROVIDERS_REQUIRING_KEY: ReadonlySet<string> = new Set([
 
 type CloudModel = { id: string; name: string };
 
-/** Per-provider config sent to /chat/cloud-config so the backend can live-list
- *  models with the user's actual credentials (same values Workspace forwards
- *  via X-API-Key / X-Account-Id headers). */
-const buildProviderConfig = (): Record<string, { api_key?: string; base_url?: string; account_id?: string; gateway_id?: string }> => {
-  const out: Record<string, { api_key?: string; base_url?: string; account_id?: string; gateway_id?: string }> = {};
-  for (const prov of ALL_CLOUD_PROVIDERS) {
-    const key = getProviderApiKey(prov);
-    const params = getProviderConnectionParams(prov);
-    if (!key && !params.base_url && !params.account_id && !params.gateway_id) continue;
-    out[prov] = {
-      ...(key ? { api_key: key } : {}),
-      ...(params.base_url ? { base_url: params.base_url } : {}),
-      ...(params.account_id ? { account_id: params.account_id } : {}),
-      ...(params.gateway_id ? { gateway_id: params.gateway_id } : {}),
-    };
-  }
-  return out;
+const DEFAULT_CLOUD_PROVIDER: ProviderId = 'ollama_cloud';
+
+const resolveCloudProvider = (): ProviderId => {
+  const persisted = localStorage.getItem('ai_provider') as ProviderId | null;
+  if (persisted && ALL_CLOUD_PROVIDERS.includes(persisted)) return persisted;
+  return DEFAULT_CLOUD_PROVIDER;
 };
+
+const readPersistedModelFor = (prov: ProviderId): string =>
+  localStorage.getItem(`ai_model_${prov}`) || '';
 
 export const useLiteRtChat = () => {
   const [messages, setMessages] = useState<LiteMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [capabilities, setCapabilities] = useState<SystemCapabilities | null>(null);
-  const [activeModelId, setActiveModelId] = useState<string>('google/gemma-3n-E4B-it-litert-lm');
+  const [provider, setProviderState] = useState<ProviderId>(resolveCloudProvider);
+  const [activeModelId, setActiveModelId] = useState<string>(readPersistedModelFor(resolveCloudProvider()) || 'google/gemma-3n-E4B-it-litert-lm');
   const [tps, setTps] = useState<number>(0);
   const [downloadStates, setDownloadStates] = useState<ArtifactDownloadState[]>(createInitialDownloadState);
   const downloadAbortRef = useRef<AbortController | null>(null);
   const [engineMode, setEngineMode] = useState<'local' | 'cloud'>('cloud');
-  const [provider, setProvider] = useState<ProviderId>('ollama_cloud');
   const [cloudModels, setCloudModels] = useState<Record<string, CloudModel[]>>({});
   const [cloudConfigSource, setCloudConfigSource] = useState<'backend' | 'fallback'>('fallback');
   const [cloudProviderStatus, setCloudProviderStatus] = useState<Record<string, 'live' | 'none'>>({});
   const [downloadReadiness, setDownloadReadiness] = useState<DownloadReadiness | null>(null);
+  const [cloudConfigRevision, setCloudConfigRevision] = useState(0);
 
   // Whether the currently selected provider needs an API key that the user
   // hasn't saved yet. Surfaced in the UI so the user knows to configure it
   // instead of sending requests that are guaranteed to fail upstream.
   const missingApiKey = PROVIDERS_REQUIRING_KEY.has(provider) && !getProviderApiKey(provider);
 
-  // Update model when provider changes (only for cloud)
+  // Update model when provider changes (only for cloud).
+  // Preference order: current selection (if still valid), persisted provider model,
+  // then first available model from live catalog.
   useEffect(() => {
-    if (engineMode === 'cloud' && cloudModels[provider]?.length) {
-      const firstModel = cloudModels[provider][0];
-      setActiveModelId(firstModel.id);
-    }
-  }, [provider, engineMode, cloudModels]);
+    if (engineMode !== 'cloud' || !cloudModels[provider]?.length) return;
 
-  // Hydrate the cloud provider/model catalog from the backend. There is no
-  // bundled fallback catalog — the endpoint reports which providers are live.
+    const models = cloudModels[provider];
+    if (models.some((m) => m.id === activeModelId)) return;
+
+    const persistedModel = readPersistedModelFor(provider);
+    const nextModel =
+      models.find((m) => m.id === persistedModel)?.id || models[0].id;
+
+    setActiveModelId(nextModel);
+    localStorage.setItem(`ai_model_${provider}`, nextModel);
+    localStorage.setItem('ai_model', nextModel);
+  }, [provider, engineMode, cloudModels, activeModelId]);
+
+  // Re-hydrate provider/model when Settings are saved.
+  useEffect(() => {
+    const onSettingsChanged = () => {
+      const nextProvider = resolveCloudProvider();
+      setProviderState(nextProvider);
+      const nextModel = readPersistedModelFor(nextProvider);
+      setActiveModelId(nextModel);
+      setCloudConfigRevision((revision) => revision + 1);
+    };
+
+    const onStorageChanged = (event: StorageEvent) => {
+      if (!event.key || (
+        event.key !== 'ai_provider' &&
+        !event.key.startsWith('ai_model_') &&
+        !event.key.endsWith('_api_key') &&
+        !event.key.endsWith('_base_url') &&
+        !event.key.endsWith('_url')
+      )) return;
+      onSettingsChanged();
+    };
+
+    window.addEventListener('ai-settings-changed', onSettingsChanged);
+    window.addEventListener('storage', onStorageChanged);
+    return () => {
+      window.removeEventListener('ai-settings-changed', onSettingsChanged);
+      window.removeEventListener('storage', onStorageChanged);
+    };
+  }, []);
+
+  // Load models for the selected provider directly. This matches the Settings
+  // connection test and avoids holding model selection hostage to a bulk
+  // request for every configured provider.
   useEffect(() => {
     let cancelled = false;
-    const fetchCloudConfig = async () => {
+    const fetchProviderModels = async () => {
+      const apiKey = getProviderApiKey(provider);
+      const connectionParams = getProviderConnectionParams(provider);
+      const token = getValidToken();
+      const headers: Record<string, string> = {};
+
+      if (token) headers.Authorization = `Bearer ${token}`;
+      if (apiKey) headers['X-API-Key'] = apiKey;
+      if (connectionParams.base_url) headers['X-Base-Url'] = connectionParams.base_url;
+      if (connectionParams.account_id) headers['X-Account-Id'] = connectionParams.account_id;
+      if (connectionParams.gateway_id) headers['X-Gateway-Id'] = connectionParams.gateway_id;
+
       try {
-        const token = getValidToken();
-        if (!token) {
-          setCloudConfigSource('fallback');
-          return;
-        }
         const baseUrl = getApiUrl(false);
-        const response = await fetch(`${baseUrl}${config.API_V1_STR}/chat/cloud-config`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ providers: buildProviderConfig() })
-        });
+        const response = await fetch(
+          `${baseUrl}${config.API_V1_STR}/models?provider=${encodeURIComponent(provider)}`,
+          { headers },
+        );
         if (response.status === 401) {
           clearAuthSession();
           setCloudConfigSource('fallback');
           return;
         }
-        if (!response.ok) throw new Error(`Cloud config failed with status ${response.status}`);
+        if (!response.ok) throw new Error(`Model lookup failed with status ${response.status}`);
         const data = await response.json();
-        if (cancelled || !data?.providers || !Array.isArray(data.providers)) return;
+        if (cancelled || !Array.isArray(data)) return;
 
-        const next: Record<string, CloudModel[]> = {};
-        const status: Record<string, 'live' | 'none'> = {};
-        for (const p of data.providers) {
-          const models = Array.isArray(p?.models) ? p.models : [];
-          next[p.id] = models.map((m: any) => ({ id: String(m.id ?? m.name), name: String(m.name ?? m.id) }));
-          status[p.id] = p.source === 'live' ? 'live' : 'none';
-        }
-        setCloudModels(() => next);
-        setCloudProviderStatus(() => status);
+        const models = data.map((model: any) => ({
+          id: String(model.id ?? model.name),
+          name: String(model.name ?? model.id),
+        }));
+        setCloudModels((previous) => ({ ...previous, [provider]: models }));
+        setCloudProviderStatus((previous) => ({
+          ...previous,
+          [provider]: models.length ? 'live' : 'none',
+        }));
         setCloudConfigSource('backend');
       } catch (error) {
-        console.warn('Cloud config fetch failed; no provider catalog available.', error);
+        console.warn(`Model lookup failed for ${provider}; no provider catalog available.`, error);
+        if (!cancelled) {
+          setCloudModels((previous) => ({ ...previous, [provider]: [] }));
+          setCloudProviderStatus((previous) => ({ ...previous, [provider]: 'none' }));
+        }
         setCloudConfigSource('fallback');
       }
     };
-    fetchCloudConfig();
+    fetchProviderModels();
     return () => { cancelled = true; };
-  }, []);
+  }, [provider, cloudConfigRevision]);
 
   // Load capabilities on mount
   useEffect(() => {
@@ -233,9 +272,23 @@ export const useLiteRtChat = () => {
     downloadAbortRef.current?.abort();
   }, []);
 
+  const setProvider = useCallback((nextProvider: ProviderId) => {
+    const normalized = ALL_CLOUD_PROVIDERS.includes(nextProvider)
+      ? nextProvider
+      : DEFAULT_CLOUD_PROVIDER;
+
+    setProviderState(normalized);
+    localStorage.setItem('ai_provider', normalized);
+
+    const persistedModel = readPersistedModelFor(normalized);
+    setActiveModelId(persistedModel);
+  }, []);
+
   const selectModel = useCallback(async (modelId: string) => {
     setActiveModelId(modelId);
-  }, []);
+    localStorage.setItem(`ai_model_${provider}`, modelId);
+    localStorage.setItem('ai_model', modelId);
+  }, [provider]);
 
   const clearChat = useCallback(() => {
     setMessages([]);

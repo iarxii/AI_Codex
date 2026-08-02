@@ -31,6 +31,12 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
     fetchModels();
   }, [provider, backendMode, bridgeModels]);
 
+  useEffect(() => {
+    const refreshModels = () => fetchModels();
+    window.addEventListener("ai-settings-changed", refreshModels);
+    return () => window.removeEventListener("ai-settings-changed", refreshModels);
+  }, [provider, backendMode, bridgeModels]);
+
 
   const fetchModels = async () => {
     const colabUrl = localStorage.getItem("colab_bridge_url");

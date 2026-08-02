@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { Fragment, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Listbox, Transition } from '@headlessui/react';
 import { 
   Cpu, 
   Zap, 
@@ -20,7 +21,8 @@ import {
   RotateCcw,
   MessageSquare,
   MessagesSquare,
-  BrainCircuit
+  BrainCircuit,
+  Check
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useLiteRtChat } from '../hooks/useLiteRtChat';
@@ -38,19 +40,6 @@ const LITERT_ICON = '/media/brand-icons/Litert_icon.svg';
 const LiteRtMark: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
   <img src={LITERT_ICON} alt="LiteRT" className={`${className} object-contain drop-shadow-sm`} />
 );
-
-const ProviderBrandThumb: React.FC<{ providerId: string; className?: string }> = ({ providerId, className = 'w-5 h-5' }) => {
-  const info = [...PROVIDERS, ...MORE_PROVIDERS].find((p) => p.id === providerId);
-  if (!info || !info.icon) return null;
-  return (
-    <img
-      src={info.icon}
-      alt={info.label}
-      title={info.label}
-      className={`${className} object-contain rounded-[5px] bg-white border border-black/[0.06] p-[2px] shadow-sm shrink-0`}
-    />
-  );
-};
 
 const PROMPT_HISTORY_KEY = 'aicodex_litert_prompt_history';
 const PROMPT_HISTORY_LIMIT = 8;
@@ -326,6 +315,12 @@ const LiteChat: React.FC = () => {
     downloadLocalModels,
     cancelLocalModelDownload,
   };
+
+  const cloudProviderOptions = [...PROVIDERS, ...MORE_PROVIDERS].filter(
+    (p) => p.id !== 'local' && p.id !== 'litert',
+  );
+  const selectedCloudProvider =
+    cloudProviderOptions.find((p) => p.id === provider) || cloudProviderOptions[0];
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-transparent text-[var(--text-primary)] font-sans relative">
@@ -638,27 +633,62 @@ const LiteChat: React.FC = () => {
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-                      className="overflow-hidden"
+                      className="overflow-visible relative z-30"
                     >
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1 pb-2 px-1 border-b border-black/[0.04] mb-1">
                         <div className="relative flex-1 min-w-0">
-                          <select
-                            value={provider}
-                            onChange={(e) => setProvider(e.target.value as ProviderId)}
-                            className="appearance-none w-full bg-white/60 hover:bg-white/85 border border-[#fd3b12]/40 rounded-xl pl-9 pr-8 py-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#fd3b12]/20 transition-all cursor-pointer shadow-sm"
-                          >
-                            {[...PROVIDERS, ...MORE_PROVIDERS]
-                              .filter(p => p.id !== 'local' && p.id !== 'litert')
-                              .map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.label}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <ProviderBrandThumb providerId={provider} className="w-5 h-5" />
-                          </div>
-                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)] pointer-events-none" />
+                          <Listbox value={provider} onChange={(value) => setProvider(value as ProviderId)}>
+                            <div className="relative">
+                              <Listbox.Button className="relative w-full bg-white/60 hover:bg-white/85 border border-[#fd3b12]/40 rounded-xl pl-2.5 pr-8 py-2 text-xs font-semibold text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#fd3b12]/20 transition-all shadow-sm text-left">
+                                <span className="flex items-center gap-2.5 min-w-0">
+                                  {selectedCloudProvider && (
+                                    <ProviderIcon provider={selectedCloudProvider} size={18} className="shrink-0" />
+                                  )}
+                                  <span className="truncate">{selectedCloudProvider?.label || provider}</span>
+                                </span>
+                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)] pointer-events-none" />
+                              </Listbox.Button>
+
+                              <Transition
+                                as={Fragment}
+                                leave="transition ease-in duration-100"
+                                leaveFrom="opacity-100"
+                                leaveTo="opacity-0"
+                              >
+                                <Listbox.Options className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-xl bg-white border border-black/[0.08] p-1.5 text-xs shadow-xl focus:outline-none">
+                                  {cloudProviderOptions.map((option) => (
+                                    <Listbox.Option
+                                      key={option.id}
+                                      value={option.id}
+                                      className={({ active }) =>
+                                        `relative cursor-pointer select-none rounded-lg py-2 pl-2.5 pr-8 transition-colors ${
+                                          active
+                                            ? 'bg-[#fd3b12]/10 text-[#fd3b12]'
+                                            : 'text-[var(--text-primary)]'
+                                        }`
+                                      }
+                                    >
+                                      {({ selected }) => (
+                                        <>
+                                          <span className="flex items-center gap-2.5 min-w-0">
+                                            <ProviderIcon provider={option} size={18} className="shrink-0" />
+                                            <span className={`truncate ${selected ? 'font-bold' : 'font-medium'}`}>
+                                              {option.label}
+                                            </span>
+                                          </span>
+                                          {selected && (
+                                            <span className="absolute inset-y-0 right-2 flex items-center text-[#fd3b12]">
+                                              <Check className="w-3.5 h-3.5" />
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </Listbox.Option>
+                                  ))}
+                                </Listbox.Options>
+                              </Transition>
+                            </div>
+                          </Listbox>
                         </div>
 
                         <div className="relative flex-1 min-w-0">
