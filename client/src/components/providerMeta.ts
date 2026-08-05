@@ -248,6 +248,25 @@ export const PROVIDER_MAP: Record<string, ProviderInfo> = Object.fromEntries(
   [...PROVIDERS, ...MORE_PROVIDERS].map(p => [p.id, p])
 );
 
+export function getVisibleProviderIds(): ProviderId[] {
+  const stored = localStorage.getItem('visible_provider_ids');
+  if (!stored) {
+    return ['local', 'ollama_cloud', 'openrouter', 'gemini', 'groq', 'openai'];
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as string[];
+    const normalized = parsed.filter((id): id is ProviderId => Boolean(PROVIDER_MAP[id]));
+    return normalized.length > 0 ? normalized : ['local', 'ollama_cloud', 'openrouter', 'gemini', 'groq', 'openai'];
+  } catch {
+    return ['local', 'ollama_cloud', 'openrouter', 'gemini', 'groq', 'openai'];
+  }
+}
+
+export function setVisibleProviderIds(ids: ProviderId[]): void {
+  localStorage.setItem('visible_provider_ids', JSON.stringify(ids));
+}
+
 /** Get the current provider from localStorage, defaulting to 'local' */
 export function getActiveProvider(): ProviderId {
   return (localStorage.getItem('ai_provider') as ProviderId) || 'local';

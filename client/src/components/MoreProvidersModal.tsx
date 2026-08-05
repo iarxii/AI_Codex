@@ -1,7 +1,7 @@
 import React, { Fragment, useState, useEffect } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { XMarkIcon, CheckCircleIcon, ExclamationCircleIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
-import { type ProviderId, MORE_PROVIDERS } from "./providerMeta";
+import { type ProviderId, MORE_PROVIDERS, getVisibleProviderIds, setVisibleProviderIds } from "./providerMeta";
 import { useAI } from "../contexts/AIContext";
 import ProviderIcon from "./ProviderIcon";
 import { config, getApiUrl } from "../config";
@@ -29,10 +29,12 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
     providerId: string;
   } | null>(null);
   const [availableModels, setAvailableModels] = useState<Record<string, { id: string; name: string }[]>>({});
+  const [visibleProviders, setVisibleProvidersState] = useState<ProviderId[]>(() => getVisibleProviderIds());
 
   useEffect(() => {
     if (isOpen) {
       setActiveProvider(provider);
+      setVisibleProvidersState(getVisibleProviderIds());
       // Load stored keys for all more providers
       MORE_PROVIDERS.forEach((p) => {
         const keyStorage = getProviderApiKeyStorageKey(p.id);
@@ -97,10 +99,22 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
     }
   };
 
+  const toggleProviderVisibility = (providerId: ProviderId) => {
+    setVisibleProvidersState((prev) => {
+      const next = prev.includes(providerId)
+        ? prev.filter((id) => id !== providerId)
+        : [...prev, providerId];
+      setVisibleProviderIds(next);
+      return next;
+    });
+    window.dispatchEvent(new Event("ai-settings-changed"));
+  };
+
   const handleSave = () => {
     try {
       setProvider(activeProvider as ProviderId);
-      
+      setVisibleProviderIds(visibleProviders);
+
       // Save keys for all more providers (write even when empty so values can be cleared)
       MORE_PROVIDERS.forEach((p) => {
         const keyStorage = getProviderApiKeyStorageKey(p.id);
@@ -115,7 +129,7 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
 
       window.dispatchEvent(new Event("ai-settings-changed"));
       setIsOpen(false);
-      
+
       setTimeout(() => {
         window.location.reload();
       }, 100);
@@ -177,19 +191,21 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
                     const showTest = testResult?.providerId === provider.id;
 
                     return (
-                      <div key={provider.id} className={`rounded-xl border-2 p-4 transition-all ${
-                        isActive
+                      <div key={provider.id} className={`rounded-xl border-2 p-4 transition-all ${isActive
                           ? "bg-[#fd3b12]/10 border-[#fd3b12] shadow-md shadow-[#fd3b12]/10"
                           : "bg-[#D8DCE4] border-transparent hover:bg-[#D0D4DC] hover:border-black/[0.08]"
-                      }`}>
+                        }`}>
                         <div className="flex items-start gap-3">
                           <button
-                            onClick={() => setActiveProvider(provider.id)}
-                            className={`relative flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${
-                              isActive
+                            type="button"
+                            onClick={() => {
+                              setActiveProvider(provider.id);
+                              setProvider(provider.id as ProviderId);
+                            }}
+                            className={`relative flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${isActive
                                 ? "bg-[#fd3b12]/20 border border-[#fd3b12]/30"
                                 : "bg-transparent hover:bg-[#D8DCE4]"
-                            }`}
+                              }`}
                           >
                             {isActive && (
                               <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#fd3b12] shadow-[0_0_6px_rgba(255,102,0,0.7)]" />
@@ -199,6 +215,24 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
                               {provider.label}
                             </span>
                           </button>
+
+                          <div className="ml-auto flex items-center gap-2">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-[#4A4D5E]">
+                              {visibleProviders.includes(provider.id as ProviderId) ? "Shown" : "Hidden"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => toggleProviderVisibility(provider.id as ProviderId)}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${visibleProviders.includes(provider.id as ProviderId) ? "bg-[#fd3b12]" : "bg-[#A8B0BE]"
+                                }`}
+                              aria-label={`Toggle ${provider.label} visibility in main provider selector`}
+                            >
+                              <span
+                                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${visibleProviders.includes(provider.id as ProviderId) ? "translate-x-6" : "translate-x-1"
+                                  }`}
+                              />
+                            </button>
+                          </div>
 
                           <div className="flex-1 min-w-0">
                             <p className="text-xs text-[#7A7D8E] mb-3">{provider.description}</p>
@@ -236,11 +270,10 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
                                 <button
                                   onClick={() => testAndLoadModels(provider.id)}
                                   disabled={loading || (policy.requiresApiKey && !storedKey)}
-                                  className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                    loading || (policy.requiresApiKey && !storedKey)
+                                  className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${loading || (policy.requiresApiKey && !storedKey)
                                       ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
                                       : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                                  }`}
+                                    }`}
                                 >
                                   {loading && testResult?.providerId === provider.id ? (
                                     <ArrowPathIcon className="w-4 h-4 animate-spin" />
@@ -251,18 +284,17 @@ const MoreProvidersModal: React.FC<MoreProvidersModalProps> = ({ isOpen, setIsOp
                                 </button>
 
                                 {showTest && (
-                                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
-                                    testResult.success
+                                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
                                       ? "bg-green-100 text-green-700"
                                       : "bg-red-100 text-red-700"
-                                  }`}>
-                                  {testResult.success ? (
-                                    <CheckCircleIcon className="w-4 h-4" />
-                                  ) : (
-                                    <ExclamationCircleIcon className="w-4 h-4" />
-                                  )}
-                                  {testResult.message}
-                                </div>
+                                    }`}>
+                                    {testResult.success ? (
+                                      <CheckCircleIcon className="w-4 h-4" />
+                                    ) : (
+                                      <ExclamationCircleIcon className="w-4 h-4" />
+                                    )}
+                                    {testResult.message}
+                                  </div>
                                 )}
 
                                 {models.length > 0 && (
