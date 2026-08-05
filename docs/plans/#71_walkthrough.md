@@ -95,3 +95,42 @@ Apply the next planned scalability step by reducing render pressure from long me
 1. Replace synchronous `log_performance` file writes with queued/structured telemetry.
 2. Run a documented before/after profiling pass with representative workloads.
 3. Optional: add automatic recovery on stream integrity mismatch (current behavior warns and annotates metadata).
+
+---
+
+## Continuation Pass (2026-08-05, Logging Queue)
+
+### Objective
+Remove blocking file I/O from request/tool hot paths by moving performance metric persistence to a background queue writer.
+
+### Implemented In This Continuation
+
+#### 1) Queue-based structured performance logging
+- File: backend/agent/nodes.py
+- Change:
+  - Replaced synchronous `log_performance` file append logic.
+  - Added a bounded in-memory queue (`maxsize=10000`) for performance events.
+  - Added a daemon background writer thread that drains queue entries and writes JSONL records.
+  - Added startup guard and shutdown hook (`atexit`) for lifecycle safety.
+  - Added overflow protection with warning when queue is saturated.
+- Record shape:
+  - `timestamp` (UTC ISO-8601)
+  - `event`
+  - `duration_sec`
+  - `metadata`
+- Why it matters:
+  - avoids blocking application flow on file I/O in `LLM_REASONING` and `TOOL_CALL` paths,
+  - keeps telemetry structured and machine-readable for later profiling analysis.
+
+### Files Changed In This Continuation
+- backend/agent/nodes.py
+- docs/plans/#71_implementation_plan.md
+- docs/plans/#71_walkthrough.md
+
+### Validation
+- Static diagnostics: no errors in `backend/agent/nodes.py`.
+- Syntax compile-check passed via `python -m py_compile backend/agent/nodes.py`.
+
+### Remaining High-Priority Work (Updated)
+1. Run a documented before/after profiling pass with representative workloads.
+2. Optional: add automatic recovery on stream integrity mismatch (warning path currently in place).

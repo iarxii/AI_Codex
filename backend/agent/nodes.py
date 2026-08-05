@@ -1,6 +1,9 @@
 import logging
 import time
 import json
+import atexit
+import threading
+import queue
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
@@ -19,16 +22,73 @@ from .routing import classify_prompt
 
 logger = logging.getLogger(__name__)
 
+_PERF_LOG_FILE = Path("./logs/performance_benchmark.log")
+_PERF_LOG_QUEUE: queue.Queue[dict] = queue.Queue(maxsize=10000)
+_PERF_WORKER_THREAD: threading.Thread | None = None
+_PERF_WORKER_STOP = threading.Event()
+_PERF_WORKER_LOCK = threading.Lock()
+
+
+def _performance_writer_loop() -> None:
+    """Background writer that persists queued performance events as JSONL."""
+    _PERF_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    while True:
+        if _PERF_WORKER_STOP.is_set() and _PERF_LOG_QUEUE.empty():
+            return
+
+        try:
+            payload = _PERF_LOG_QUEUE.get(timeout=0.2)
+        except queue.Empty:
+            continue
+
+        try:
+            with open(_PERF_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        except Exception as exc:
+            logger.warning(f"PERF_LOG write failed: {exc}")
+        finally:
+            _PERF_LOG_QUEUE.task_done()
+
+
+def _ensure_performance_writer_started() -> None:
+    global _PERF_WORKER_THREAD
+    with _PERF_WORKER_LOCK:
+        if _PERF_WORKER_THREAD and _PERF_WORKER_THREAD.is_alive():
+            return
+
+        _PERF_WORKER_STOP.clear()
+        _PERF_WORKER_THREAD = threading.Thread(
+            target=_performance_writer_loop,
+            name="performance-log-writer",
+            daemon=True,
+        )
+        _PERF_WORKER_THREAD.start()
+
+
+def _stop_performance_writer() -> None:
+    _PERF_WORKER_STOP.set()
+    if _PERF_WORKER_THREAD and _PERF_WORKER_THREAD.is_alive():
+        _PERF_WORKER_THREAD.join(timeout=1.0)
+
+
+atexit.register(_stop_performance_writer)
+
 def log_performance(event: str, duration: float, metadata: dict = None):
     """
-    Appends performance metrics to logs/performance_benchmark.log
+    Queues a structured performance metric record for async persistence.
     """
-    log_file = Path("./logs/performance_benchmark.log")
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    meta_str = f" | {metadata}" if metadata else ""
-    with open(log_file, "a", encoding="utf-8") as f:
-        f.write(f"[{timestamp}] {event}: {duration:.4f}s{meta_str}\n")
+    _ensure_performance_writer_started()
+    payload = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "event": event,
+        "duration_sec": round(float(duration), 6),
+        "metadata": metadata or {},
+    }
+    try:
+        _PERF_LOG_QUEUE.put_nowait(payload)
+    except queue.Full:
+        logger.warning("PERF_LOG queue full; dropping event")
 
 async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier: str = "reasoning"):
     """

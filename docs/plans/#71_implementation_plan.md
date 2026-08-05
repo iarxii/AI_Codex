@@ -5,7 +5,8 @@
 - Phase 1 (stream transport and client update cadence) is complete.
 - Phase 2 (render-path and trace-scaling optimizations) is complete.
 - Stream metrics and integrity enforcement are implemented in the active Workspace flow.
-- Remaining work is now concentrated in structured backend performance logging and re-profiling/benchmarking.
+- Structured backend performance logging is now queued and non-blocking.
+- Remaining work is now concentrated in re-profiling/benchmarking and optional integrity auto-recovery hardening.
 
 ## Scope
 - Reduce UI thread pressure during streamed responses.
@@ -26,11 +27,11 @@
 11. Backend final telemetry now reports stream metrics (chunk counts, byte/char counts, flush counts, final sequence/length).
 12. Client now validates `final_seq` and `final_length` on `done`, records integrity metadata, and annotates mismatch warnings.
 13. Lightweight windowing was added for long message histories and long thought-trace histories (progressive "load older" rendering).
+14. Backend `log_performance` now queues structured JSONL telemetry to a background writer thread instead of performing synchronous file writes in request/tool paths.
 
 ## Outstanding Work
-1. Performance logging backend: replace synchronous file writes in `log_performance` with queued/structured telemetry.
-2. Re-profiling pass with real workloads after items above are complete.
-3. Optional hardening: add automatic recovery flow on integrity mismatch (retry or request transcript refresh) instead of warning-only behavior.
+1. Re-profiling pass with real workloads after the queue-based logging and UI improvements.
+2. Optional hardening: add automatic recovery flow on integrity mismatch (retry or request transcript refresh) instead of warning-only behavior.
 
 ## Original Plan Tracking
 - [x] 1. Switch WebSocket token contract from full accumulated content to delta chunks.
@@ -41,7 +42,7 @@
 - [x] 6. Cap and batch updates to thought trace entries/details.
 - [x] 7. Virtualize historical trace/log surfaces and avoid mapping full arrays on every token event.
 - [x] 8. Remove per-token terminal/debug logging in production paths; keep opt-in debug sampling only.
-- [ ] 9. Replace synchronous performance file writes with structured, queued logging/telemetry emission.
+- [x] 9. Replace synchronous performance file writes with structured, queued logging/telemetry emission.
 - [x] 10. Stop emitting non-consumed context telemetry events per node, or gate them behind debug mode.
 - [x] 11. Add request-level metrics: inbound/outbound event count, streamed bytes, flush count, TTFT, total latency, and long-task indicators.
 - [ ] 12. Re-profile before any desktop/runtime migration decisions (React Native/Tauri/Electron), since transport/render costs are current primary bottlenecks.
@@ -55,11 +56,9 @@ Reasoning: verifies impact before any architectural migration decisions.
 Reasoning: current warning path is safe but manual; automatic recovery improves robustness for end users.
 
 ## Next-Step Tasks (Ready To Implement)
-1. Implement structured telemetry emitter for `LLM_REASONING` and `TOOL_CALL` metrics.
-Why now: replaces sync writes with safer production-grade observability.
-2. Run before/after profiling capture and write baseline vs. current metrics to docs.
+1. Run before/after profiling capture and write baseline vs. current metrics to docs.
 Why now: confirms the real impact of transport/render/logging changes and informs any further optimization.
-3. Add automatic recovery behavior for stream integrity mismatch (instead of warning-only).
+2. Add automatic recovery behavior for stream integrity mismatch (instead of warning-only).
 Why now: closes the loop on reliability where network jitter or missed frames may occur.
 
 ## Notes
