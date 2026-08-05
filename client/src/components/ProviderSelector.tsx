@@ -157,8 +157,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               type="button"
               onClick={() => handleBackendModeChange("ollama")}
               className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all ${backendMode === "ollama"
-                  ? "bg-[#A3E635]/20 text-[#65A30D] shadow-sm border border-[#A3E635]/30"
-                  : "text-[#7A7D8E] hover:text-[#4A4D5E]"
+                ? "bg-[#A3E635]/20 text-[#65A30D] shadow-sm border border-[#A3E635]/30"
+                : "text-[#7A7D8E] hover:text-[#4A4D5E]"
                 }`}
             >
               Ollama
@@ -167,8 +167,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               type="button"
               onClick={() => handleBackendModeChange("llamacpp")}
               className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all ${backendMode === "llamacpp"
-                  ? "bg-[#fb923c]/20 text-[#ea580c] shadow-sm border border-[#fb923c]/30"
-                  : "text-[#7A7D8E] hover:text-[#4A4D5E]"
+                ? "bg-[#fb923c]/20 text-[#ea580c] shadow-sm border border-[#fb923c]/30"
+                : "text-[#7A7D8E] hover:text-[#4A4D5E]"
                 }`}
             >
               llama.cpp
@@ -177,8 +177,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               type="button"
               onClick={() => handleBackendModeChange("litert")}
               className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-tight transition-all ${backendMode === "litert"
-                  ? "bg-[#8B5CF6]/20 text-[#7C3AED] shadow-sm border border-[#8B5CF6]/30"
-                  : "text-[#7A7D8E] hover:text-[#4A4D5E]"
+                ? "bg-[#8B5CF6]/20 text-[#7C3AED] shadow-sm border border-[#8B5CF6]/30"
+                : "text-[#7A7D8E] hover:text-[#4A4D5E]"
                 }`}
             >
               LiteRT
@@ -196,8 +196,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
             type="button"
             onClick={() => setShowTelemetry(!showTelemetry)}
             className={`h-[42px] px-3 rounded-xl border transition-all active:scale-95 flex items-center justify-center ${showTelemetry
-                ? "bg-[#fd3b12]/10 border-[#fd3b12]/30 text-[#fd3b12] shadow-sm shadow-[#fd3b12]/10"
-                : "bg-[#E2E6EC] border-black/[0.08] text-[#7A7D8E] hover:bg-[#D8DCE4] hover:text-[#4A4D5E]"
+              ? "bg-[#fd3b12]/10 border-[#fd3b12]/30 text-[#fd3b12] shadow-sm shadow-[#fd3b12]/10"
+              : "bg-[#E2E6EC] border-black/[0.08] text-[#7A7D8E] hover:bg-[#D8DCE4] hover:text-[#4A4D5E]"
               }`}
             title={
               showTelemetry
@@ -255,7 +255,12 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                 leaveFrom="opacity-100"
                 leaveTo="opacity-0"
               >
-                <Listbox.Options className="absolute z-50 bottom-full mb-2 max-h-60 w-48 sm:w-full left-0 overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide">
+                <Listbox.Options
+                  anchor="top start"
+                  portal
+                  className="z-50 max-h-60 overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide"
+                  style={{ minWidth: "max(var(--button-width), 12rem)" }}
+                >
                   {[...PROVIDERS, ...MORE_PROVIDERS]
                     .filter((p) => visibleProviders.includes(p.id as ProviderId))
                     .filter((p) => {
@@ -345,7 +350,12 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                 leaveTo="opacity-0"
                 afterLeave={() => setModelSearch("")}
               >
-                <Listbox.Options className="absolute z-50 bottom-full mb-2 max-h-72 w-full overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide">
+                <Listbox.Options
+                  anchor="top start"
+                  portal
+                  className="z-50 max-h-72 overflow-auto rounded-xl bg-[#E2E6EC] border border-black/[0.1] py-1 text-xs shadow-xl focus:outline-none scrollbar-hide"
+                  style={{ minWidth: "var(--button-width)" }}
+                >
                   <div className="sticky top-0 z-20 px-2 py-2 bg-[#E2E6EC] border-b border-black/[0.05]">
                     <div className="flex items-center gap-2 mb-2">
                       <input
@@ -365,8 +375,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                             setModelSearch(isFree ? "" : "free");
                           }}
                           className={`px-2 py-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-tight transition-all active:scale-95 whitespace-nowrap ${modelSearch.toLowerCase() === "free"
-                              ? "bg-[#fd3b12] border-[#fd3b12] text-white shadow-sm"
-                              : "bg-[#D8DCE4] border-black/[0.08] text-[#7A7D8E] hover:text-[#4A4D5E]"
+                            ? "bg-[#fd3b12] border-[#fd3b12] text-white shadow-sm"
+                            : "bg-[#D8DCE4] border-black/[0.08] text-[#7A7D8E] hover:text-[#4A4D5E]"
                             }`}
                         >
                           Free Only
@@ -404,11 +414,11 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                                   provider === "local") && (
                                     <span
                                       className={`ml-2 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter ${provider === "groq"
-                                          ? m.id.includes("compound") ||
-                                            m.id.includes("instant")
-                                            ? "bg-green-100 text-green-600 border border-green-200"
-                                            : "bg-blue-100 text-blue-600 border border-blue-200"
-                                          : "bg-green-100 text-green-600 border border-green-200"
+                                        ? m.id.includes("compound") ||
+                                          m.id.includes("instant")
+                                          ? "bg-green-100 text-green-600 border border-green-200"
+                                          : "bg-blue-100 text-blue-600 border border-blue-200"
+                                        : "bg-green-100 text-green-600 border border-green-200"
                                         }`}
                                     >
                                       {provider === "groq"
