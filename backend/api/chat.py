@@ -93,7 +93,7 @@ agent_graph = create_agent_graph()
 
 @router.websocket("/ws/agent")
 async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
-    print(f"DEBUG: WebSocket connection attempt on /ws/agent (token: {'present' if token else 'missing'})")
+    logger.debug(f"WebSocket connection attempt on /ws/agent (token: {'present' if token else 'missing'})")
     await manager.connect(websocket)
     
     # WebSocket Authentication
@@ -118,7 +118,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 manager.disconnect(websocket)
                 return
             
-    print(f"DEBUG: WebSocket connected on /ws/agent for user: {user.username}")
+    logger.debug(f"WebSocket connected on /ws/agent for user: {user.username}")
     active_tasks: Set[asyncio.Task] = set()
     client_tool_responses = asyncio.Queue()
     
@@ -218,9 +218,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     hide_inputs=scrub_telemetry_payload,
                     hide_outputs=scrub_telemetry_payload
                 )
-                print(f"PIPELINE: Dynamic LangSmith Tracing Client initialized for project '{langsmith_project}'")
+                logger.info(f"PIPELINE: Dynamic LangSmith Tracing Client initialized for project '{langsmith_project}'")
             except Exception as e:
-                print(f"PIPELINE ERROR: Failed to initialize LangSmith Client: {e}")
+                logger.error(f"PIPELINE ERROR: Failed to initialize LangSmith Client: {e}")
                 enable_tracing = False
         
         if not conversation_id:
@@ -244,6 +244,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         pending_token_delta = ""
         token_flush_last_at = request_start
         last_native_stream_content = ""
+        debug_stream_logs = bool(payload_data.get("debug_stream_logs", False))
+
+        def pipeline_debug(message: str):
+            if debug_stream_logs:
+                logger.debug(message)
 
         async def flush_token_delta(now: float | None = None, node: str | None = None):
             nonlocal pending_token_delta, token_seq, token_flush_last_at
@@ -303,11 +308,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 # Apply provider/model recommendations if not explicitly provided by user
                 if not provider and s_config.get("recommended_provider"):
                     provider = s_config["recommended_provider"]
-                    print(f"PIPELINE: Using recommended provider [{provider}] for space [{space_type}]")
+                    pipeline_debug(f"PIPELINE: Using recommended provider [{provider}] for space [{space_type}]")
                 
                 if not model and s_config.get("recommended_model"):
                     model = s_config["recommended_model"]
-                    print(f"PIPELINE: Using recommended model [{model}] for space [{space_type}]")
+                    pipeline_debug(f"PIPELINE: Using recommended model [{model}] for space [{space_type}]")
 
                 # Default fallback
                 provider = provider or "local"
@@ -316,21 +321,21 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 if provider != "local":
                     # Priority: api_keys map > legacy api_key field
                     # Robust key resolution
-                    print(f"PIPELINE: Resolving key for provider [{provider}]. Available map keys: {list(api_keys.keys())}")
+                    pipeline_debug(f"PIPELINE: Resolving key for provider [{provider}]. Available map keys: {list(api_keys.keys())}")
                     
                     provider_key = api_keys.get(provider)
                     if not provider_key and api_key:
-                        print(f"PIPELINE: Key not found in map for [{provider}], falling back to legacy field.")
+                        pipeline_debug(f"PIPELINE: Key not found in map for [{provider}], falling back to legacy field.")
                         provider_key = api_key
                         
                     if provider_key and str(provider_key).strip():
                         api_key = str(provider_key).strip()
                         api_keys[provider] = api_key
                         masked_key = f"{api_key[:6]}...{api_key[-4:]}" if len(api_key) > 10 else "****"
-                        print(f"PIPELINE: Successfully resolved API key for [{provider}]: {masked_key}")
+                        pipeline_debug(f"PIPELINE: Successfully resolved API key for [{provider}]: {masked_key}")
                     else:
                         api_key = None
-                        print(f"PIPELINE CRITICAL: No valid API key found for resolved provider [{provider}]")
+                        logger.warning(f"PIPELINE CRITICAL: No valid API key found for resolved provider [{provider}]")
 
                 # 1. Load History
                 client_messages = payload_data.get("messages")
@@ -347,7 +352,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 langchain_history = []
                 
                 if client_messages is not None:
-                    print(f"PIPELINE: Loading history from client payload ({len(client_messages)} messages)")
+                    pipeline_debug(f"PIPELINE: Loading history from client payload ({len(client_messages)} messages)")
                     for m in client_messages:
                         role = m.get("role")
                         content = m.get("content", "")
@@ -523,7 +528,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     
                         # Pipeline monitoring — filter graph-level events
                         if kind == "on_chain_start" and node_name != "unknown" and event.get("name") == node_name:
-                            print(f"\nPIPELINE: Entering node [{node_name}]")
+                            pipeline_debug(f"PIPELINE: Entering node [{node_name}]")
                             node_has_streamed = False
                             current_node_name = node_name
                             current_node_start_time = time.time()
@@ -571,7 +576,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             msg = event["data"]["output"]
                             if hasattr(msg, "tool_calls") and msg.tool_calls:
                                 await flush_token_delta(node=node_name)
-                                print(f"PIPELINE: Tool Call detected: {msg.tool_calls[0]['name']}")
+                                pipeline_debug(f"PIPELINE: Tool Call detected: {msg.tool_calls[0]['name']}")
                                 for tc in msg.tool_calls:
                                     if not any(t.get("id") == tc.get("id") for t in tool_runs):
                                         tool_runs.append({
@@ -590,7 +595,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                 node_stream_content = str(msg.content)
                                 full_ai_response += str(msg.content)
                                 node_has_streamed = True
-                                print(f"\nPIPELINE: Non-streaming response captured ({len(msg.content)} chars)")
+                                pipeline_debug(f"PIPELINE: Non-streaming response captured ({len(msg.content)} chars)")
                                 await queue_token_delta(node_stream_content, node=node_name)
                                 await flush_token_delta(node=node_name)
                             
@@ -599,7 +604,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             await flush_token_delta(node=node_name)
                             tool_result_content = str(event["data"]["output"])
                             tool_call_id = event["metadata"].get("tool_call_id", "unknown")
-                            print(f"PIPELINE: Tool Result: {tool_result_content[:50]}...")
+                            pipeline_debug(f"PIPELINE: Tool Result: {tool_result_content[:50]}...")
                             for tr in tool_runs:
                                 if tr["id"] == tool_call_id:
                                     tr["result"] = tool_result_content
@@ -613,7 +618,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         elif kind == "on_error":
                             await flush_token_delta(node=node_name)
                             error_obj = event.get("data", {}).get("error")
-                            print(f"PIPELINE ERROR: {error_obj}")
+                            logger.error(f"PIPELINE ERROR: {error_obj}")
                             await websocket.send_json({"type": "error", "message": f"Graph Error: {str(error_obj)}"})
                     
                         elif kind == "on_chain_end":
@@ -695,7 +700,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                         node_stream_content = str(content)
                                         full_ai_response += node_stream_content
                                         node_has_streamed = True
-                                        print(f"\nPIPELINE: Captured response from chain_end ({len(node_stream_content)} chars)")
+                                        pipeline_debug(f"PIPELINE: Captured response from chain_end ({len(node_stream_content)} chars)")
                                         await queue_token_delta(node_stream_content, node=node_name)
                                         await flush_token_delta(node=node_name)
                                         break
@@ -814,7 +819,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 continue
             
             if payload.get("type") == "cancel":
-                print("PIPELINE: Cancel signal received from client")
+                logger.debug("PIPELINE: Cancel signal received from client")
                 for task in list(active_tasks):
                     if not task.done():
                         task.cancel()

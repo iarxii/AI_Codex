@@ -109,6 +109,13 @@ const workspace: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const STREAM_UI_FLUSH_MS = 75;
+  const MAX_THOUGHT_LOG_ENTRIES = 120;
+  const MAX_THOUGHT_DETAIL_CHARS = 4000;
+
+  const clampThoughtDetail = useCallback((value: string) => {
+    if (value.length <= MAX_THOUGHT_DETAIL_CHARS) return value;
+    return value.slice(-MAX_THOUGHT_DETAIL_CHARS);
+  }, []);
 
   const resetStreamBuffer = useCallback(() => {
     streamTextRef.current = "";
@@ -197,12 +204,13 @@ const workspace: React.FC = () => {
       if (lastLog.text.includes("reason")) {
         const thinkMatch = contentStr.match(/<think>([\s\S]*?)(<\/think>|$)/);
         if (thinkMatch) {
-          lastLog.details = thinkMatch[1].trim();
+          lastLog.details = clampThoughtDetail(thinkMatch[1].trim());
         } else if (contentStr.length > 0) {
-          lastLog.details =
+          lastLog.details = clampThoughtDetail(
             contentStr.length > 500
               ? "..." + contentStr.substring(contentStr.length - 500)
-              : contentStr;
+              : contentStr,
+          );
         }
       }
 
@@ -417,7 +425,7 @@ const workspace: React.FC = () => {
           const updated = [
             ...prev,
             { text: data.status, timestamp: Date.now(), type: data.node },
-          ];
+          ].slice(-MAX_THOUGHT_LOG_ENTRIES);
           thoughtLogRef.current = updated;
           return updated;
         });
@@ -451,10 +459,12 @@ const workspace: React.FC = () => {
           if (prev.length === 0) return prev;
           const updated = [...prev];
           const lastLog = { ...updated[updated.length - 1] };
-          lastLog.details = JSON.stringify(
-            currentToolCallsRef.current,
-            null,
-            2,
+          lastLog.details = clampThoughtDetail(
+            JSON.stringify(
+              currentToolCallsRef.current,
+              null,
+              2,
+            ),
           );
           updated[updated.length - 1] = lastLog;
           thoughtLogRef.current = updated;
@@ -490,9 +500,10 @@ const workspace: React.FC = () => {
             typeof data.content === "string"
               ? data.content
               : JSON.stringify(data.content);
-          lastLog.details =
+          lastLog.details = clampThoughtDetail(
             (lastLog.details ? lastLog.details + "\n\n" : "") +
-            `Result:\n${resText}`;
+            `Result:\n${resText}`,
+          );
           updated[updated.length - 1] = lastLog;
           thoughtLogRef.current = updated;
           return updated;
@@ -719,6 +730,7 @@ const workspace: React.FC = () => {
       if (mSocket.readyState !== WebSocket.CLOSED) mSocket.close();
     };
   }, [
+    clampThoughtDetail,
     reconnectCount,
     isPremiumSpace,
     flushStreamBuffer,
