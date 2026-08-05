@@ -36,11 +36,11 @@
 ## Original Plan Tracking
 - [x] 1. Switch WebSocket token contract from full accumulated content to delta chunks.
 - [x] 2. Add server-side stream coalescing (flush every 50-100ms or one frame equivalent).
-- [x] 3. Add sequence numbers and final checksum/length to ensure deterministic client reconstruction.
+- [x] 3. Add sequence numbers and final length metadata to ensure deterministic client reconstruction.
 - [x] 4. In client stream handlers, buffer token deltas in refs and publish state on a throttled cadence.
 - [x] 5. During streaming, render plain text preview; defer full Markdown/KaTeX parsing until completion (or low-frequency checkpoints).
 - [x] 6. Cap and batch updates to thought trace entries/details.
-- [x] 7. Virtualize historical trace/log surfaces and avoid mapping full arrays on every token event.
+- [x] 7. Window historical trace/log surfaces with progressive reveal to limit render work in long sessions.
 - [x] 8. Remove per-token terminal/debug logging in production paths; keep opt-in debug sampling only.
 - [x] 9. Replace synchronous performance file writes with structured, queued logging/telemetry emission.
 - [x] 10. Stop emitting non-consumed context telemetry events per node, or gate them behind debug mode.

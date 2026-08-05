@@ -40,9 +40,14 @@ const MessageList: React.FC<MessageListProps> = ({
 }) => {
   const MESSAGE_WINDOW_SIZE = 120;
   const MESSAGE_WINDOW_STEP = 100;
-  const lastUserIndex = [...messages]
-    .reverse()
-    .findIndex((m) => m.sender === "user");
+  const lastUserIndex = React.useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].sender === "user") {
+        return i;
+      }
+    }
+    return -1;
+  }, [messages]);
   const [messageWindowStart, setMessageWindowStart] = React.useState(0);
 
   React.useEffect(() => {
@@ -484,7 +489,7 @@ const MessageList: React.FC<MessageListProps> = ({
               msg={msg}
               isLastUserMsg={
                 lastUserIndex !== -1 &&
-                absoluteIndex === messages.length - 1 - lastUserIndex
+                absoluteIndex === lastUserIndex
               }
               nextMsg={messages[absoluteIndex + 1]}
               loading={loading}

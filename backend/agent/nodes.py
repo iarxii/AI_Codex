@@ -31,8 +31,6 @@ _PERF_WORKER_LOCK = threading.Lock()
 
 def _performance_writer_loop() -> None:
     """Background writer that persists queued performance events as JSONL."""
-    _PERF_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-
     while True:
         if _PERF_WORKER_STOP.is_set() and _PERF_LOG_QUEUE.empty():
             return
@@ -43,6 +41,7 @@ def _performance_writer_loop() -> None:
             continue
 
         try:
+            _PERF_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
             with open(_PERF_LOG_FILE, "a", encoding="utf-8") as f:
                 f.write(json.dumps(payload, ensure_ascii=False) + "\n")
         except Exception as exc:
@@ -68,8 +67,16 @@ def _ensure_performance_writer_started() -> None:
 
 def _stop_performance_writer() -> None:
     _PERF_WORKER_STOP.set()
+
+    drain_deadline = time.time() + 3.0
+    while not _PERF_LOG_QUEUE.empty() and time.time() < drain_deadline:
+        time.sleep(0.05)
+
     if _PERF_WORKER_THREAD and _PERF_WORKER_THREAD.is_alive():
-        _PERF_WORKER_THREAD.join(timeout=1.0)
+        _PERF_WORKER_THREAD.join(timeout=2.0)
+
+    if not _PERF_LOG_QUEUE.empty():
+        logger.warning(f"PERF_LOG shutdown with {_PERF_LOG_QUEUE.qsize()} pending events")
 
 
 atexit.register(_stop_performance_writer)

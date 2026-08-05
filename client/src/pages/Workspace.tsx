@@ -68,6 +68,7 @@ const workspace: React.FC = () => {
     expectedLength?: number;
     mismatchReason?: string;
   }>({});
+  const streamErroredRef = useRef(false);
   const [telemetry, setTelemetry] = useState<ModelTelemetry | null>(null);
   const [metrics, setMetrics] = useState<any>({
     cpu: 0,
@@ -122,12 +123,15 @@ const workspace: React.FC = () => {
     return value.slice(-MAX_THOUGHT_DETAIL_CHARS);
   }, []);
 
-  const resetStreamBuffer = useCallback(() => {
+  const resetStreamBuffer = useCallback((clearErrorState = true) => {
     streamTextRef.current = "";
     streamPendingDeltaRef.current = "";
     streamLastSeqRef.current = 0;
     streamMetaRef.current = {};
     streamIntegrityRef.current = {};
+    if (clearErrorState) {
+      streamErroredRef.current = false;
+    }
     if (streamFlushTimerRef.current !== null) {
       window.clearTimeout(streamFlushTimerRef.current);
       streamFlushTimerRef.current = null;
@@ -531,6 +535,13 @@ const workspace: React.FC = () => {
           );
         }
       } else if (data.type === "done") {
+        if (streamErroredRef.current) {
+          resetStreamBuffer();
+          setLoading(false);
+          isProcessing.current = false;
+          return;
+        }
+
         flushStreamBuffer();
 
         const expectedSeq =
@@ -575,12 +586,13 @@ const workspace: React.FC = () => {
             updated[updated.length - 1].sender === "bot"
           ) {
             const lastMsg = updated[updated.length - 1];
+            const finalizedContent = streamIntegrityRef.current.mismatchReason
+              ? `${lastMsg.content}\n\n[Warning] Stream integrity check failed (${streamIntegrityRef.current.mismatchReason}).`
+              : lastMsg.content;
             updated[updated.length - 1] = {
               ...lastMsg,
               status: "done",
-              content: streamIntegrityRef.current.mismatchReason
-                ? `${lastMsg.content}\n\n[Warning] Stream integrity check failed (${streamIntegrityRef.current.mismatchReason}).`
-                : lastMsg.content,
+              content: finalizedContent,
               metadata: {
                 ...lastMsg.metadata,
                 latency: data.duration || lastMsg.metadata?.latency,
@@ -597,17 +609,21 @@ const workspace: React.FC = () => {
                         streamIntegrityRef.current.expectedLength,
                       reason: streamIntegrityRef.current.mismatchReason,
                     }
-                    : { ok: true, expected_seq: expectedSeq, expected_length: expectedLength },
+                    : {
+                      ok: true,
+                      expected_seq: expectedSeq,
+                      expected_length: expectedLength,
+                    },
               },
             };
 
             // Parse artifacts from final response (once, not on every token)
-            extractedArtifacts = parseArtifacts(lastMsg.content, lastMsg.id);
+            extractedArtifacts = parseArtifacts(finalizedContent, lastMsg.id);
 
             // Check for explicit CANVAS tags in the raw response text
             if (
-              typeof lastMsg.content === "string" &&
-              lastMsg.content.includes("[CANVAS:")
+              typeof finalizedContent === "string" &&
+              finalizedContent.includes("[CANVAS:")
             ) {
               shouldAutoOpenCanvas = true;
             }
@@ -719,14 +735,43 @@ const workspace: React.FC = () => {
           }
         }, 0);
       } else if (data.type === "error") {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: "err-" + Date.now(),
-            sender: "bot",
-            content: "❌ Error: " + data.message,
-          },
-        ]);
+        flushStreamBuffer();
+        streamErroredRef.current = true;
+        const errorText =
+          typeof data.message === "string" ? data.message : "Unknown error";
+
+        setMessages((prev) => {
+          const updated = [...prev];
+          const lastMsg = updated[updated.length - 1];
+          if (lastMsg && lastMsg.sender === "bot" && lastMsg.status === "typing") {
+            updated[updated.length - 1] = {
+              ...lastMsg,
+              status: "done",
+              content: `${lastMsg.content}\n\n❌ Error: ${errorText}`,
+              metadata: {
+                ...lastMsg.metadata,
+                stream_integrity: {
+                  ok: false,
+                  reason: `server_error: ${errorText}`,
+                },
+              },
+            };
+            return updated;
+          }
+
+          return [
+            ...updated,
+            {
+              id: "err-" + Date.now(),
+              sender: "bot",
+              content: "❌ Error: " + errorText,
+              status: "done",
+            },
+          ];
+        });
+
+        // Preserve the error marker so a subsequent "done" frame is ignored.
+        resetStreamBuffer(false);
         setLoading(false);
         isProcessing.current = false;
       }
