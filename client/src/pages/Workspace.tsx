@@ -58,6 +58,11 @@ const workspace: React.FC = () => {
   const isCanvasOpenRef = useRef(false);
   const currentToolCallsRef = useRef<any[]>([]);
   const thoughtLogRef = useRef<ThoughtLogEntry[]>([]);
+  const streamTextRef = useRef("");
+  const streamPendingDeltaRef = useRef("");
+  const streamLastSeqRef = useRef(0);
+  const streamFlushTimerRef = useRef<number | null>(null);
+  const streamMetaRef = useRef<any>({});
   const [telemetry, setTelemetry] = useState<ModelTelemetry | null>(null);
   const [metrics, setMetrics] = useState<any>({
     cpu: 0,
@@ -103,6 +108,116 @@ const workspace: React.FC = () => {
   const metricsWs = useRef<WebSocket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const STREAM_UI_FLUSH_MS = 75;
+
+  const resetStreamBuffer = useCallback(() => {
+    streamTextRef.current = "";
+    streamPendingDeltaRef.current = "";
+    streamLastSeqRef.current = 0;
+    streamMetaRef.current = {};
+    if (streamFlushTimerRef.current !== null) {
+      window.clearTimeout(streamFlushTimerRef.current);
+      streamFlushTimerRef.current = null;
+    }
+  }, []);
+
+  const flushStreamBuffer = useCallback(() => {
+    const pendingDelta = streamPendingDeltaRef.current;
+    streamFlushTimerRef.current = null;
+    if (!pendingDelta) return;
+
+    streamPendingDeltaRef.current = "";
+    streamTextRef.current += pendingDelta;
+    const streamContent = streamTextRef.current;
+    const streamMeta = streamMetaRef.current || {};
+
+    setMessages((prev) => {
+      const lastMsg = prev[prev.length - 1];
+      if (lastMsg && lastMsg.sender === "bot") {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          ...lastMsg,
+          content: streamContent,
+          status: "typing",
+          metadata: {
+            ...lastMsg.metadata,
+            provider:
+              streamMeta.provider ||
+              lastMsg.metadata?.provider ||
+              activeProvider,
+            model: streamMeta.model || lastMsg.metadata?.model || activeModel,
+            latency: streamMeta.duration || lastMsg.metadata?.latency,
+            tokens: streamMeta.tokens || lastMsg.metadata?.tokens,
+            timestamp: lastMsg.metadata?.timestamp || Date.now(),
+          },
+        };
+        return updated;
+      }
+
+      return [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: "bot",
+          content: streamContent,
+          status: "typing",
+          metadata: {
+            provider: streamMeta.provider || activeProvider,
+            model: streamMeta.model || activeModel,
+            latency: streamMeta.duration,
+            tokens: streamMeta.tokens,
+            timestamp: Date.now(),
+          },
+        },
+      ];
+    });
+
+    if (
+      typeof streamContent === "string" &&
+      streamContent.includes("[CANVAS:") &&
+      !isCanvasOpenRef.current
+    ) {
+      setIsCanvasOpen(true);
+    }
+
+    if (streamMeta.duration) {
+      setCurrentLatency(streamMeta.duration);
+    }
+
+    setThoughtLog((prev) => {
+      if (prev.length === 0) return prev;
+      const updated = [...prev];
+      const lastLog = { ...updated[updated.length - 1] };
+
+      const contentStr =
+        typeof streamContent === "string"
+          ? streamContent
+          : JSON.stringify(streamContent);
+
+      if (lastLog.text.includes("reason")) {
+        const thinkMatch = contentStr.match(/<think>([\s\S]*?)(<\/think>|$)/);
+        if (thinkMatch) {
+          lastLog.details = thinkMatch[1].trim();
+        } else if (contentStr.length > 0) {
+          lastLog.details =
+            contentStr.length > 500
+              ? "..." + contentStr.substring(contentStr.length - 500)
+              : contentStr;
+        }
+      }
+
+      updated[updated.length - 1] = lastLog;
+      thoughtLogRef.current = updated;
+      return updated;
+    });
+  }, [activeModel, activeProvider]);
+
+  const scheduleStreamFlush = useCallback(() => {
+    if (streamFlushTimerRef.current !== null) return;
+    streamFlushTimerRef.current = window.setTimeout(() => {
+      flushStreamBuffer();
+    }, STREAM_UI_FLUSH_MS);
+  }, [flushStreamBuffer]);
 
   // Sync canvas-open state to ref for use inside closures
   useEffect(() => {
@@ -256,95 +371,47 @@ const workspace: React.FC = () => {
       const data = JSON.parse(event.data);
       if (data.type === "telemetry") {
         setTelemetry(data.data);
-      } else if (data.type === "token") {
-        setMessages((prev) => {
-          const lastMsg = prev[prev.length - 1];
-          if (lastMsg && lastMsg.sender === "bot") {
-            const updated = [...prev];
-            updated[updated.length - 1] = {
-              ...lastMsg,
-              content: data.content,
-              status: "typing",
-              metadata: {
-                ...lastMsg.metadata,
-                provider:
-                  data.provider || lastMsg.metadata?.provider || activeProvider,
-                model: data.model || lastMsg.metadata?.model || activeModel,
-                latency: data.duration || lastMsg.metadata?.latency,
-                tokens: data.tokens || lastMsg.metadata?.tokens,
-                timestamp: lastMsg.metadata?.timestamp || Date.now(),
-              },
-            };
-            // Real-time Canvas Toggle: Open if [CANVAS: is detected in the stream
-            if (
-              typeof data.content === "string" &&
-              data.content.includes("[CANVAS:") &&
-              !isCanvasOpenRef.current
-            ) {
-              setIsCanvasOpen(true);
+      } else if (data.type === "token" || data.type === "token_delta") {
+        let deltaText = "";
+
+        if (data.type === "token_delta") {
+          if (typeof data.seq === "number") {
+            if (data.seq <= streamLastSeqRef.current) {
+              return;
             }
-
-            if (data.duration) setCurrentLatency(data.duration);
-            return updated;
-          } else {
-            if (data.duration) setCurrentLatency(data.duration);
-
-            // Real-time Canvas Toggle for new message
-            if (
-              typeof data.content === "string" &&
-              data.content.includes("[CANVAS:") &&
-              !isCanvasOpenRef.current
-            ) {
-              setIsCanvasOpen(true);
-            }
-
-            return [
-              ...prev,
-              {
-                id: Date.now().toString(),
-                sender: "bot",
-                content: data.content,
-                status: "typing",
-                metadata: {
-                  provider: data.provider || activeProvider,
-                  model: data.model || activeModel,
-                  latency: data.duration,
-                  tokens: data.tokens,
-                  timestamp: Date.now(),
-                },
-              },
-            ];
+            streamLastSeqRef.current = data.seq;
           }
-        });
 
-        setThoughtLog((prev) => {
-          if (prev.length === 0) return prev;
-          const updated = [...prev];
-          const lastLog = { ...updated[updated.length - 1] };
-
-          // Ensure content is a string for regex matching (safety check for multimodal/malformed data)
-          const contentStr =
+          deltaText =
+            typeof data.delta === "string"
+              ? data.delta
+              : JSON.stringify(data.delta ?? "");
+        } else {
+          const incomingText =
             typeof data.content === "string"
               ? data.content
-              : JSON.stringify(data.content);
+              : JSON.stringify(data.content ?? "");
 
-          if (lastLog.text.includes("reason")) {
-            const thinkMatch = contentStr.match(
-              /<think>([\s\S]*?)(<\/think>|$)/,
-            );
-            if (thinkMatch) {
-              lastLog.details = thinkMatch[1].trim();
-            } else if (contentStr.length > 0) {
-              lastLog.details =
-                contentStr.length > 500
-                  ? "..." + contentStr.substring(contentStr.length - 500)
-                  : contentStr;
-            }
+          if (incomingText.startsWith(streamTextRef.current)) {
+            deltaText = incomingText.slice(streamTextRef.current.length);
+          } else {
+            streamTextRef.current = "";
+            streamPendingDeltaRef.current = "";
+            deltaText = incomingText;
           }
-          updated[updated.length - 1] = lastLog;
-          thoughtLogRef.current = updated;
-          return updated;
-        });
+        }
+
+        if (!deltaText) return;
+
+        streamMetaRef.current = {
+          provider: data.provider,
+          model: data.model,
+          duration: data.duration,
+          tokens: data.tokens,
+        };
+
+        streamPendingDeltaRef.current += deltaText;
+        scheduleStreamFlush();
       } else if (data.type === "status") {
         setThoughtLog((prev) => {
           const updated = [
@@ -447,6 +514,7 @@ const workspace: React.FC = () => {
           );
         }
       } else if (data.type === "done") {
+        flushStreamBuffer();
         setLoading(false);
         isProcessing.current = false;
 
@@ -645,11 +713,18 @@ const workspace: React.FC = () => {
     };
 
     return () => {
+      resetStreamBuffer();
       (socket as any).wasCleanlyClosed = true;
       if (socket.readyState !== WebSocket.CLOSED) socket.close();
       if (mSocket.readyState !== WebSocket.CLOSED) mSocket.close();
     };
-  }, [reconnectCount, isPremiumSpace]);
+  }, [
+    reconnectCount,
+    isPremiumSpace,
+    flushStreamBuffer,
+    resetStreamBuffer,
+    scheduleStreamFlush,
+  ]);
 
   // 3. Auto-scroll
   const lastScrolledMsgId = useRef<string | null>(null);
@@ -963,6 +1038,7 @@ const workspace: React.FC = () => {
     setThoughtStartTime(Date.now());
     setThoughtLog([]);
     thoughtLogRef.current = [];
+    resetStreamBuffer();
     setTelemetry(null); // Reset telemetry for new request
 
     const apiKey = getApiKey(activeProvider) || "";
@@ -1072,6 +1148,7 @@ const workspace: React.FC = () => {
       setThoughtStartTime(Date.now());
       setThoughtLog([]);
       thoughtLogRef.current = [];
+      resetStreamBuffer();
       setTelemetry(null);
 
       const apiKey = getApiKey(providerToUse) || "";

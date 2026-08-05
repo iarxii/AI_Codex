@@ -237,6 +237,41 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         thought_log = []
         tool_runs = []
         node_stream_content = ""
+        debug_context_telemetry = bool(payload_data.get("debug_context_telemetry", False))
+
+        stream_flush_interval_s = 0.075
+        token_seq = 0
+        pending_token_delta = ""
+        token_flush_last_at = request_start
+        last_native_stream_content = ""
+
+        async def flush_token_delta(now: float | None = None, node: str | None = None):
+            nonlocal pending_token_delta, token_seq, token_flush_last_at
+            if not pending_token_delta:
+                return
+
+            token_seq += 1
+            await websocket.send_json({
+                "type": "token_delta",
+                "delta": pending_token_delta,
+                "seq": token_seq,
+                "node": node or current_node_name,
+                "provider": provider,
+                "model": model,
+                "duration": (now if now is not None else time.perf_counter()) - request_start,
+            })
+            pending_token_delta = ""
+            token_flush_last_at = now if now is not None else time.perf_counter()
+
+        async def queue_token_delta(delta: str, node: str):
+            nonlocal pending_token_delta
+            if not delta:
+                return
+
+            pending_token_delta += delta
+            now = time.perf_counter()
+            if now - token_flush_last_at >= stream_flush_interval_s:
+                await flush_token_delta(now=now, node=node)
 
         try:
             async with AsyncSessionLocal() as db:
@@ -459,8 +494,15 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                     # NativeLocalClient streaming — only in llamacpp mode
                     first_token_received = False
                     async def _token_callback(accumulated_content: str):
-                        nonlocal full_ai_response, first_token_received
+                        nonlocal full_ai_response, first_token_received, last_native_stream_content, node_stream_content
                         full_ai_response = accumulated_content
+
+                        if accumulated_content.startswith(last_native_stream_content):
+                            delta = accumulated_content[len(last_native_stream_content):]
+                        else:
+                            delta = accumulated_content
+                        last_native_stream_content = accumulated_content
+                        node_stream_content += delta
                         
                         now = time.perf_counter()
                         if not first_token_received:
@@ -470,15 +512,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                 "type": "telemetry",
                                 "data": initial_state["telemetry"]
                             })
-
-                        await websocket.send_json({
-                            "type": "token",
-                            "content": accumulated_content,
-                            "node": "reason",
-                            "provider": provider,
-                            "model": model,
-                            "duration": now - request_start
-                        })
+                        await queue_token_delta(delta, node="reason")
                     config["configurable"]["token_callback"] = _token_callback
                 
                 from langsmith.run_helpers import tracing_context
@@ -518,8 +552,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         if kind == "on_chat_model_stream":
                             content = event["data"]["chunk"].content
                             if content:
-                                full_ai_response += content
-                                node_stream_content += content
+                                chunk_text = str(content)
+                                full_ai_response += chunk_text
+                                node_stream_content += chunk_text
                                 node_has_streamed = True
                             
                                 now = time.perf_counter()
@@ -529,20 +564,13 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                         "type": "telemetry",
                                         "data": initial_state["telemetry"]
                                     })
- 
-                                print(content, end="", flush=True)
-                                await websocket.send_json({
-                                    "type": "token",
-                                    "content": node_stream_content,
-                                    "node": node_name,
-                                    "provider": provider,
-                                    "model": model,
-                                    "duration": now - request_start
-                                })
+
+                                await queue_token_delta(chunk_text, node=node_name)
                     
                         elif kind == "on_chat_model_end":
                             msg = event["data"]["output"]
                             if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                await flush_token_delta(node=node_name)
                                 print(f"PIPELINE: Tool Call detected: {msg.tool_calls[0]['name']}")
                                 for tc in msg.tool_calls:
                                     if not any(t.get("id") == tc.get("id") for t in tool_runs):
@@ -559,21 +587,16 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                     "duration": time.perf_counter() - request_start
                                 })
                             elif hasattr(msg, "content") and msg.content and not node_has_streamed:
-                                node_stream_content = msg.content
-                                full_ai_response += msg.content
+                                node_stream_content = str(msg.content)
+                                full_ai_response += str(msg.content)
                                 node_has_streamed = True
                                 print(f"\nPIPELINE: Non-streaming response captured ({len(msg.content)} chars)")
-                                await websocket.send_json({
-                                    "type": "token",
-                                    "content": node_stream_content,
-                                    "node": node_name,
-                                    "provider": provider,
-                                    "model": model,
-                                    "duration": time.perf_counter() - request_start
-                                })
+                                await queue_token_delta(node_stream_content, node=node_name)
+                                await flush_token_delta(node=node_name)
                             
                         # Tool Results
                         elif kind == "on_tool_end":
+                            await flush_token_delta(node=node_name)
                             tool_result_content = str(event["data"]["output"])
                             tool_call_id = event["metadata"].get("tool_call_id", "unknown")
                             print(f"PIPELINE: Tool Result: {tool_result_content[:50]}...")
@@ -588,6 +611,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                             })
                     
                         elif kind == "on_error":
+                            await flush_token_delta(node=node_name)
                             error_obj = event.get("data", {}).get("error")
                             print(f"PIPELINE ERROR: {error_obj}")
                             await websocket.send_json({"type": "error", "message": f"Graph Error: {str(error_obj)}"})
@@ -605,6 +629,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                         initial_state[k] = v
 
                                 if node_name == "init" and output.get("routing_metadata"):
+                                    await flush_token_delta(node=node_name)
                                     routing = output["routing_metadata"]
                                     await websocket.send_json({
                                         "type": "routing",
@@ -616,7 +641,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                         
                                 # Stream context telemetry
                                 msgs = initial_state.get("messages", [])
-                                if msgs and node_name != "unknown":
+                                if debug_context_telemetry and msgs and node_name != "unknown":
                                     total_tok = sum(estimate_tokens(str(m.content)) for m in msgs)
                                     
                                     system_msgs = [m for m in msgs if getattr(m, "type", "") == "system" or m.__class__.__name__ == "SystemMessage"]
@@ -671,21 +696,17 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                         full_ai_response += node_stream_content
                                         node_has_streamed = True
                                         print(f"\nPIPELINE: Captured response from chain_end ({len(node_stream_content)} chars)")
-                                        await websocket.send_json({
-                                            "type": "token",
-                                            "content": node_stream_content,
-                                            "node": node_name,
-                                            "provider": provider,
-                                            "model": model,
-                                            "duration": time.perf_counter() - request_start
-                                        })
+                                        await queue_token_delta(node_stream_content, node=node_name)
+                                        await flush_token_delta(node=node_name)
                                         break
 
         except asyncio.CancelledError:
+            await flush_token_delta(node=current_node_name)
             log_debug(f"Task cancelled for conversation {conversation_id}")
             await websocket.send_json({"type": "status", "status": "Cancelled", "node": "idle"})
             return  # Exit early — cancel handler already sends "done"
         except Exception as e:
+            await flush_token_delta(node=current_node_name)
             error_str = str(e)
             log_error(f"PIPELINE EXCEPTION for conv {conversation_id}", e)
             
@@ -744,6 +765,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 initial_state["telemetry"]["usage"]["output"] = estimate_tokens(full_ai_response)
                 initial_state["telemetry"]["total_tokens"] = initial_state["telemetry"]["usage"]["input"] + initial_state["telemetry"]["usage"]["output"]
 
+            await flush_token_delta(node=current_node_name)
+
             await websocket.send_json({
                 "type": "telemetry",
                 "data": initial_state["telemetry"]
@@ -756,7 +779,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 "node": "idle"
             })
             
-            await websocket.send_json({"type": "done"})
+            await websocket.send_json({"type": "done", "final_length": len(full_ai_response), "final_seq": token_seq})
 
     try:
         while True:
