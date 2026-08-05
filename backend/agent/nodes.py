@@ -19,6 +19,7 @@ from .profile import build_system_prompt
 from .local_client import NativeLocalClient, detect_template
 from backend.agent.skill_routing import resolve_client_capabilities
 from .routing import classify_prompt
+from .provider_auth import resolve_provider_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -596,12 +597,12 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
 
     # Early Auth Check for Cloud Providers
     if provider in ["groq", "openrouter", "gemini", "ollama_cloud"]:
-        api_key = config.get("configurable", {}).get("api_key")
+        api_keys = config.get("configurable", {}).get("api_keys", {}) or {}
+        api_key = resolve_provider_api_key(provider, config.get("configurable", {}).get("api_key"), api_keys)
         
-        is_missing = not api_key or (provider == "ollama_cloud" and api_key == "sk-ollama")
+        is_missing = not api_key
         if is_missing:
             # Try to resolve fallback since primary key is missing
-            api_keys = config.get("configurable", {}).get("api_keys", {})
             fallback_prov, fallback_model, fallback_key = resolve_llm_fallback(provider, model, api_keys)
             
             if fallback_prov:

@@ -16,6 +16,7 @@ from backend.db.models import Conversation, Message, CodexSpace, CodexSpaceAcces
 from backend.agent.graph import create_agent_graph
 from codex_spaces.backend.agent.space_config import get_space_config
 from sqlalchemy import select, update
+from backend.agent.provider_auth import build_provider_api_key_map, resolve_provider_api_key
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -164,6 +165,13 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         api_keys = payload_data.get("api_keys")
         if not isinstance(api_keys, dict):
             api_keys = {}
+        if user and getattr(user, "settings_json", None):
+            saved_api_keys = build_provider_api_key_map(api_keys, user.settings_json)
+            api_keys = saved_api_keys
+            if not api_key:
+                provider_key = resolve_provider_api_key(provider, None, api_keys)
+                if provider_key:
+                    api_key = provider_key
         base_url = payload_data.get("base_url")
         account_id = payload_data.get("account_id")
         gateway_id = payload_data.get("gateway_id")
@@ -333,17 +341,10 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
                 # Extract correct API key for the resolved provider
                 if provider != "local":
-                    # Priority: api_keys map > legacy api_key field
-                    # Robust key resolution
                     pipeline_debug(f"PIPELINE: Resolving key for provider [{provider}]. Available map keys: {list(api_keys.keys())}")
-                    
-                    provider_key = api_keys.get(provider)
-                    if not provider_key and api_key:
-                        pipeline_debug(f"PIPELINE: Key not found in map for [{provider}], falling back to legacy field.")
-                        provider_key = api_key
-                        
-                    if provider_key and str(provider_key).strip():
-                        api_key = str(provider_key).strip()
+                    provider_key = resolve_provider_api_key(provider, api_key, api_keys)
+                    if provider_key:
+                        api_key = provider_key
                         api_keys[provider] = api_key
                         masked_key = f"{api_key[:6]}...{api_key[-4:]}" if len(api_key) > 10 else "****"
                         pipeline_debug(f"PIPELINE: Successfully resolved API key for [{provider}]: {masked_key}")
