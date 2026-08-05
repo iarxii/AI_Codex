@@ -245,6 +245,12 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         token_flush_last_at = request_start
         last_native_stream_content = ""
         debug_stream_logs = bool(payload_data.get("debug_stream_logs", False))
+        stream_chunk_count = 0
+        stream_chunk_chars = 0
+        stream_chunk_bytes = 0
+        stream_flush_count = 0
+        stream_sent_delta_chars = 0
+        stream_sent_delta_bytes = 0
 
         def pipeline_debug(message: str):
             if debug_stream_logs:
@@ -252,13 +258,21 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
         async def flush_token_delta(now: float | None = None, node: str | None = None):
             nonlocal pending_token_delta, token_seq, token_flush_last_at
+            nonlocal stream_flush_count, stream_sent_delta_chars, stream_sent_delta_bytes
             if not pending_token_delta:
                 return
 
+            delta_payload = pending_token_delta
+            delta_bytes = len(delta_payload.encode("utf-8"))
+            delta_chars = len(delta_payload)
+
             token_seq += 1
+            stream_flush_count += 1
+            stream_sent_delta_chars += delta_chars
+            stream_sent_delta_bytes += delta_bytes
             await websocket.send_json({
                 "type": "token_delta",
-                "delta": pending_token_delta,
+                "delta": delta_payload,
                 "seq": token_seq,
                 "node": node or current_node_name,
                 "provider": provider,
@@ -561,6 +575,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                                 full_ai_response += chunk_text
                                 node_stream_content += chunk_text
                                 node_has_streamed = True
+                                stream_chunk_count += 1
+                                stream_chunk_chars += len(chunk_text)
+                                stream_chunk_bytes += len(chunk_text.encode("utf-8"))
                             
                                 now = time.perf_counter()
                                 if initial_state["telemetry"]["ttft"] == 0:
@@ -771,6 +788,18 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 initial_state["telemetry"]["total_tokens"] = initial_state["telemetry"]["usage"]["input"] + initial_state["telemetry"]["usage"]["output"]
 
             await flush_token_delta(node=current_node_name)
+
+            initial_state["telemetry"]["stream"] = {
+                "flushIntervalMs": int(stream_flush_interval_s * 1000),
+                "chunksReceived": stream_chunk_count,
+                "chunkChars": stream_chunk_chars,
+                "chunkBytes": stream_chunk_bytes,
+                "flushCount": stream_flush_count,
+                "deltaCharsSent": stream_sent_delta_chars,
+                "deltaBytesSent": stream_sent_delta_bytes,
+                "finalSeq": token_seq,
+                "finalLength": len(full_ai_response),
+            }
 
             await websocket.send_json({
                 "type": "telemetry",

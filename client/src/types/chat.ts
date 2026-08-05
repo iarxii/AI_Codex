@@ -41,4 +41,15 @@ export interface ModelTelemetry {
   capabilities: string[];
   provider: string;
   model: string;
+  stream?: {
+    flushIntervalMs: number;
+    chunksReceived: number;
+    chunkChars: number;
+    chunkBytes: number;
+    flushCount: number;
+    deltaCharsSent: number;
+    deltaBytesSent: number;
+    finalSeq: number;
+    finalLength: number;
+  };
 }

@@ -63,6 +63,11 @@ const workspace: React.FC = () => {
   const streamLastSeqRef = useRef(0);
   const streamFlushTimerRef = useRef<number | null>(null);
   const streamMetaRef = useRef<any>({});
+  const streamIntegrityRef = useRef<{
+    expectedSeq?: number;
+    expectedLength?: number;
+    mismatchReason?: string;
+  }>({});
   const [telemetry, setTelemetry] = useState<ModelTelemetry | null>(null);
   const [metrics, setMetrics] = useState<any>({
     cpu: 0,
@@ -122,6 +127,7 @@ const workspace: React.FC = () => {
     streamPendingDeltaRef.current = "";
     streamLastSeqRef.current = 0;
     streamMetaRef.current = {};
+    streamIntegrityRef.current = {};
     if (streamFlushTimerRef.current !== null) {
       window.clearTimeout(streamFlushTimerRef.current);
       streamFlushTimerRef.current = null;
@@ -526,6 +532,36 @@ const workspace: React.FC = () => {
         }
       } else if (data.type === "done") {
         flushStreamBuffer();
+
+        const expectedSeq =
+          typeof data.final_seq === "number" ? data.final_seq : undefined;
+        const expectedLength =
+          typeof data.final_length === "number" ? data.final_length : undefined;
+
+        let mismatchReason = "";
+        if (
+          typeof expectedSeq === "number" &&
+          streamLastSeqRef.current !== expectedSeq
+        ) {
+          mismatchReason = `sequence mismatch (client=${streamLastSeqRef.current}, server=${expectedSeq})`;
+        }
+        if (
+          !mismatchReason &&
+          typeof expectedLength === "number" &&
+          streamTextRef.current.length !== expectedLength
+        ) {
+          mismatchReason = `length mismatch (client=${streamTextRef.current.length}, server=${expectedLength})`;
+        }
+
+        if (mismatchReason) {
+          console.warn("Stream integrity mismatch:", mismatchReason);
+          streamIntegrityRef.current = {
+            expectedSeq,
+            expectedLength,
+            mismatchReason,
+          };
+        }
+
         setLoading(false);
         isProcessing.current = false;
 
@@ -542,6 +578,9 @@ const workspace: React.FC = () => {
             updated[updated.length - 1] = {
               ...lastMsg,
               status: "done",
+              content: streamIntegrityRef.current.mismatchReason
+                ? `${lastMsg.content}\n\n[Warning] Stream integrity check failed (${streamIntegrityRef.current.mismatchReason}).`
+                : lastMsg.content,
               metadata: {
                 ...lastMsg.metadata,
                 latency: data.duration || lastMsg.metadata?.latency,
@@ -549,6 +588,16 @@ const workspace: React.FC = () => {
                 timestamp: lastMsg.metadata?.timestamp || Date.now(),
                 thought_log: thoughtLogRef.current,
                 tool_calls: currentToolCallsRef.current,
+                stream_integrity:
+                  streamIntegrityRef.current.mismatchReason
+                    ? {
+                      ok: false,
+                      expected_seq: streamIntegrityRef.current.expectedSeq,
+                      expected_length:
+                        streamIntegrityRef.current.expectedLength,
+                      reason: streamIntegrityRef.current.mismatchReason,
+                    }
+                    : { ok: true, expected_seq: expectedSeq, expected_length: expectedLength },
               },
             };
 

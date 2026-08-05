@@ -50,3 +50,48 @@ Continue performance remediation after delta streaming rollout by reducing live 
 
 ## Suggested Next Task Start
 Begin with list virtualization in the chat surfaces, because transport and live streaming render have been optimized and list growth is now the dominant UI scaling risk.
+
+---
+
+## Continuation Pass (2026-08-05)
+
+### Objective
+Apply the next planned scalability step by reducing render pressure from long message and trace histories.
+
+### Implemented In This Continuation
+
+#### 1) Message history windowing
+- File: client/src/components/chat/MessageList.tsx
+- Change:
+  - Added a default message window (latest 120 items).
+  - Added progressive reveal controls (`Load Older`, `Show All`) for hidden history.
+  - Preserved index-sensitive behaviors (`isLastUserMsg`, `nextMsg`) using absolute indices.
+- Why it matters: avoids mounting and reconciling very large message lists on every render in long sessions.
+
+#### 2) Thought trace windowing
+- File: client/src/components/chat/ThinkingTrace.tsx
+- Change:
+  - Added default trace window (latest 80 entries).
+  - Added progressive reveal control (`Load Older Trace`).
+  - Preserved absolute step numbering and per-step timing deltas.
+- Why it matters: limits UI work when traces get long, while still allowing access to full history on demand.
+
+### Additional Verification Notes
+- Existing stream metrics and integrity checks are present in the latest code state:
+  - backend/api/chat.py reports stream counters in final telemetry.
+  - client/src/pages/Workspace.tsx validates `final_seq` and `final_length` and records mismatch metadata.
+
+### Files Changed In Continuation
+- client/src/components/chat/MessageList.tsx
+- client/src/components/chat/ThinkingTrace.tsx
+- docs/plans/#71_implementation_plan.md
+- docs/plans/#71_walkthrough.md
+
+### Validation
+- Static diagnostics report no errors in modified files.
+- Client tests: `vitest run` passed (19 tests).
+
+### Remaining High-Priority Work
+1. Replace synchronous `log_performance` file writes with queued/structured telemetry.
+2. Run a documented before/after profiling pass with representative workloads.
+3. Optional: add automatic recovery on stream integrity mismatch (current behavior warns and annotates metadata).

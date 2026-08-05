@@ -19,6 +19,18 @@ const ThinkingTrace: React.FC<ThinkingTraceProps> = ({
   currentToolCalls,
   currentContext,
 }) => {
+  const TRACE_WINDOW_SIZE = 80;
+  const TRACE_WINDOW_STEP = 60;
+  const defaultStart = Math.max(0, thoughtLog.length - TRACE_WINDOW_SIZE);
+  const [traceStartIndex, setTraceStartIndex] = React.useState(defaultStart);
+
+  React.useEffect(() => {
+    setTraceStartIndex(Math.max(0, thoughtLog.length - TRACE_WINDOW_SIZE));
+  }, [thoughtLog.length]);
+
+  const hiddenTraceCount = Math.max(0, traceStartIndex);
+  const visibleTrace = thoughtLog.slice(traceStartIndex);
+
   if (
     !loading &&
     thoughtLog.length === 0 &&
@@ -77,9 +89,27 @@ const ThinkingTrace: React.FC<ThinkingTraceProps> = ({
             </div>
           </summary>
           <div className="mt-4 space-y-2 pl-5 border-l-2 border-[#fd3b12]/20">
-            {thoughtLog.map((log, i) => {
+            {hiddenTraceCount > 0 && (
+              <div className="pb-2">
+                <button
+                  onClick={() =>
+                    setTraceStartIndex((prev) =>
+                      Math.max(0, prev - TRACE_WINDOW_STEP),
+                    )
+                  }
+                  className="px-2.5 py-1 rounded-full bg-white/50 border border-[#fd3b12]/20 text-[9px] font-bold uppercase tracking-widest text-[#4A4D5E] hover:bg-white/80 transition-colors"
+                >
+                  Load Older Trace ({hiddenTraceCount} hidden)
+                </button>
+              </div>
+            )}
+
+            {visibleTrace.map((log, i) => {
+              const absoluteIndex = traceStartIndex + i;
               const prevTime =
-                i === 0 ? thoughtStartTime! : thoughtLog[i - 1].timestamp;
+                absoluteIndex === 0
+                  ? thoughtStartTime!
+                  : thoughtLog[absoluteIndex - 1].timestamp;
               const delta = ((log.timestamp - prevTime) / 1000).toFixed(2);
               return (
                 <div key={i} className="group/item">
@@ -87,7 +117,7 @@ const ThinkingTrace: React.FC<ThinkingTraceProps> = ({
                     <details className="group/details">
                       <summary className="text-[11px] font-mono text-[#4A4D5E] flex gap-3 cursor-pointer list-none hover:bg-white/40 p-1 rounded transition-colors">
                         <span className="text-[#fd3b12] opacity-40 font-bold">
-                          [{i + 1}]
+                          [{absoluteIndex + 1}]
                         </span>
                         <span className="group-hover/item:text-[#1A1D2E] transition-colors flex-1 flex items-center gap-2">
                           {log.text}
@@ -104,7 +134,7 @@ const ThinkingTrace: React.FC<ThinkingTraceProps> = ({
                   ) : (
                     <div className="text-[11px] font-mono text-[#4A4D5E] flex gap-3 p-1">
                       <span className="text-[#fd3b12] opacity-40 font-bold">
-                        [{i + 1}]
+                        [{absoluteIndex + 1}]
                       </span>
                       <span className="group-hover/item:text-[#1A1D2E] transition-colors flex-1">
                         {log.text}

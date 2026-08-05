@@ -38,9 +38,20 @@ const MessageList: React.FC<MessageListProps> = ({
   onViewInCanvas,
   onRetry,
 }) => {
+  const MESSAGE_WINDOW_SIZE = 120;
+  const MESSAGE_WINDOW_STEP = 100;
   const lastUserIndex = [...messages]
     .reverse()
     .findIndex((m) => m.sender === "user");
+  const [messageWindowStart, setMessageWindowStart] = React.useState(0);
+
+  React.useEffect(() => {
+    const defaultStart = Math.max(0, messages.length - MESSAGE_WINDOW_SIZE);
+    setMessageWindowStart(defaultStart);
+  }, [messages.length]);
+
+  const hiddenMessageCount = Math.max(0, messageWindowStart);
+  const visibleMessages = messages.slice(messageWindowStart);
 
   const [signal, setSignal] = React.useState({
     symbol: "BTCUSD",
@@ -444,25 +455,49 @@ const MessageList: React.FC<MessageListProps> = ({
         })()}
 
       <div className="space-y-6">
-        {messages.map((msg, index) => (
-          <MessageItem
-            key={msg.id}
-            msg={msg}
-            isLastUserMsg={
-              lastUserIndex !== -1 &&
-              index === messages.length - 1 - lastUserIndex
-            }
-            nextMsg={messages[index + 1]}
-            loading={loading}
-            thoughtLog={thoughtLog}
-            thoughtStartTime={thoughtStartTime}
-            currentToolCalls={currentToolCalls}
-            currentContext={currentContext}
-            onCancel={onCancel}
-            onViewInCanvas={onViewInCanvas}
-            onRetry={onRetry}
-          />
-        ))}
+        {hiddenMessageCount > 0 && (
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() =>
+                setMessageWindowStart((prev) =>
+                  Math.max(0, prev - MESSAGE_WINDOW_STEP),
+                )
+              }
+              className="px-3 py-1.5 rounded-full bg-white/70 border border-black/10 text-[10px] font-bold uppercase tracking-widest text-[#4A4D5E] hover:bg-white transition-colors"
+            >
+              Load Older ({hiddenMessageCount} hidden)
+            </button>
+            <button
+              onClick={() => setMessageWindowStart(0)}
+              className="px-3 py-1.5 rounded-full bg-[#fd3b12]/10 border border-[#fd3b12]/20 text-[10px] font-bold uppercase tracking-widest text-[#fd3b12] hover:bg-[#fd3b12]/15 transition-colors"
+            >
+              Show All
+            </button>
+          </div>
+        )}
+
+        {visibleMessages.map((msg, localIndex) => {
+          const absoluteIndex = messageWindowStart + localIndex;
+          return (
+            <MessageItem
+              key={msg.id}
+              msg={msg}
+              isLastUserMsg={
+                lastUserIndex !== -1 &&
+                absoluteIndex === messages.length - 1 - lastUserIndex
+              }
+              nextMsg={messages[absoluteIndex + 1]}
+              loading={loading}
+              thoughtLog={thoughtLog}
+              thoughtStartTime={thoughtStartTime}
+              currentToolCalls={currentToolCalls}
+              currentContext={currentContext}
+              onCancel={onCancel}
+              onViewInCanvas={onViewInCanvas}
+              onRetry={onRetry}
+            />
+          );
+        })}
       </div>
       <div ref={scrollRef} />
     </main>
