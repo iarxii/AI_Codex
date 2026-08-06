@@ -288,12 +288,6 @@ export const SpiritBirdHarness: React.FC<SpiritBirdHarnessProps> = ({ spaceName 
           {simulatedAction}
         </div>
       )}
-
-      <div className="w-full text-left p-3 bg-black/20 rounded border border-white/5">
-        <span className="opacity-60 text-[8px] font-mono leading-tight block">
-          PROMPT_STUB: "Generate interactive UI Tool components that allow the user to trigger actions (e.g. trades, limits, analysis) directly via button clicks within this projection space, maintaining context with the chat stream."
-        </span>
-      </div>
     </div>
   );
 };
