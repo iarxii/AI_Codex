@@ -16,12 +16,10 @@ import MessageList from "../components/chat/MessageList";
 import ChatInput from "../components/chat/ChatInput";
 import MetricsStrip from "../components/chat/MetricsStrip";
 import ModelTelemetryHUD from "../components/chat/ModelTelemetryHUD";
-import { SpiritBirdHarness } from "../components/chat/SpiritBirdHarness";
-import { GemmaSandboxHarness } from "../components/chat/GemmaSandboxHarness";
-import { MicrosoftAgentHarness } from "../components/chat/MicrosoftAgentHarness";
-import { SpiritBirdChatHarness } from "../components/chat/SpiritBirdChatHarness";
 import SpacesCatalog from "codex_spaces/client/src/components/SpacesCatalog";
 import TradingSpaceHeader from "../components/spaces/trading/TradingSpaceHeader";
+import { TradingMarketProvider } from "../components/spaces/trading/TradingMarketContext";
+import { resolveSpaceHarness } from "../config/spaceHarnessRegistry";
 import "../spaces.css";
 
 // Types
@@ -1311,124 +1309,127 @@ const workspace: React.FC = () => {
   // Dynamic styling based on active space
   const themeClass =
     activeSpace && !viewSpacesCatalog ? `space-theme-${activeSpace.slug}` : "";
+  const activeHarness = resolveSpaceHarness(activeSpace);
+  const renderActiveHarness = () => activeHarness?.render({
+    spaceName: activeSpace?.name ?? "Workspace",
+    thoughtLog,
+    telemetry,
+    onArtifactReady: (artifact) => window.dispatchEvent(
+      new CustomEvent("a2ui-artifact", { detail: artifact }),
+    ),
+  });
 
   return (
-    <div
-      className={`flex h-screen bg-transparent font-sans overflow-hidden transition-colors duration-500 ${themeClass}`}
-    >
-      <Sidebar
-        currentConversationId={currentConvId}
-        onSelectConversation={loadConversation}
-        onNewChat={handleNewChat}
-        isOpen={isSidebarOpen && !isCanvasOpen}
-        onClose={() => setIsSidebarOpen(false)}
-      />
-
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        {spaceNote && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-[var(--accent-primary)] text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium animate-bounce border border-white/20 backdrop-blur-md">
-            ✨ {spaceNote}
-          </div>
-        )}
-
-        <ChatHeader
-          isSidebarOpen={isSidebarOpen}
-          setIsSidebarOpen={setIsSidebarOpen}
-          currentConvId={currentConvId}
-          setIsOnboardingOpen={setIsOnboardingOpen}
-          isCanvasOpen={isCanvasOpen}
-          setIsCanvasOpen={setIsCanvasOpen}
-          setIsSettingsOpen={setIsSettingsOpen}
-          connected={connected}
-          activeProvider={activeProvider}
-          activeProviderInfo={activeProviderInfo}
-          currentLatency={currentLatency}
-          loading={loading}
-          artifactCount={artifacts.length}
-          isHarnessOpen={isHarnessOpen}
-          setIsHarnessOpen={setIsHarnessOpen}
+    <TradingMarketProvider enabled={activeSpace?.slug === "trading-space" && !viewSpacesCatalog}>
+      <div
+        className={`flex h-screen bg-transparent font-sans overflow-hidden transition-colors duration-500 ${themeClass}`}
+      >
+        <Sidebar
+          currentConversationId={currentConvId}
+          onSelectConversation={loadConversation}
           onNewChat={handleNewChat}
+          isOpen={isSidebarOpen && !isCanvasOpen}
+          onClose={() => setIsSidebarOpen(false)}
         />
 
-        {/* Trading Space Header — contextual sub-header */}
-        {activeSpace?.slug === "trading-space" && !viewSpacesCatalog && (
-          <TradingSpaceHeader connected={connected} />
-        )}
+        <div className="flex-1 flex flex-col min-w-0 relative">
+          {spaceNote && (
+            <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-[var(--accent-primary)] text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium animate-bounce border border-white/20 backdrop-blur-md">
+              ✨ {spaceNote}
+            </div>
+          )}
 
-        {/* Floating Hardware Telemetry — Moved to Top to prevent input obstruction */}
-        <div
-          className={`absolute left-0 right-0 pointer-events-none flex flex-col items-center gap-2 z-30 transition-all duration-500 ${activeSpace?.slug === "trading-space" && !viewSpacesCatalog ? "top-32" : "top-16"}`}
-        >
-          <div
-            className={`pointer-events-auto transition-all duration-300 transform ${showTelemetry ? "translate-y-0 opacity-100 scale-100" : "-translate-y-4 opacity-0 scale-95 pointer-events-none"}`}
-          >
-            <MetricsStrip
-              metrics={metrics}
-              metricsHistory={metricsHistory}
-              isChartExpanded={isChartExpanded}
-              setIsChartExpanded={setIsChartExpanded}
-            />
-          </div>
-
-          <div className="pointer-events-auto">
-            <ModelTelemetryHUD
-              telemetry={telemetry}
-              isVisible={showTelemetry}
-            />
-          </div>
-        </div>
-
-        {viewSpacesCatalog ? (
-          <SpacesCatalog
-            onSpaceSelected={() => {
-              setMessages([]);
-              setCurrentConvId(null);
-            }}
+          <ChatHeader
+            isSidebarOpen={isSidebarOpen}
+            setIsSidebarOpen={setIsSidebarOpen}
+            currentConvId={currentConvId}
+            setIsOnboardingOpen={setIsOnboardingOpen}
+            isCanvasOpen={isCanvasOpen}
+            setIsCanvasOpen={setIsCanvasOpen}
+            setIsSettingsOpen={setIsSettingsOpen}
+            connected={connected}
+            activeProvider={activeProvider}
+            activeProviderInfo={activeProviderInfo}
+            currentLatency={currentLatency}
+            loading={loading}
+            artifactCount={artifacts.length}
+            isHarnessOpen={isHarnessOpen}
+            setIsHarnessOpen={setIsHarnessOpen}
+            onNewChat={handleNewChat}
           />
-        ) : (
-          <div className="flex-1 flex flex-row overflow-hidden relative">
-            {/* Left Column: Chat Stream */}
-            <div className="workspace-chat-surface flex-1 flex flex-col min-w-0 relative">
-              <MessageList
-                messages={messages}
-                loading={loading}
-                thoughtLog={thoughtLog}
-                thoughtStartTime={thoughtStartTime}
-                currentToolCalls={currentToolCalls}
-                currentContext={currentContext}
-                scrollRef={scrollRef}
-                currentConvId={currentConvId}
-                activeProvider={activeProvider}
-                activeModel={activeModel}
-                activeSpace={activeSpace}
-                onCancel={handleCancel}
-                onViewInCanvas={handleViewInCanvas}
-                onRetry={handleRetry}
-              />
 
-              <ChatInput
-                input={input}
-                setInput={setInput}
-                onSend={handleSend}
-                loading={loading}
-                currentConvId={currentConvId}
-                showTelemetry={showTelemetry}
-                setShowTelemetry={setShowTelemetry}
-                agentMode={agentMode}
-                setAgentMode={setAgentMode}
-                onExport={handleExport}
+          {/* Trading Space Header — contextual sub-header */}
+          {activeSpace?.slug === "trading-space" && !viewSpacesCatalog && (
+            <TradingSpaceHeader connected={connected} />
+          )}
+
+          {/* Floating Hardware Telemetry — Moved to Top to prevent input obstruction */}
+          <div
+            className={`absolute left-0 right-0 pointer-events-none flex flex-col items-center gap-2 z-30 transition-all duration-500 ${activeSpace?.slug === "trading-space" && !viewSpacesCatalog ? "top-32" : "top-16"}`}
+          >
+            <div
+              className={`pointer-events-auto transition-all duration-300 transform ${showTelemetry ? "translate-y-0 opacity-100 scale-100" : "-translate-y-4 opacity-0 scale-95 pointer-events-none"}`}
+            >
+              <MetricsStrip
+                metrics={metrics}
+                metricsHistory={metricsHistory}
+                isChartExpanded={isChartExpanded}
+                setIsChartExpanded={setIsChartExpanded}
               />
             </div>
 
-            {/* Contextual Interaction Harnesses for spaces */}
-            {activeSpace &&
-              [
-                "trading-space",
-                "code-lab",
-                "spirit-book",
-                "health-tech",
-                "microsoft-agent-lab",
-              ].includes(activeSpace.slug) && (
+            <div className="pointer-events-auto">
+              <ModelTelemetryHUD
+                telemetry={telemetry}
+                isVisible={showTelemetry}
+              />
+            </div>
+          </div>
+
+          {viewSpacesCatalog ? (
+            <SpacesCatalog
+              onSpaceSelected={() => {
+                setMessages([]);
+                setCurrentConvId(null);
+              }}
+            />
+          ) : (
+            <div className="flex-1 flex flex-row overflow-hidden relative">
+              {/* Left Column: Chat Stream */}
+              <div className="workspace-chat-surface flex-1 flex flex-col min-w-0 relative">
+                <MessageList
+                  messages={messages}
+                  loading={loading}
+                  thoughtLog={thoughtLog}
+                  thoughtStartTime={thoughtStartTime}
+                  currentToolCalls={currentToolCalls}
+                  currentContext={currentContext}
+                  scrollRef={scrollRef}
+                  currentConvId={currentConvId}
+                  activeProvider={activeProvider}
+                  activeModel={activeModel}
+                  activeSpace={activeSpace}
+                  onCancel={handleCancel}
+                  onViewInCanvas={handleViewInCanvas}
+                  onRetry={handleRetry}
+                />
+
+                <ChatInput
+                  input={input}
+                  setInput={setInput}
+                  onSend={handleSend}
+                  loading={loading}
+                  currentConvId={currentConvId}
+                  showTelemetry={showTelemetry}
+                  setShowTelemetry={setShowTelemetry}
+                  agentMode={agentMode}
+                  setAgentMode={setAgentMode}
+                  onExport={handleExport}
+                />
+              </div>
+
+              {/* Contextual Interaction Harnesses for spaces */}
+              {activeSpace && activeHarness && (
                 <>
                   {/* Mobile Right Slide-Over Side Drawer */}
                   {isHarnessOpen && (
@@ -1442,18 +1443,8 @@ const workspace: React.FC = () => {
                       >
                         <div className="flex items-center justify-between p-4 border-b border-white/5 safe-area-top">
                           <div>
-                            <h3
-                              className={`text-[10px] font-black uppercase tracking-[0.2em] ${["code-lab", "health-tech"].includes(activeSpace.slug) ? "text-[#446EFF]" : activeSpace.slug === "microsoft-agent-lab" ? "text-[#0078D4]" : activeSpace.slug === "spirit-book" ? "text-[#6366f1]" : "text-[#fd3b12]"}`}
-                            >
-                              {activeSpace.slug === "code-lab"
-                                ? "Gemma Code Lab"
-                                : activeSpace.slug === "health-tech"
-                                  ? "MedGemma Soft Lab"
-                                  : activeSpace.slug === "microsoft-agent-lab"
-                                    ? "Microsoft Code Lab"
-                                    : activeSpace.slug === "spirit-book"
-                                      ? "SpiritBook Helper"
-                                      : "Spirit Bird Interaction"}
+                            <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${activeHarness.accentClass}`}>
+                              {activeHarness.label}
                             </h3>
                             <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">
                               Agent UI Projection Space
@@ -1480,31 +1471,7 @@ const workspace: React.FC = () => {
                           </button>
                         </div>
                         <div className="flex-1 overflow-y-auto safe-area-bottom">
-                          {activeSpace.slug === "trading-space" && (
-                            <SpiritBirdHarness spaceName={activeSpace.name} />
-                          )}
-                          {["code-lab", "health-tech"].includes(
-                            activeSpace.slug,
-                          ) && (
-                              <GemmaSandboxHarness
-                                thoughtLog={thoughtLog}
-                                telemetry={telemetry}
-                              />
-                            )}
-                          {activeSpace.slug === "microsoft-agent-lab" && (
-                            <MicrosoftAgentHarness
-                              onArtifactReady={(art) =>
-                                window.dispatchEvent(
-                                  new CustomEvent("a2ui-artifact", {
-                                    detail: art,
-                                  }),
-                                )
-                              }
-                            />
-                          )}
-                          {activeSpace.slug === "spirit-book" && (
-                            <SpiritBirdChatHarness />
-                          )}
+                          {renderActiveHarness()}
                         </div>
                       </div>
                     </div>
@@ -1644,33 +1611,15 @@ const workspace: React.FC = () => {
                           )}
                         </div>
                         <div className="text-[9px] text-slate-600 font-mono tracking-[0.25em] font-black uppercase [writing-mode:vertical-lr] rotate-180 py-4 select-none">
-                          {["code-lab", "health-tech"].includes(
-                            activeSpace.slug,
-                          )
-                            ? "GEMMA LAB"
-                            : activeSpace.slug === "microsoft-agent-lab"
-                              ? "MS CODE LAB"
-                              : activeSpace.slug === "spirit-book"
-                                ? "SPIRIT BOOK"
-                                : "SPIRIT BIRD"}
+                          {activeHarness.collapsedLabel}
                         </div>
                       </div>
                     ) : (
                       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
                         <div className="p-4 border-b border-white/5 sticky top-0 bg-[#090A0E]/80 backdrop-blur-md flex items-center justify-between z-10">
                           <div>
-                            <h3
-                              className={`text-[10px] font-black uppercase tracking-[0.2em] ${["code-lab", "health-tech"].includes(activeSpace.slug) ? "text-[#446EFF]" : activeSpace.slug === "microsoft-agent-lab" ? "text-[#0078D4]" : activeSpace.slug === "spirit-book" ? "text-[#6366f1]" : "text-[#fd3b12]"}`}
-                            >
-                              {activeSpace.slug === "code-lab"
-                                ? "Gemma Code Lab"
-                                : activeSpace.slug === "health-tech"
-                                  ? "MedGemma Soft Lab"
-                                  : activeSpace.slug === "microsoft-agent-lab"
-                                    ? "Microsoft Code Lab"
-                                    : activeSpace.slug === "spirit-book"
-                                      ? "SpiritBook Helper"
-                                      : `Spirit Bird Interaction (${activeSpace.name})`}
+                            <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${activeHarness.accentClass}`}>
+                              {activeHarness.label}
                             </h3>
                             <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5 font-mono">
                               Agent UI Projection Space
@@ -1697,66 +1646,43 @@ const workspace: React.FC = () => {
                           </button>
                         </div>
                         <div className="flex-1 overflow-y-auto flex flex-col">
-                          {activeSpace.slug === "trading-space" && (
-                            <SpiritBirdHarness spaceName={activeSpace.name} />
-                          )}
-                          {["code-lab", "health-tech"].includes(
-                            activeSpace.slug,
-                          ) && (
-                              <GemmaSandboxHarness
-                                thoughtLog={thoughtLog}
-                                telemetry={telemetry}
-                              />
-                            )}
-                          {activeSpace.slug === "microsoft-agent-lab" && (
-                            <MicrosoftAgentHarness
-                              onArtifactReady={(art) =>
-                                window.dispatchEvent(
-                                  new CustomEvent("a2ui-artifact", {
-                                    detail: art,
-                                  }),
-                                )
-                              }
-                            />
-                          )}
-                          {activeSpace.slug === "spirit-book" && (
-                            <SpiritBirdChatHarness />
-                          )}
+                          {renderActiveHarness()}
                         </div>
                       </div>
                     )}
                   </div>
                 </>
               )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
+
+        <AgentCanvas
+          isOpen={isCanvasOpen}
+          onClose={() => setIsCanvasOpen(false)}
+          artifacts={artifacts}
+          externalSelectedId={selectedArtifactId}
+          conversationId={currentConvId}
+        />
+        <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
+
+        <WorkspaceOnboardingModal
+          isOpen={isOnboardingOpen}
+          setIsOpen={setIsOnboardingOpen}
+          onSubmit={({ profile, goals }) => {
+            const initPrompt = `WORKSPACE INITIALIZATION:\n\nProfile Context:\n${profile}\n\nProject Goals:\n${goals}\n\nPlease acknowledge these goals and outline your initial execution plan.`;
+            setInput(initPrompt);
+            setTimeout(() => {
+              const form = document.querySelector("form");
+              if (form)
+                form.dispatchEvent(
+                  new Event("submit", { cancelable: true, bubbles: true }),
+                );
+            }, 100);
+          }}
+        />
       </div>
-
-      <AgentCanvas
-        isOpen={isCanvasOpen}
-        onClose={() => setIsCanvasOpen(false)}
-        artifacts={artifacts}
-        externalSelectedId={selectedArtifactId}
-        conversationId={currentConvId}
-      />
-      <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
-
-      <WorkspaceOnboardingModal
-        isOpen={isOnboardingOpen}
-        setIsOpen={setIsOnboardingOpen}
-        onSubmit={({ profile, goals }) => {
-          const initPrompt = `WORKSPACE INITIALIZATION:\n\nProfile Context:\n${profile}\n\nProject Goals:\n${goals}\n\nPlease acknowledge these goals and outline your initial execution plan.`;
-          setInput(initPrompt);
-          setTimeout(() => {
-            const form = document.querySelector("form");
-            if (form)
-              form.dispatchEvent(
-                new Event("submit", { cancelable: true, bubbles: true }),
-              );
-          }, 100);
-        }}
-      />
-    </div>
+    </TradingMarketProvider>
   );
 };
 

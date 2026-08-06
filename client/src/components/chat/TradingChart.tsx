@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  Play, 
-  ShieldAlert, 
-  CheckCircle, 
-  MousePointer, 
-  Sliders, 
-  ChevronUp, 
+import {
+  Play,
+  ShieldAlert,
+  CheckCircle,
+  MousePointer,
+  Sliders,
+  ChevronUp,
   ChevronDown,
   Activity,
   Zap,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { config } from "../../config";
 import { useDiscipline } from "../../contexts/DisciplineContext";
+import { getTradingInstrument, TRADING_INSTRUMENTS } from "../spaces/trading/instruments";
 
 interface TradingChartProps {
   symbol?: string;
@@ -33,33 +34,6 @@ interface Candle {
   low: number;
   close: number;
 }
-
-const INSTRUMENTS = [
-  // Cryptocurrencies
-  { symbol: "BTCUSD", name: "Bitcoin / USD", category: "Cryptocurrencies", basePrice: 95000 },
-  { symbol: "ETHUSD", name: "Ethereum / USD", category: "Cryptocurrencies", basePrice: 3400 },
-  { symbol: "XRPUSD", name: "Ripple / USD", category: "Cryptocurrencies", basePrice: 0.62 },
-  // Forex
-  { symbol: "EURUSD", name: "Euro / US Dollar", category: "Forex", basePrice: 1.0850 },
-  { symbol: "GBPUSD", name: "Pound / US Dollar", category: "Forex", basePrice: 1.2650 },
-  { symbol: "ZARUSD", name: "SA Rand / US Dollar", category: "Forex", basePrice: 18.50 },
-  // US M7 Stocks
-  { symbol: "TSLA", name: "Tesla Inc.", category: "US M7 Stocks", basePrice: 245.0 },
-  { symbol: "AAPL", name: "Apple Inc.", category: "US M7 Stocks", basePrice: 185.0 },
-  { symbol: "MSFT", name: "Microsoft Corp.", category: "US M7 Stocks", basePrice: 420.0 },
-  { symbol: "GOOGL", name: "Alphabet Inc.", category: "US M7 Stocks", basePrice: 175.0 },
-  { symbol: "META", name: "Meta Platforms Inc.", category: "US M7 Stocks", basePrice: 470.0 },
-  { symbol: "NVDA", name: "NVIDIA Corp.", category: "US M7 Stocks", basePrice: 900.0 },
-  { symbol: "AMZN", name: "Amazon.com Inc.", category: "US M7 Stocks", basePrice: 180.0 },
-  // Commodities
-  { symbol: "XAUUSD", name: "Gold / USD", category: "Commodities", basePrice: 2400.0 },
-  { symbol: "USOIL", name: "WTI Crude Oil", category: "Commodities", basePrice: 78.0 },
-  { symbol: "BRENT", name: "Brent Crude Oil", category: "Commodities", basePrice: 82.0 },
-  { symbol: "NATGAS", name: "Natural Gas", category: "Commodities", basePrice: 2.50 },
-  // ETFs / Indices
-  { symbol: "SPX500", name: "S&P 500 Index", category: "ETFs / Indices", basePrice: 5300.0 },
-  { symbol: "STX40", name: "Top 40 Index", category: "ETFs / Indices", basePrice: 7500.0 },
-];
 
 const STRATEGIES = [
   {
@@ -106,7 +80,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   const [isLive, setIsLive] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [dispatched, setDispatched] = useState(false);
   const [dispatchStatus, setDispatchStatus] = useState<string>("");
   const [selectedTool, setSelectedTool] = useState<string>("cursor");
@@ -119,10 +93,14 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   const [measureEnd, setMeasureEnd] = useState<{ x: number; y: number } | null>(null);
   const [supportZones, setSupportZones] = useState<{ min: number; max: number }[]>([]);
   const [resistanceZones, setResistanceZones] = useState<{ min: number; max: number }[]>([]);
-  
+
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<SVGSVGElement | null>(null);
   const [svgWidth, setSvgWidth] = useState(520);
+
+  useEffect(() => {
+    setSelectedSymbol(symbol);
+  }, [symbol]);
 
   // Responsive SVG Width
   useEffect(() => {
@@ -156,14 +134,14 @@ export const TradingChart: React.FC<TradingChartProps> = ({
             const lastCandle = data[data.length - 1];
             setCurrentPrice(lastCandle.close);
             setEntry(lastCandle.close);
-            
+
             // Set default TP/SL based on instrument decimals
             const displayDecs = selectedSymbol === "EURUSD" || selectedSymbol === "GBPUSD" ? 4 : 2;
             const entryVal = lastCandle.close;
             const vol = entryVal * 0.005;
             setTp(Number((entryVal + vol * 4).toFixed(displayDecs)));
             setSl(Number((entryVal - vol * 2).toFixed(displayDecs)));
-            
+
             // Strategy Zones Integration (Brothers FX / David Perk logic)
             setSupportZones([{ min: entryVal - vol * 2.5, max: entryVal - vol * 1.5 }]);
             setResistanceZones([{ min: entryVal + vol * 1.5, max: entryVal + vol * 2.5 }]);
@@ -211,7 +189,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     const wsProtocol = config.API_BASE_URL.startsWith("https") ? "wss" : "ws";
     const cleanBaseUrl = config.API_BASE_URL.replace(/^https?:\/\//, "");
     const wsUrl = `${wsProtocol}://${cleanBaseUrl}${config.API_V1_STR}/market/live?symbol=${selectedSymbol}`;
-    
+
     console.log("Connecting to live price WS:", wsUrl);
     const ws = new WebSocket(wsUrl);
 
@@ -251,7 +229,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   const potentialProfit = Math.abs(tp - entry);
   const potentialLoss = Math.abs(entry - sl);
   const riskRewardRatio = potentialLoss > 0 ? (potentialProfit / potentialLoss).toFixed(2) : "0.00";
-  
+
   // Discipline Check Rules (MQL5 Part 5 Risk Enforcement)
   const isRRCompliant = Number(riskRewardRatio) >= 1.5;
   // Compare against global remaining drawdown from context instead of static 3%
@@ -336,7 +314,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   const padding = 15;
   const paddingBottom = 35; // Reserved for timeline
 
-  const allPrices = candles.length > 0 
+  const allPrices = candles.length > 0
     ? candles.flatMap(c => [c.high, c.low, tp, sl, entry, currentPrice])
     : [tp, sl, entry, currentPrice];
   const maxPrice = Math.max(...allPrices) * 1.002;
@@ -359,7 +337,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
 
   return (
     <div className="w-full bg-[#0D0F16] border border-white/5 rounded-3xl overflow-hidden shadow-2xl p-6 select-none font-sans text-slate-200">
-      
+
       {/* Header Info */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div className="flex items-center gap-3">
@@ -373,25 +351,23 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                 onChange={(e) => {
                   const sym = e.target.value;
                   setSelectedSymbol(sym);
-                  const inst = INSTRUMENTS.find((i) => i.symbol === sym);
-                  if (inst) {
-                    setEntry(inst.basePrice);
-                    setTp(inst.basePrice * 1.02);
-                    setSl(inst.basePrice * 0.99);
-                    setCurrentPrice(inst.basePrice);
-                    if (onSymbolChange) {
-                      onSymbolChange(sym, inst.basePrice);
-                    }
+                  const instrument = getTradingInstrument(sym);
+                  setEntry(instrument.basePrice);
+                  setTp(instrument.basePrice * 1.02);
+                  setSl(instrument.basePrice * 0.99);
+                  setCurrentPrice(instrument.basePrice);
+                  if (onSymbolChange) {
+                    onSymbolChange(sym, instrument.basePrice);
                   }
                 }}
                 className="bg-[#1A1D27] border border-white/10 rounded-xl px-2 py-1 text-xs font-bold text-white uppercase outline-none focus:ring-1 focus:ring-[#fd3b12] cursor-pointer hover:bg-white/5 transition-colors"
               >
                 {Object.entries(
-                  INSTRUMENTS.reduce((acc, inst) => {
+                  TRADING_INSTRUMENTS.reduce((acc, inst) => {
                     if (!acc[inst.category]) acc[inst.category] = [];
                     acc[inst.category].push(inst);
                     return acc;
-                  }, {} as Record<string, typeof INSTRUMENTS>)
+                  }, {} as Record<string, typeof TRADING_INSTRUMENTS>)
                 ).map(([category, items]) => (
                   <optgroup key={category} label={category} className="bg-[#1A1D27] text-slate-400 font-normal">
                     {items.map((item) => (
@@ -415,11 +391,10 @@ export const TradingChart: React.FC<TradingChartProps> = ({
               <button
                 key={t}
                 onClick={() => setChartType(t)}
-                className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${
-                  chartType === t
+                className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${chartType === t
                     ? "bg-[#fd3b12] text-white"
                     : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-                }`}
+                  }`}
               >
                 {t}
               </button>
@@ -432,11 +407,10 @@ export const TradingChart: React.FC<TradingChartProps> = ({
               <button
                 key={r}
                 onClick={() => setRange(r)}
-                className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${
-                  range === r
+                className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase transition-all ${range === r
                     ? "bg-[#fd3b12] text-white"
                     : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-                }`}
+                  }`}
               >
                 {r}
               </button>
@@ -458,7 +432,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                   const pct = (firstPrice > 0) ? (diff / firstPrice) * 100 : 0;
                   const sign = diff >= 0 ? "+" : "";
                   const color = diff >= 0 ? "text-emerald-400" : "text-rose-400";
-                  
+
                   const getDurationLabel = (r: string) => {
                     switch (r) {
                       case "1D": return "a day";
@@ -477,13 +451,12 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                 })()}
               </div>
             </div>
-            <button 
+            <button
               onClick={() => setIsLive(!isLive)}
-              className={`px-3 py-1.5 rounded-xl border text-[9px] font-bold uppercase tracking-wider transition-all ${
-                isLive 
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20' 
+              className={`px-3 py-1.5 rounded-xl border text-[9px] font-bold uppercase tracking-wider transition-all ${isLive
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
                   : 'bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20'
-              }`}
+                }`}
             >
               {isLive ? "Live" : "Paused"}
             </button>
@@ -493,7 +466,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
 
       {/* Main SVG Candlestick Chart */}
       <div className="relative border border-white/5 bg-[#090B0F]/50 rounded-2xl p-2 mb-6 group/chart overflow-hidden flex flex-row h-[280px]">
-        
+
         {/* Strategy Column (Toggled) */}
         {showStrategyPanel && (
           <div className="w-[180px] shrink-0 border-r border-white/5 bg-black/20 p-3 flex flex-col gap-2.5 overflow-y-auto h-full scrollbar-thin select-none">
@@ -532,419 +505,419 @@ export const TradingChart: React.FC<TradingChartProps> = ({
               <span className="text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-4 py-2 rounded-xl">{error}</span>
             </div>
           )}
-          <svg 
+          <svg
             ref={chartRef}
-            width="100%" 
-            height={svgHeight} 
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`} 
+            width="100%"
+            height={svgHeight}
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
             className="overflow-visible cursor-crosshair"
             onClick={handleChartClick}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
           >
-          {/* Horizontal grid lines */}
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
-            const yVal = padding + ratio * (svgHeight - padding - paddingBottom);
-            return (
-              <line 
-                key={idx}
-                x1="0" 
-                y1={yVal} 
-                x2={svgWidth} 
-                y2={yVal} 
-                stroke="white" 
-                strokeOpacity="0.03" 
-                strokeDasharray="4"
-              />
-            );
-          })}
-
-          {/* Strategy Zones Overlay */}
-          {supportZones.map((z, idx) => (
-            <rect key={`sz-${idx}`} x="0" y={getY(z.max)} width={svgWidth} height={Math.abs(getY(z.min) - getY(z.max))} fill="#10B981" fillOpacity="0.04" stroke="#10B981" strokeOpacity="0.2" strokeWidth="1" strokeDasharray="4" />
-          ))}
-          {resistanceZones.map((z, idx) => (
-            <rect key={`rz-${idx}`} x="0" y={getY(z.max)} width={svgWidth} height={Math.abs(getY(z.min) - getY(z.max))} fill="#EF4444" fillOpacity="0.04" stroke="#EF4444" strokeOpacity="0.2" strokeWidth="1" strokeDasharray="4" />
-          ))}
-
-          {/* Render Line Chart */}
-          {chartType === "line" && candles.length > 0 && (() => {
-            const linePoints = candles.map((c, i) => `${getX(i)},${getY(c.close)}`).join(" L ");
-            const bottomY = getY(minPrice);
-            const fillAreaPath = `M ${getX(0)},${bottomY} L ${linePoints} L ${getX(candles.length - 1)},${bottomY} Z`;
-            return (
-              <g>
-                <defs>
-                  <linearGradient id="chart-area-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#fd3b12" stopOpacity="0.25"/>
-                    <stop offset="100%" stopColor="#fd3b12" stopOpacity="0.0"/>
-                  </linearGradient>
-                </defs>
-                <path d={fillAreaPath} fill="url(#chart-area-grad)" />
-                <path d={`M ${linePoints}`} fill="none" stroke="#fd3b12" strokeWidth="2.5" />
-              </g>
-            );
-          })()}
-
-          {/* Render Bar Chart (OHLC) */}
-          {chartType === "bar" && candles.map((c, i) => {
-            const cx = getX(i);
-            const cyOpen = getY(c.open);
-            const cyClose = getY(c.close);
-            const cyHigh = getY(c.high);
-            const cyLow = getY(c.low);
-            const isBull = c.close >= c.open;
-            const strokeColor = isBull ? "#10B981" : "#EF4444";
-            return (
-              <g key={`bar-${i}`} className="transition-all duration-200">
-                <line x1={cx} y1={cyHigh} x2={cx} y2={cyLow} stroke={strokeColor} strokeWidth="1.5" />
-                <line x1={cx - 3.5} y1={cyOpen} x2={cx} y2={cyOpen} stroke={strokeColor} strokeWidth="1.5" />
-                <line x1={cx} y1={cyClose} x2={cx + 3.5} y2={cyClose} stroke={strokeColor} strokeWidth="1.5" />
-              </g>
-            );
-          })}
-
-          {/* Render Candles */}
-          {chartType === "candle" && candles.map((c, i) => {
-            const cx = getX(i);
-            const cyOpen = getY(c.open);
-            const cyClose = getY(c.close);
-            const cyHigh = getY(c.high);
-            const cyLow = getY(c.low);
-            const isBull = c.close >= c.open;
-            const strokeColor = isBull ? "#10B981" : "#EF4444";
-            
-            return (
-              <g key={i} className="transition-all duration-200">
-                {/* Wick */}
-                <line x1={cx} y1={cyHigh} x2={cx} y2={cyLow} stroke={strokeColor} strokeWidth="1.2" />
-                {/* Body */}
-                <rect 
-                  x={cx - 3.5} 
-                  y={Math.min(cyOpen, cyClose)} 
-                  width="7" 
-                  height={Math.max(1, Math.abs(cyOpen - cyClose))} 
-                  fill={isBull ? "#10B981" : "#EF4444"} 
-                  stroke={strokeColor}
-                  strokeWidth="1"
-                  rx="1"
-                />
-                
-                {/* Entry Signal Markers (Brothers FX Strategy) */}
-                {i === Math.max(0, candles.length - 4) && isBull && (
-                  <g transform={`translate(${cx}, ${cyLow + 10})`}>
-                    <path d="M-4,0 L4,0 L0,-6 Z" fill="#10B981" />
-                    <text y="8" fill="#10B981" fontSize="6" textAnchor="middle" fontWeight="bold" fontFamily="monospace" letterSpacing="1">ENTRY SIGNAL</text>
-                  </g>
-                )}
-                {i === Math.max(0, candles.length - 8) && !isBull && (
-                  <g transform={`translate(${cx}, ${cyHigh - 10})`}>
-                    <path d="M-4,0 L4,0 L0,6 Z" fill="#EF4444" />
-                    <text y="-4" fill="#EF4444" fontSize="6" textAnchor="middle" fontWeight="bold" fontFamily="monospace" letterSpacing="1">SUPPLY ZONE</text>
-                  </g>
-                )}
-              </g>
-            );
-          })}
-
-          {/* Timeline X-Axis Labels */}
-          {candles.map((c, i) => {
-            const interval = Math.max(1, Math.ceil(candles.length / 5));
-            if (i % interval !== 0 && i !== candles.length - 1) return null;
-            return (
-              <g key={`time-${i}`}>
+            {/* Horizontal grid lines */}
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+              const yVal = padding + ratio * (svgHeight - padding - paddingBottom);
+              return (
                 <line
-                  x1={getX(i)}
-                  y1={svgHeight - paddingBottom + 5}
-                  x2={getX(i)}
-                  y2={svgHeight - paddingBottom}
+                  key={idx}
+                  x1="0"
+                  y1={yVal}
+                  x2={svgWidth}
+                  y2={yVal}
                   stroke="white"
-                  strokeOpacity="0.1"
-                  strokeWidth="1"
-                />
-                <text
-                  x={getX(i)}
-                  y={svgHeight - 12}
-                  fill="white"
-                  fillOpacity="0.4"
-                  fontSize="8"
-                  fontWeight="bold"
-                  textAnchor="middle"
-                  fontFamily="monospace"
-                >
-                  {c.time}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Custom Drawn Overlay Tools (Part 31) */}
-          {decorations.map((dec, idx) => {
-            if (dec.type === "trend") {
-              return (
-                <line 
-                  key={idx} 
-                  x1="100" 
-                  y1={dec.y - 30} 
-                  x2="400" 
-                  y2={dec.y + 30} 
-                  stroke="#fbbf24" 
-                  strokeWidth="1.5" 
-                  strokeDasharray="2"
-                  className="animate-pulse"
+                  strokeOpacity="0.03"
+                  strokeDasharray="4"
                 />
               );
-            }
-            if (dec.type === "h-line") {
+            })}
+
+            {/* Strategy Zones Overlay */}
+            {supportZones.map((z, idx) => (
+              <rect key={`sz-${idx}`} x="0" y={getY(z.max)} width={svgWidth} height={Math.abs(getY(z.min) - getY(z.max))} fill="#10B981" fillOpacity="0.04" stroke="#10B981" strokeOpacity="0.2" strokeWidth="1" strokeDasharray="4" />
+            ))}
+            {resistanceZones.map((z, idx) => (
+              <rect key={`rz-${idx}`} x="0" y={getY(z.max)} width={svgWidth} height={Math.abs(getY(z.min) - getY(z.max))} fill="#EF4444" fillOpacity="0.04" stroke="#EF4444" strokeOpacity="0.2" strokeWidth="1" strokeDasharray="4" />
+            ))}
+
+            {/* Render Line Chart */}
+            {chartType === "line" && candles.length > 0 && (() => {
+              const linePoints = candles.map((c, i) => `${getX(i)},${getY(c.close)}`).join(" L ");
+              const bottomY = getY(minPrice);
+              const fillAreaPath = `M ${getX(0)},${bottomY} L ${linePoints} L ${getX(candles.length - 1)},${bottomY} Z`;
               return (
-                <line 
-                  key={idx} 
-                  x1="0" 
-                  y1={dec.y} 
-                  x2={svgWidth} 
-                  y2={dec.y} 
-                  stroke="#818cf8" 
-                  strokeWidth="1.5" 
-                  strokeDasharray="2"
-                />
+                <g>
+                  <defs>
+                    <linearGradient id="chart-area-grad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#fd3b12" stopOpacity="0.25" />
+                      <stop offset="100%" stopColor="#fd3b12" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  <path d={fillAreaPath} fill="url(#chart-area-grad)" />
+                  <path d={`M ${linePoints}`} fill="none" stroke="#fd3b12" strokeWidth="2.5" />
+                </g>
               );
-            }
-            return null;
-          })}
+            })()}
 
-          {/* Draggable/Visual Indicators for SL, TP, Entry */}
-          {/* TAKE PROFIT (TP) LINE */}
-          <g className="transition-all duration-300">
-            <line 
-              x1="0" 
-              y1={getY(tp)} 
-              x2={svgWidth} 
-              y2={getY(tp)} 
-              stroke="#10B981" 
-              strokeWidth="1.5" 
-              strokeDasharray="5"
-            />
-            <rect 
-              x={svgWidth - 95} 
-              y={getY(tp) - 10} 
-              width="90" 
-              height="20" 
-              rx="6" 
-              fill="#10B981" 
-              className="shadow-lg"
-            />
-            <text 
-              x={svgWidth - 50} 
-              y={getY(tp) + 4} 
-              fill="#061F14" 
-              fontSize="9" 
-              fontWeight="900" 
-              textAnchor="middle"
-              fontFamily="monospace"
-            >
-              TP: {tp.toFixed(displayDecimals)}
-            </text>
-          </g>
+            {/* Render Bar Chart (OHLC) */}
+            {chartType === "bar" && candles.map((c, i) => {
+              const cx = getX(i);
+              const cyOpen = getY(c.open);
+              const cyClose = getY(c.close);
+              const cyHigh = getY(c.high);
+              const cyLow = getY(c.low);
+              const isBull = c.close >= c.open;
+              const strokeColor = isBull ? "#10B981" : "#EF4444";
+              return (
+                <g key={`bar-${i}`} className="transition-all duration-200">
+                  <line x1={cx} y1={cyHigh} x2={cx} y2={cyLow} stroke={strokeColor} strokeWidth="1.5" />
+                  <line x1={cx - 3.5} y1={cyOpen} x2={cx} y2={cyOpen} stroke={strokeColor} strokeWidth="1.5" />
+                  <line x1={cx} y1={cyClose} x2={cx + 3.5} y2={cyClose} stroke={strokeColor} strokeWidth="1.5" />
+                </g>
+              );
+            })}
 
-          {/* ENTRY LINE */}
-          <g>
-            <line 
-              x1="0" 
-              y1={getY(entry)} 
-              x2={svgWidth} 
-              y2={getY(entry)} 
-              stroke="#E2E8F0" 
-              strokeWidth="1" 
-              strokeOpacity="0.5"
-            />
-            <rect 
-              x={5} 
-              y={getY(entry) - 10} 
-              width="90" 
-              height="20" 
-              rx="6" 
-              fill="#334155" 
-              stroke="#E2E8F0"
-              strokeWidth="1"
-              strokeOpacity="0.2"
-            />
-            <text 
-              x={50} 
-              y={getY(entry) + 4} 
-              fill="#E2E8F0" 
-              fontSize="9" 
-              fontWeight="900" 
-              textAnchor="middle"
-              fontFamily="monospace"
-            >
-              ENTRY: {entry.toFixed(displayDecimals)}
-            </text>
-          </g>
+            {/* Render Candles */}
+            {chartType === "candle" && candles.map((c, i) => {
+              const cx = getX(i);
+              const cyOpen = getY(c.open);
+              const cyClose = getY(c.close);
+              const cyHigh = getY(c.high);
+              const cyLow = getY(c.low);
+              const isBull = c.close >= c.open;
+              const strokeColor = isBull ? "#10B981" : "#EF4444";
 
-          {/* STOP LOSS (SL) LINE */}
-          <g className="transition-all duration-300">
-            <line 
-              x1="0" 
-              y1={getY(sl)} 
-              x2={svgWidth} 
-              y2={getY(sl)} 
-              stroke="#EF4444" 
-              strokeWidth="1.5" 
-              strokeDasharray="5"
-            />
-            <rect 
-              x={svgWidth - 95} 
-              y={getY(sl) - 10} 
-              width="90" 
-              height="20" 
-              rx="6" 
-              fill="#EF4444" 
-            />
-            <text 
-              x={svgWidth - 50} 
-              y={getY(sl) + 4} 
-              fill="#2D0606" 
-              fontSize="9" 
-              fontWeight="900" 
-              textAnchor="middle"
-              fontFamily="monospace"
-            >
-              SL: {sl.toFixed(displayDecimals)}
-            </text>
-          </g>
+              return (
+                <g key={i} className="transition-all duration-200">
+                  {/* Wick */}
+                  <line x1={cx} y1={cyHigh} x2={cx} y2={cyLow} stroke={strokeColor} strokeWidth="1.2" />
+                  {/* Body */}
+                  <rect
+                    x={cx - 3.5}
+                    y={Math.min(cyOpen, cyClose)}
+                    width="7"
+                    height={Math.max(1, Math.abs(cyOpen - cyClose))}
+                    fill={isBull ? "#10B981" : "#EF4444"}
+                    stroke={strokeColor}
+                    strokeWidth="1"
+                    rx="1"
+                  />
 
-          {/* Live Price Line overlay */}
-          <g className="transition-all duration-100">
-            <line 
-              x1="0" 
-              y1={getY(currentPrice)} 
-              x2={svgWidth} 
-              y2={getY(currentPrice)} 
-              stroke="#fbbf24" 
-              strokeWidth="1" 
-              strokeDasharray="2"
-            />
-            <circle cx={svgWidth - padding} cy={getY(currentPrice)} r="3" fill="#fbbf24" className="animate-ping" />
-          </g>
+                  {/* Entry Signal Markers (Brothers FX Strategy) */}
+                  {i === Math.max(0, candles.length - 4) && isBull && (
+                    <g transform={`translate(${cx}, ${cyLow + 10})`}>
+                      <path d="M-4,0 L4,0 L0,-6 Z" fill="#10B981" />
+                      <text y="8" fill="#10B981" fontSize="6" textAnchor="middle" fontWeight="bold" fontFamily="monospace" letterSpacing="1">ENTRY SIGNAL</text>
+                    </g>
+                  )}
+                  {i === Math.max(0, candles.length - 8) && !isBull && (
+                    <g transform={`translate(${cx}, ${cyHigh - 10})`}>
+                      <path d="M-4,0 L4,0 L0,6 Z" fill="#EF4444" />
+                      <text y="-4" fill="#EF4444" fontSize="6" textAnchor="middle" fontWeight="bold" fontFamily="monospace" letterSpacing="1">SUPPLY ZONE</text>
+                    </g>
+                  )}
+                </g>
+              );
+            })}
 
-          {/* CROSSHAIR TOOL */}
-          {(crosshairFixed || crosshair) && (selectedTool === "crosshair" || selectedTool === "measure") && (() => {
-            const currentCrosshair = crosshairFixed || crosshair;
-            if (!currentCrosshair) return null;
-            return (
-              <g className="pointer-events-none">
-                <line x1={currentCrosshair.x} y1="0" x2={currentCrosshair.x} y2={svgHeight} stroke="#94a3b8" strokeWidth="0.5" strokeDasharray="3" />
-                <line x1="0" y1={currentCrosshair.y} x2={svgWidth} y2={currentCrosshair.y} stroke="#94a3b8" strokeWidth="0.5" strokeDasharray="3" />
-                {/* Crosshair Price Label */}
-                <rect x={svgWidth - 55} y={currentCrosshair.y - 10} width="55" height="20" fill="#334155" rx="2" />
-                <text x={svgWidth - 27} y={currentCrosshair.y + 3} fill="white" fontSize="9" textAnchor="middle" fontFamily="monospace">
-                  {getPriceFromY(currentCrosshair.y).toFixed(displayDecimals)}
-                </text>
-              </g>
-            );
-          })()}
+            {/* Timeline X-Axis Labels */}
+            {candles.map((c, i) => {
+              const interval = Math.max(1, Math.ceil(candles.length / 5));
+              if (i % interval !== 0 && i !== candles.length - 1) return null;
+              return (
+                <g key={`time-${i}`}>
+                  <line
+                    x1={getX(i)}
+                    y1={svgHeight - paddingBottom + 5}
+                    x2={getX(i)}
+                    y2={svgHeight - paddingBottom}
+                    stroke="white"
+                    strokeOpacity="0.1"
+                    strokeWidth="1"
+                  />
+                  <text
+                    x={getX(i)}
+                    y={svgHeight - 12}
+                    fill="white"
+                    fillOpacity="0.4"
+                    fontSize="8"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                    fontFamily="monospace"
+                  >
+                    {c.time}
+                  </text>
+                </g>
+              );
+            })}
 
-          {/* MEASURE TOOL OVERLAY */}
-          {measureStart && measureEnd && (
-            <g className="pointer-events-none">
-              <rect 
-                x={Math.min(measureStart.x, measureEnd.x)} 
-                y={Math.min(measureStart.y, measureEnd.y)} 
-                width={Math.abs(measureEnd.x - measureStart.x)} 
-                height={Math.abs(measureEnd.y - measureStart.y)} 
-                fill="#3b82f6" 
-                fillOpacity="0.15" 
-                stroke="#3b82f6" 
-                strokeWidth="1" 
-                strokeDasharray="2"
+            {/* Custom Drawn Overlay Tools (Part 31) */}
+            {decorations.map((dec, idx) => {
+              if (dec.type === "trend") {
+                return (
+                  <line
+                    key={idx}
+                    x1="100"
+                    y1={dec.y - 30}
+                    x2="400"
+                    y2={dec.y + 30}
+                    stroke="#fbbf24"
+                    strokeWidth="1.5"
+                    strokeDasharray="2"
+                    className="animate-pulse"
+                  />
+                );
+              }
+              if (dec.type === "h-line") {
+                return (
+                  <line
+                    key={idx}
+                    x1="0"
+                    y1={dec.y}
+                    x2={svgWidth}
+                    y2={dec.y}
+                    stroke="#818cf8"
+                    strokeWidth="1.5"
+                    strokeDasharray="2"
+                  />
+                );
+              }
+              return null;
+            })}
+
+            {/* Draggable/Visual Indicators for SL, TP, Entry */}
+            {/* TAKE PROFIT (TP) LINE */}
+            <g className="transition-all duration-300">
+              <line
+                x1="0"
+                y1={getY(tp)}
+                x2={svgWidth}
+                y2={getY(tp)}
+                stroke="#10B981"
+                strokeWidth="1.5"
+                strokeDasharray="5"
               />
-              <rect 
-                x={measureEnd.x + 10} 
-                y={measureEnd.y - 15} 
-                width="80" 
-                height="30" 
-                fill="#1e293b" 
-                rx="4" 
-                stroke="#475569" 
-                strokeWidth="1"
+              <rect
+                x={svgWidth - 95}
+                y={getY(tp) - 10}
+                width="90"
+                height="20"
+                rx="6"
+                fill="#10B981"
+                className="shadow-lg"
               />
-              <text x={measureEnd.x + 50} y={measureEnd.y - 2} fill="#60a5fa" fontSize="9" textAnchor="middle" fontFamily="monospace" fontWeight="bold">
-                {((getPriceFromY(measureEnd.y) - getPriceFromY(measureStart.y)) / volRange * 100).toFixed(1)} Pips
-              </text>
-              <text x={measureEnd.x + 50} y={measureEnd.y + 9} fill="#cbd5e1" fontSize="8" textAnchor="middle" fontFamily="monospace">
-                {(Math.abs(measureEnd.x - measureStart.x) / ((svgWidth - 2*padding) / Math.max(1, candles.length))).toFixed(0)} Bars
+              <text
+                x={svgWidth - 50}
+                y={getY(tp) + 4}
+                fill="#061F14"
+                fontSize="9"
+                fontWeight="900"
+                textAnchor="middle"
+                fontFamily="monospace"
+              >
+                TP: {tp.toFixed(displayDecimals)}
               </text>
             </g>
-          )}
-        </svg>
 
-        {/* Interactive MT5 Tools Sidebar (Part 31) */}
-        <div className="absolute left-3 top-3 flex flex-col gap-1.5 bg-black/40 backdrop-blur-md p-1.5 rounded-xl border border-white/5 z-20">
-          <button 
-            onClick={() => setShowStrategyPanel(!showStrategyPanel)}
-            className={`p-2.5 rounded-xl transition-all border ${showStrategyPanel ? 'bg-[#fd3b12] border-[#fd3b12]/50 text-white shadow-lg shadow-[#fd3b12]/20' : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-350'}`}
-            title="Toggle Strategy Panel"
-          >
-            <BookOpen className="w-4 h-4" />
-          </button>
-          <div className="h-px w-6 bg-white/10 my-0.5"></div>
-          <button 
-            onClick={() => setSelectedTool("cursor")}
-            className={`p-1.5 rounded-lg transition-colors ${selectedTool === "cursor" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
-            title="Cursor Pointer"
-          >
-            <MousePointer className="w-3.5 h-3.5" />
-          </button>
-          <button 
-            onClick={() => setSelectedTool("crosshair")}
-            className={`p-1.5 rounded-lg transition-colors ${selectedTool === "crosshair" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
-            title="Crosshair"
-          >
-            <Crosshair className="w-3.5 h-3.5" />
-          </button>
-          <button 
-            onClick={() => setSelectedTool("measure")}
-            className={`p-1.5 rounded-lg transition-colors ${selectedTool === "measure" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
-            title="Measure Mode"
-          >
-            <Ruler className="w-3.5 h-3.5" />
-          </button>
-          <button 
-            onClick={() => setSelectedTool("trend")}
-            className={`p-1.5 rounded-lg transition-colors ${selectedTool === "trend" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
-            title="Draw Trendline"
-          >
-            <Zap className="w-3.5 h-3.5" />
-          </button>
-          <button 
-            onClick={() => setSelectedTool("h-line")}
-            className={`p-1.5 rounded-lg transition-colors ${selectedTool === "h-line" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
-            title="Draw Horizontal Line"
-          >
-            <Target className="w-3.5 h-3.5" />
-          </button>
-          {decorations.length > 0 && (
-            <button 
-              onClick={() => setDecorations([])}
-              className="p-1.5 rounded-lg hover:bg-rose-500/20 text-rose-400"
-              title="Clear drawings"
+            {/* ENTRY LINE */}
+            <g>
+              <line
+                x1="0"
+                y1={getY(entry)}
+                x2={svgWidth}
+                y2={getY(entry)}
+                stroke="#E2E8F0"
+                strokeWidth="1"
+                strokeOpacity="0.5"
+              />
+              <rect
+                x={5}
+                y={getY(entry) - 10}
+                width="90"
+                height="20"
+                rx="6"
+                fill="#334155"
+                stroke="#E2E8F0"
+                strokeWidth="1"
+                strokeOpacity="0.2"
+              />
+              <text
+                x={50}
+                y={getY(entry) + 4}
+                fill="#E2E8F0"
+                fontSize="9"
+                fontWeight="900"
+                textAnchor="middle"
+                fontFamily="monospace"
+              >
+                ENTRY: {entry.toFixed(displayDecimals)}
+              </text>
+            </g>
+
+            {/* STOP LOSS (SL) LINE */}
+            <g className="transition-all duration-300">
+              <line
+                x1="0"
+                y1={getY(sl)}
+                x2={svgWidth}
+                y2={getY(sl)}
+                stroke="#EF4444"
+                strokeWidth="1.5"
+                strokeDasharray="5"
+              />
+              <rect
+                x={svgWidth - 95}
+                y={getY(sl) - 10}
+                width="90"
+                height="20"
+                rx="6"
+                fill="#EF4444"
+              />
+              <text
+                x={svgWidth - 50}
+                y={getY(sl) + 4}
+                fill="#2D0606"
+                fontSize="9"
+                fontWeight="900"
+                textAnchor="middle"
+                fontFamily="monospace"
+              >
+                SL: {sl.toFixed(displayDecimals)}
+              </text>
+            </g>
+
+            {/* Live Price Line overlay */}
+            <g className="transition-all duration-100">
+              <line
+                x1="0"
+                y1={getY(currentPrice)}
+                x2={svgWidth}
+                y2={getY(currentPrice)}
+                stroke="#fbbf24"
+                strokeWidth="1"
+                strokeDasharray="2"
+              />
+              <circle cx={svgWidth - padding} cy={getY(currentPrice)} r="3" fill="#fbbf24" className="animate-ping" />
+            </g>
+
+            {/* CROSSHAIR TOOL */}
+            {(crosshairFixed || crosshair) && (selectedTool === "crosshair" || selectedTool === "measure") && (() => {
+              const currentCrosshair = crosshairFixed || crosshair;
+              if (!currentCrosshair) return null;
+              return (
+                <g className="pointer-events-none">
+                  <line x1={currentCrosshair.x} y1="0" x2={currentCrosshair.x} y2={svgHeight} stroke="#94a3b8" strokeWidth="0.5" strokeDasharray="3" />
+                  <line x1="0" y1={currentCrosshair.y} x2={svgWidth} y2={currentCrosshair.y} stroke="#94a3b8" strokeWidth="0.5" strokeDasharray="3" />
+                  {/* Crosshair Price Label */}
+                  <rect x={svgWidth - 55} y={currentCrosshair.y - 10} width="55" height="20" fill="#334155" rx="2" />
+                  <text x={svgWidth - 27} y={currentCrosshair.y + 3} fill="white" fontSize="9" textAnchor="middle" fontFamily="monospace">
+                    {getPriceFromY(currentCrosshair.y).toFixed(displayDecimals)}
+                  </text>
+                </g>
+              );
+            })()}
+
+            {/* MEASURE TOOL OVERLAY */}
+            {measureStart && measureEnd && (
+              <g className="pointer-events-none">
+                <rect
+                  x={Math.min(measureStart.x, measureEnd.x)}
+                  y={Math.min(measureStart.y, measureEnd.y)}
+                  width={Math.abs(measureEnd.x - measureStart.x)}
+                  height={Math.abs(measureEnd.y - measureStart.y)}
+                  fill="#3b82f6"
+                  fillOpacity="0.15"
+                  stroke="#3b82f6"
+                  strokeWidth="1"
+                  strokeDasharray="2"
+                />
+                <rect
+                  x={measureEnd.x + 10}
+                  y={measureEnd.y - 15}
+                  width="80"
+                  height="30"
+                  fill="#1e293b"
+                  rx="4"
+                  stroke="#475569"
+                  strokeWidth="1"
+                />
+                <text x={measureEnd.x + 50} y={measureEnd.y - 2} fill="#60a5fa" fontSize="9" textAnchor="middle" fontFamily="monospace" fontWeight="bold">
+                  {((getPriceFromY(measureEnd.y) - getPriceFromY(measureStart.y)) / volRange * 100).toFixed(1)} Pips
+                </text>
+                <text x={measureEnd.x + 50} y={measureEnd.y + 9} fill="#cbd5e1" fontSize="8" textAnchor="middle" fontFamily="monospace">
+                  {(Math.abs(measureEnd.x - measureStart.x) / ((svgWidth - 2 * padding) / Math.max(1, candles.length))).toFixed(0)} Bars
+                </text>
+              </g>
+            )}
+          </svg>
+
+          {/* Interactive MT5 Tools Sidebar (Part 31) */}
+          <div className="absolute left-3 top-3 flex flex-col gap-1.5 bg-black/40 backdrop-blur-md p-1.5 rounded-xl border border-white/5 z-20">
+            <button
+              onClick={() => setShowStrategyPanel(!showStrategyPanel)}
+              className={`p-2.5 rounded-xl transition-all border ${showStrategyPanel ? 'bg-[#fd3b12] border-[#fd3b12]/50 text-white shadow-lg shadow-[#fd3b12]/20' : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-350'}`}
+              title="Toggle Strategy Panel"
             >
-              ×
+              <BookOpen className="w-4 h-4" />
             </button>
-          )}
-        </div>
+            <div className="h-px w-6 bg-white/10 my-0.5"></div>
+            <button
+              onClick={() => setSelectedTool("cursor")}
+              className={`p-1.5 rounded-lg transition-colors ${selectedTool === "cursor" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
+              title="Cursor Pointer"
+            >
+              <MousePointer className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setSelectedTool("crosshair")}
+              className={`p-1.5 rounded-lg transition-colors ${selectedTool === "crosshair" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
+              title="Crosshair"
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setSelectedTool("measure")}
+              className={`p-1.5 rounded-lg transition-colors ${selectedTool === "measure" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
+              title="Measure Mode"
+            >
+              <Ruler className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setSelectedTool("trend")}
+              className={`p-1.5 rounded-lg transition-colors ${selectedTool === "trend" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
+              title="Draw Trendline"
+            >
+              <Zap className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setSelectedTool("h-line")}
+              className={`p-1.5 rounded-lg transition-colors ${selectedTool === "h-line" ? 'bg-[#fd3b12] text-white' : 'hover:bg-white/10 text-slate-400'}`}
+              title="Draw Horizontal Line"
+            >
+              <Target className="w-3.5 h-3.5" />
+            </button>
+            {decorations.length > 0 && (
+              <button
+                onClick={() => setDecorations([])}
+                className="p-1.5 rounded-lg hover:bg-rose-500/20 text-rose-400"
+                title="Clear drawings"
+              >
+                ×
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Control Panel & Discipline Engine Status */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
+
         {/* Fine-Tune Parameters */}
         <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-4">
           <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
             <Sliders className="w-3 h-3 text-[#fd3b12]" /> Parameter Optimizer
           </h4>
-          
+
           <div className="space-y-3">
             <div>
               <div className="flex justify-between items-center mb-1">
@@ -953,13 +926,13 @@ export const TradingChart: React.FC<TradingChartProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => adjustTP(-stepSize)} className="p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300"><ChevronDown className="w-3 h-3" /></button>
-                <input 
-                  type="range" 
-                  min={entry + (volRange * 0.5)} 
-                  max={entry + (volRange * 20)} 
+                <input
+                  type="range"
+                  min={entry + (volRange * 0.5)}
+                  max={entry + (volRange * 20)}
                   step={stepSize}
-                  value={tp} 
-                  onChange={(e) => setTp(Number(e.target.value))} 
+                  value={tp}
+                  onChange={(e) => setTp(Number(e.target.value))}
                   className="flex-1 accent-[#10B981] h-1 bg-white/10 rounded-lg cursor-pointer"
                 />
                 <button onClick={() => adjustTP(stepSize)} className="p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300"><ChevronUp className="w-3 h-3" /></button>
@@ -973,13 +946,13 @@ export const TradingChart: React.FC<TradingChartProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => adjustSL(-stepSize)} className="p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300"><ChevronDown className="w-3 h-3" /></button>
-                <input 
-                  type="range" 
-                  min={entry - (volRange * 20)} 
-                  max={entry - (volRange * 0.5)} 
+                <input
+                  type="range"
+                  min={entry - (volRange * 20)}
+                  max={entry - (volRange * 0.5)}
                   step={stepSize}
-                  value={sl} 
-                  onChange={(e) => setSl(Number(e.target.value))} 
+                  value={sl}
+                  onChange={(e) => setSl(Number(e.target.value))}
                   className="flex-1 accent-[#EF4444] h-1 bg-white/10 rounded-lg cursor-pointer"
                 />
                 <button onClick={() => adjustSL(50)} className="p-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300"><ChevronUp className="w-3 h-3" /></button>
@@ -999,7 +972,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
               <p className="text-[8px] text-slate-400 uppercase tracking-widest mt-0.5">Automated Discipline Checks</p>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-400 font-medium text-[10px] uppercase">Risk-to-Reward Ratio</span>
@@ -1007,7 +980,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                 1:{riskRewardRatio}
               </span>
             </div>
-            
+
             <div className="space-y-1.5 text-[9px] font-bold">
               <div className="flex items-center gap-2 p-1.5 rounded bg-white/[0.02] border border-white/5">
                 <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${isRRCompliant ? 'text-emerald-400' : 'text-amber-500'}`} />
@@ -1024,7 +997,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
               <div className="flex items-center gap-2 p-1.5 rounded bg-white/[0.02] border border-white/5 relative group">
                 <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span className="text-slate-300">PCA ONNX Inputs Aligned</span>
-                
+
                 {/* Tooltip explaining automation */}
                 <div className="absolute left-0 bottom-full mb-2 w-48 p-2 bg-[#1A1D27] border border-white/10 rounded-lg text-[8px] text-slate-300 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl z-10 normal-case font-medium">
                   The Agent dynamically calculates parameter optimization constraints based on current volatility metrics. MQL5 integration is currently running in local-simulation mode until terminal routing is fully established.
@@ -1065,7 +1038,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
                 </div>
               </div>
             ) : (
-              <button 
+              <button
                 onClick={handleDispatch}
                 disabled={!isRRCompliant || !isDrawdownSafe || disciplineState.isGateLocked}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#fd3b12] to-amber-500 hover:from-amber-500 hover:to-[#fd3b12] text-white text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-[#fd3b12]/20 transition-all active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:from-[#fd3b12] disabled:hover:to-amber-500 flex items-center justify-center gap-2"

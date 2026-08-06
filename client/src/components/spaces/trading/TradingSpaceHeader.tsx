@@ -1,40 +1,105 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { TrendingUpIcon, ActivityIcon, X, BarChart2 } from 'lucide-react';
 import { TradingChart } from '../../chat/TradingChart';
 import { AnalystSidebar } from './AnalystSidebar';
+import { formatTradingPrice, getTradingInstrument, TRADING_INSTRUMENTS } from './instruments';
+import { type MarketQuote, useTradingMarket } from './TradingMarketContext';
 
-const ASSETS = [
-  { symbol: "EURUSD", price: "1.0852", change: "+0.12%" },
-  { symbol: "GBPUSD", price: "1.2641", change: "-0.05%" },
-  { symbol: "ZARUSD", price: "18.5200", change: "+0.45%" },
-  { symbol: "BTCUSD", price: "95240", change: "+2.4%" },
-  { symbol: "ETHUSD", price: "3420", change: "+1.1%" },
-  { symbol: "XRPUSD", price: "0.6210", change: "+5.6%" },
-  { symbol: "SPX500", price: "5304", change: "+0.8%" },
-  { symbol: "STX40", price: "75320", change: "+0.3%" },
-  { symbol: "TSLA", price: "245.10", change: "-1.2%" },
-  { symbol: "NVDA", price: "912.40", change: "+3.8%" },
-  { symbol: "BRENT", price: "82.40", change: "+0.7%" },
-];
+interface MarketTickerProps {
+  onLaunchChart: (symbol: string) => void;
+  quotes: Record<string, MarketQuote>;
+  selectedSymbol: string;
+}
 
-const MarketTicker: React.FC<{ onLaunchChart: (symbol: string, price: number) => void }> = ({ onLaunchChart }) => {
+const MarketTicker: React.FC<MarketTickerProps> = ({ onLaunchChart, quotes, selectedSymbol }) => {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const didDragRef = useRef(false);
+  const lastPointerXRef = useRef(0);
+
+  const normalizeScrollPosition = () => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const loopWidth = viewport.scrollWidth / 2;
+    if (!loopWidth) return;
+    if (viewport.scrollLeft >= loopWidth) viewport.scrollLeft -= loopWidth;
+    if (viewport.scrollLeft <= 0) viewport.scrollLeft = loopWidth - 1;
+  };
+
+  useEffect(() => {
+    let frameId = 0;
+    let previousTime = performance.now();
+    const advance = (time: number) => {
+      const viewport = viewportRef.current;
+      if (viewport && !isDraggingRef.current) {
+        viewport.scrollLeft += (time - previousTime) * 0.04;
+        normalizeScrollPosition();
+      }
+      previousTime = time;
+      frameId = requestAnimationFrame(advance);
+    };
+    frameId = requestAnimationFrame(advance);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    isDraggingRef.current = true;
+    didDragRef.current = false;
+    lastPointerXRef.current = event.clientX;
+    viewport.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current || !viewportRef.current) return;
+    const delta = event.clientX - lastPointerXRef.current;
+    if (Math.abs(delta) > 2) didDragRef.current = true;
+    viewportRef.current.scrollLeft -= delta;
+    lastPointerXRef.current = event.clientX;
+    normalizeScrollPosition();
+  };
+
+  const handlePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    const viewport = viewportRef.current;
+    isDraggingRef.current = false;
+    if (viewport?.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+    window.setTimeout(() => {
+      didDragRef.current = false;
+    }, 0);
+  };
+
   return (
-    <div className="w-full bg-[#090B0F] border-b border-white/5 py-1.5 overflow-hidden flex items-center relative z-20 shadow-inner">
+    <div
+      ref={viewportRef}
+      className="w-full bg-[#090B0F] border-b border-white/5 py-1.5 overflow-hidden flex items-center relative z-20 shadow-inner cursor-grab active:cursor-grabbing touch-pan-y select-none"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+    >
       <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#090B0F] to-transparent z-10 pointer-events-none"></div>
-      <div className="flex animate-marquee whitespace-nowrap">
-        {[...ASSETS, ...ASSETS, ...ASSETS].map((asset, i) => {
-          const isUp = asset.change.startsWith('+');
+      <div className="flex whitespace-nowrap min-w-max">
+        {[...TRADING_INSTRUMENTS, ...TRADING_INSTRUMENTS].map((instrument, index) => {
+          const quote = quotes[instrument.symbol];
+          const change = quote?.change_percent ?? 0;
+          const isSelected = instrument.symbol === selectedSymbol;
+          const changeClass = change > 0 ? 'text-emerald-400' : change < 0 ? 'text-rose-400' : 'text-slate-500';
           return (
-            <div 
-              key={i} 
-              className="flex items-center gap-2 mx-6 cursor-pointer hover:bg-white/5 px-2 py-0.5 rounded transition-colors group"
-              onClick={() => onLaunchChart(asset.symbol, Number(asset.price))}
+            <button
+              key={`${instrument.symbol}-${index}`}
+              type="button"
+              className={`flex items-center gap-2 mx-4 px-2 py-0.5 rounded transition-colors group ${isSelected ? 'bg-[#fd3b12]/15' : 'hover:bg-white/5'}`}
+              title={`${instrument.symbol}: ${quote?.source === 'fallback' ? 'fallback price' : 'market quote'}`}
+              onClick={() => {
+                if (!didDragRef.current) onLaunchChart(instrument.symbol);
+              }}
             >
-              <BarChart2 className="w-3 h-3 text-slate-500 group-hover:text-[#fd3b12] transition-colors" />
-              <span className="text-[10px] font-bold text-slate-300">{asset.symbol}</span>
-              <span className="text-[10px] font-mono text-slate-400">{asset.price}</span>
-              <span className={`text-[9px] font-bold ${isUp ? 'text-emerald-400' : 'text-rose-400'}`}>{asset.change}</span>
-            </div>
+              <BarChart2 className={`w-3 h-3 transition-colors ${isSelected ? 'text-[#fd3b12]' : 'text-slate-500 group-hover:text-[#fd3b12]'}`} />
+              <span className={`text-[10px] font-bold ${isSelected ? 'text-white' : 'text-slate-300'}`}>{instrument.symbol}</span>
+              <span className="text-[10px] font-mono text-slate-400">{formatTradingPrice(instrument.symbol, quote?.price ?? instrument.basePrice)}</span>
+              <span className={`text-[9px] font-bold ${changeClass}`}>{change > 0 ? '+' : ''}{change.toFixed(2)}%</span>
+            </button>
           );
         })}
       </div>
@@ -50,6 +115,20 @@ interface TradingSpaceHeaderProps {
 const TradingSpaceHeader: React.FC<TradingSpaceHeaderProps> = ({ connected = false }) => {
   const [activeChart, setActiveChart] = useState<{ symbol: string; entry: number } | null>(null);
   const [activeModalTab, setActiveModalTab] = useState<'chart' | 'analyst'>('chart');
+  const { selectedSymbol, selectSymbol, price, quotes } = useTradingMarket();
+  const resolveEntryPrice = (symbol: string) =>
+    symbol === selectedSymbol && price ? price : quotes[symbol]?.price ?? getTradingInstrument(symbol).basePrice;
+
+  useEffect(() => {
+    setActiveChart((currentChart) => currentChart
+      ? { symbol: selectedSymbol, entry: resolveEntryPrice(selectedSymbol) }
+      : currentChart);
+  }, [price, quotes, selectedSymbol]);
+
+  const openChart = (symbol: string) => {
+    selectSymbol(symbol);
+    setActiveChart({ symbol, entry: resolveEntryPrice(symbol) });
+  };
 
   return (
     <>
@@ -66,7 +145,7 @@ const TradingSpaceHeader: React.FC<TradingSpaceHeaderProps> = ({ connected = fal
               <p className="text-[10px] text-gray-400 font-medium">Quantitative Analysis & Strategy Engine</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-6">
             <div className="flex flex-col items-end">
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Market Status</span>
@@ -75,12 +154,12 @@ const TradingSpaceHeader: React.FC<TradingSpaceHeaderProps> = ({ connected = fal
                 <span className="text-xs font-bold text-emerald-400">OPEN</span>
               </div>
             </div>
-            
+
             <div className="h-8 w-px bg-white/10"></div>
-            
+
             <div className="flex gap-3">
-              <button 
-                onClick={() => setActiveChart({ symbol: 'BTCUSD', entry: 95200 })}
+              <button
+                onClick={() => openChart(selectedSymbol)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fd3b12]/10 hover:bg-[#fd3b12]/20 border border-[#fd3b12]/20 rounded-lg text-xs font-bold text-[#fd3b12] transition-all cursor-pointer touch-44"
               >
                 <ActivityIcon className="w-3.5 h-3.5" />
@@ -91,14 +170,14 @@ const TradingSpaceHeader: React.FC<TradingSpaceHeaderProps> = ({ connected = fal
         </div>
 
         {/* Market Ticker Strip */}
-        <MarketTicker onLaunchChart={(symbol, price) => setActiveChart({ symbol, entry: price })} />
+        <MarketTicker onLaunchChart={openChart} quotes={quotes} selectedSymbol={selectedSymbol} />
       </div>
 
       {/* Global Chart Modal */}
       {activeChart && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in">
           <div className="w-full h-full max-h-[95vh] max-w-[95vw] 2xl:max-w-[1600px] flex flex-col bg-[#0B0D14] rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden">
-            
+
             {/* Modal Header */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 sm:px-6 sm:py-4 border-b border-white/5 bg-[#1A1D27]/50 gap-3">
               <div className="flex items-center justify-between">
@@ -106,7 +185,7 @@ const TradingSpaceHeader: React.FC<TradingSpaceHeaderProps> = ({ connected = fal
                   <BarChart2 className="w-5 h-5 text-[#fd3b12]" /> Global Chart Module
                 </h2>
                 {/* Close Button on Mobile (aligned right in header row) */}
-                <button 
+                <button
                   onClick={() => setActiveChart(null)}
                   className="sm:hidden p-2.5 bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 rounded-full transition-colors z-20 cursor-pointer touch-44"
                 >
@@ -118,28 +197,26 @@ const TradingSpaceHeader: React.FC<TradingSpaceHeaderProps> = ({ connected = fal
               <div className="flex lg:hidden bg-black/40 p-1 rounded-xl border border-white/5 self-center sm:self-auto w-full sm:w-auto">
                 <button
                   onClick={() => setActiveModalTab('chart')}
-                  className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-black uppercase transition-all tracking-wider ${
-                    activeModalTab === 'chart'
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-black uppercase transition-all tracking-wider ${activeModalTab === 'chart'
                       ? 'bg-[#fd3b12] text-white shadow-md shadow-[#fd3b12]/20'
                       : 'text-slate-400 hover:text-slate-200'
-                  }`}
+                    }`}
                 >
                   Chart
                 </button>
                 <button
                   onClick={() => setActiveModalTab('analyst')}
-                  className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-black uppercase transition-all tracking-wider ${
-                    activeModalTab === 'analyst'
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-black uppercase transition-all tracking-wider ${activeModalTab === 'analyst'
                       ? 'bg-[#fd3b12] text-white shadow-md shadow-[#fd3b12]/20'
                       : 'text-slate-400 hover:text-slate-200'
-                  }`}
+                    }`}
                 >
                   Analyst Panel
                 </button>
               </div>
 
               {/* Close Button on Desktop */}
-              <button 
+              <button
                 onClick={() => setActiveChart(null)}
                 className="hidden sm:block p-2 bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 rounded-full transition-colors z-20 cursor-pointer touch-44"
               >
@@ -152,13 +229,14 @@ const TradingSpaceHeader: React.FC<TradingSpaceHeaderProps> = ({ connected = fal
               {/* Main Chart Area (70% on desktop, visible when tab is active on mobile) */}
               <div className={`flex-1 lg:w-[70%] p-3 sm:p-4 overflow-y-auto flex-col ${activeModalTab === 'chart' ? 'flex' : 'hidden lg:flex'}`}>
                 <div className="flex-1 min-h-[350px] lg:min-h-0">
-                  <TradingChart 
+                  <TradingChart
                     key={activeChart.symbol}
-                    symbol={activeChart.symbol} 
-                    initialEntry={activeChart.entry} 
-                    initialSL={activeChart.entry * 0.99} 
-                    initialTP={activeChart.entry * 1.02} 
+                    symbol={activeChart.symbol}
+                    initialEntry={activeChart.entry}
+                    initialSL={activeChart.entry * 0.99}
+                    initialTP={activeChart.entry * 1.02}
                     onSymbolChange={(newSymbol: string, basePrice: number) => {
+                      selectSymbol(newSymbol);
                       setActiveChart({ symbol: newSymbol, entry: basePrice });
                     }}
                   />

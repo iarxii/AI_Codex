@@ -1,62 +1,32 @@
 import React, { useState } from 'react';
 import { TrendingUp, AlertTriangle, Target, Shield, Scale, Info } from 'lucide-react';
 import { useDiscipline } from '../../contexts/DisciplineContext';
+import { useTradingMarket } from '../spaces/trading/TradingMarketContext';
+import { formatTradingPrice, getTradingInstrument, TRADING_INSTRUMENTS } from '../spaces/trading/instruments';
 
-interface SpiritBirdHarnessProps {
+interface FinTraderHarnessProps {
   spaceName: string;
 }
 
-const instrumentSignals = {
-  BTCUSD: {
-    label: 'BTCUSD',
-    sentiment: 'Bullish',
-    tone: 'text-emerald-400',
-    pill: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    strength: 82,
-    note: 'Momentum remains constructive after a clean reclaim of trend support.',
-  },
-  EURUSD: {
-    label: 'EURUSD',
-    sentiment: 'Neutral',
-    tone: 'text-slate-300',
-    pill: 'bg-slate-500/10 text-slate-300 border-slate-500/20',
-    strength: 54,
-    note: 'Range-bound flow is dominating as macro positioning stabilizes.',
-  },
-  SPY: {
-    label: 'SPY',
-    sentiment: 'Bullish',
-    tone: 'text-emerald-400',
-    pill: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    strength: 76,
-    note: 'Equity breadth is broadening and dip-buying remains active.',
-  },
-  AAPL: {
-    label: 'AAPL',
-    sentiment: 'Bearish',
-    tone: 'text-rose-400',
-    pill: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-    strength: 63,
-    note: 'Near-term pressure is building as positioning tilts risk-off.',
-  },
-  GBPUSD: {
-    label: 'GBPUSD',
-    sentiment: 'Neutral',
-    tone: 'text-amber-400',
-    pill: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    strength: 49,
-    note: 'Policy-driven volatility is keeping the pair in a cautious range.',
-  },
-} as const;
-
-type InstrumentKey = keyof typeof instrumentSignals;
-
-export const SpiritBirdHarness: React.FC<SpiritBirdHarnessProps> = ({ spaceName }) => {
+export const FinTraderHarness: React.FC<FinTraderHarnessProps> = ({ spaceName }) => {
   const [activeTab, setActiveTab] = useState<'trade' | 'risk'>('trade');
   const [simulatedAction, setSimulatedAction] = useState<string | null>(null);
-  const [selectedInstrument, setSelectedInstrument] = useState<InstrumentKey>('BTCUSD');
   const { state: disciplineState, updateExposure, recordTradeResult } = useDiscipline();
-  const currentSignal = instrumentSignals[selectedInstrument];
+  const { selectedSymbol, selectSymbol, price, signal } = useTradingMarket();
+  const selectedInstrument = getTradingInstrument(selectedSymbol);
+  const activePrice = price ?? selectedInstrument.basePrice;
+  const stopLoss = activePrice * 0.99;
+  const takeProfit = activePrice * 1.02;
+  const signalClasses = signal.sentiment === 'BULLISH'
+    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+    : signal.sentiment === 'BEARISH'
+      ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+      : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+  const signalBarClass = signal.sentiment === 'BULLISH'
+    ? 'bg-emerald-400'
+    : signal.sentiment === 'BEARISH'
+      ? 'bg-rose-400'
+      : 'bg-amber-400';
 
   const handleAction = (action: string, type: 'buy' | 'sell' | 'tighten' | 'flatten') => {
     setSimulatedAction(action);
@@ -87,7 +57,7 @@ export const SpiritBirdHarness: React.FC<SpiritBirdHarnessProps> = ({ spaceName 
           <Target className="w-5 h-5 text-[#fd3b12]" />
         </div>
         <div className="text-left">
-          <h4 className="text-[11px] font-black uppercase tracking-widest text-white">Spirit Bird Harness</h4>
+          <h4 className="text-[11px] font-black uppercase tracking-widest text-white">FinTrader Harness</h4>
           <p className="text-[9px] text-gray-500 uppercase tracking-wider font-mono">
             {spaceName} UI Projection
           </p>
@@ -115,29 +85,36 @@ export const SpiritBirdHarness: React.FC<SpiritBirdHarnessProps> = ({ spaceName 
             <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">FinTrader Signal</p>
-                <p className="text-[11px] font-semibold text-white">{currentSignal.label} sentiment</p>
+                <p className="text-[11px] font-semibold text-white">{selectedSymbol} sentiment</p>
               </div>
               <select
-                value={selectedInstrument}
-                onChange={(event) => setSelectedInstrument(event.target.value as InstrumentKey)}
+                value={selectedSymbol}
+                onChange={(event) => selectSymbol(event.target.value)}
                 className="rounded-lg border border-white/10 bg-[#0F111A] px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 outline-none"
               >
-                {Object.keys(instrumentSignals).map((instrument) => (
-                  <option key={instrument} value={instrument}>
-                    {instrument}
-                  </option>
+                {Object.entries(TRADING_INSTRUMENTS.reduce((groups, instrument) => {
+                  (groups[instrument.category] ??= []).push(instrument);
+                  return groups;
+                }, {} as Record<string, typeof TRADING_INSTRUMENTS>)).map(([category, instruments]) => (
+                  <optgroup key={category} label={category}>
+                    {instruments.map((instrument) => (
+                      <option key={instrument.symbol} value={instrument.symbol}>
+                        {instrument.symbol} - {instrument.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
-            <div className={`rounded-lg border px-3 py-2 ${currentSignal.pill}`}>
+            <div className={`rounded-lg border px-3 py-2 ${signalClasses}`}>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black uppercase tracking-[0.25em]">{currentSignal.sentiment}</span>
-                <span className="text-[10px] font-semibold">{currentSignal.strength}%</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.25em]">{signal.sentiment}</span>
+                <span className="text-[10px] font-semibold">{signal.strength}%</span>
               </div>
               <div className="mt-2 h-1.5 rounded-full bg-black/20 overflow-hidden">
-                <div className={`h-full rounded-full ${currentSignal.sentiment === 'Bullish' ? 'bg-emerald-400' : currentSignal.sentiment === 'Bearish' ? 'bg-rose-400' : 'bg-amber-400'}`} style={{ width: `${currentSignal.strength}%` }} />
+                <div className={`h-full rounded-full ${signalBarClass}`} style={{ width: `${signal.strength}%` }} />
               </div>
-              <p className="mt-2 text-[10px] leading-relaxed text-slate-300">{currentSignal.note}</p>
+              <p className="mt-2 text-[10px] leading-relaxed text-slate-300">{signal.description}</p>
             </div>
           </div>
 
@@ -148,7 +125,7 @@ export const SpiritBirdHarness: React.FC<SpiritBirdHarnessProps> = ({ spaceName 
                 <div className="space-y-1">
                   <span className="text-[9px] font-bold text-gray-300 uppercase tracking-wider">Market Intelligence Context</span>
                   <p className="text-[10px] text-gray-400 leading-relaxed font-sans">
-                    {currentSignal.label} is currently being monitored by the FinTrader signal layer. The projected setup remains aligned with the selected instrument bias and the discipline gate.
+                    {selectedSymbol} is the active FinTrader pair across the terminal. Price movement drives the displayed signal and the discipline gate remains active before simulated actions.
                   </p>
                 </div>
               </div>
@@ -162,15 +139,15 @@ export const SpiritBirdHarness: React.FC<SpiritBirdHarnessProps> = ({ spaceName 
                   <tbody>
                     <tr className="border-b border-white/5">
                       <td className="px-3 py-2 text-gray-500">ENTRY TRIGGER</td>
-                      <td className="px-3 py-2 text-white text-right font-bold">$77,100.00</td>
+                      <td className="px-3 py-2 text-white text-right font-bold">{formatTradingPrice(selectedSymbol, activePrice)}</td>
                     </tr>
                     <tr className="border-b border-white/5">
                       <td className="px-3 py-2 text-gray-500">STOP LOSS</td>
-                      <td className="px-3 py-2 text-rose-400 text-right font-bold">$76,324.77</td>
+                      <td className="px-3 py-2 text-rose-400 text-right font-bold">{formatTradingPrice(selectedSymbol, stopLoss)}</td>
                     </tr>
                     <tr>
                       <td className="px-3 py-2 text-gray-500">TAKE PROFIT</td>
-                      <td className="px-3 py-2 text-emerald-400 text-right font-bold">$78,637.64</td>
+                      <td className="px-3 py-2 text-emerald-400 text-right font-bold">{formatTradingPrice(selectedSymbol, takeProfit)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -190,13 +167,13 @@ export const SpiritBirdHarness: React.FC<SpiritBirdHarnessProps> = ({ spaceName 
 
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
                 <button
-                  onClick={() => handleAction(`EXECUTING: MARKET BUY (${currentSignal.label})`, 'buy')}
+                  onClick={() => handleAction(`EXECUTING: MARKET BUY (${selectedSymbol})`, 'buy')}
                   className="py-2.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-wider rounded border border-emerald-500/20 hover:bg-emerald-500/20 transition-all text-center flex items-center justify-center gap-1.5"
                 >
                   <TrendingUp className="w-3.5 h-3.5" /> Market Buy
                 </button>
                 <button
-                  onClick={() => handleAction(`EXECUTING: MARKET SELL (${currentSignal.label})`, 'sell')}
+                  onClick={() => handleAction(`EXECUTING: MARKET SELL (${selectedSymbol})`, 'sell')}
                   className="py-2.5 bg-rose-500/10 text-rose-400 text-[10px] font-black uppercase tracking-wider rounded border border-rose-500/20 hover:bg-rose-500/20 transition-all text-center flex items-center justify-center gap-1.5"
                 >
                   <TrendingUp className="w-3.5 h-3.5 rotate-180" /> Market Sell

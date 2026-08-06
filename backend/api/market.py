@@ -82,6 +82,54 @@ FALLBACK_BASE_PRICES = {
     "STX40": 7500.0,
 }
 
+def get_market_quote(symbol: str) -> dict:
+    """Return a normalized quote, using a transparent fallback when yfinance is unavailable."""
+    yf_symbol = SYMBOL_MAP[symbol]
+    fallback_price = FALLBACK_BASE_PRICES[symbol]
+
+    try:
+        history = yf.Ticker(yf_symbol).history(period="5d", interval="1d")
+        if history.empty:
+            raise ValueError("No quote history returned")
+
+        current_price = float(history["Close"].iloc[-1])
+        previous_price = float(history["Close"].iloc[-2]) if len(history.index) > 1 else current_price
+        change_percent = ((current_price - previous_price) / previous_price) * 100 if previous_price else 0.0
+        return {
+            "symbol": symbol,
+            "price": current_price,
+            "change_percent": change_percent,
+            "source": "yfinance",
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        print(f"Error fetching quote for {symbol} ({yf_symbol}): {exc}. Using fallback price.")
+        return {
+            "symbol": symbol,
+            "price": fallback_price,
+            "change_percent": 0.0,
+            "source": "fallback",
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }
+
+@router.get("/quotes")
+async def get_market_quotes(symbols: str | None = Query(None)):
+    requested_symbols = list(SYMBOL_MAP)
+    if symbols:
+        requested_symbols = [symbol.strip().upper() for symbol in symbols.split(",") if symbol.strip()]
+        invalid_symbols = [symbol for symbol in requested_symbols if symbol not in SYMBOL_MAP]
+        if invalid_symbols:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unsupported market symbols: {', '.join(invalid_symbols)}",
+            )
+
+    loop = asyncio.get_event_loop()
+    quotes = await asyncio.gather(
+        *(loop.run_in_executor(None, get_market_quote, symbol) for symbol in requested_symbols)
+    )
+    return {"quotes": quotes}
+
 def get_fallback_candles(symbol: str, range_preset: str) -> list:
     """Generates realistic fallback mock data if the API fails."""
     candles = []

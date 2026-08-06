@@ -4,6 +4,7 @@ import MessageItem from "./MessageItem";
 import type { Message, ThoughtLogEntry } from "../../types/chat";
 import type { ProviderId, CodexSpace } from "../../contexts/AIContext";
 import { getIcon } from "../SpaceCard";
+import { useTradingMarket } from "../spaces/trading/TradingMarketContext";
 
 interface MessageListProps {
   messages: Message[];
@@ -57,46 +58,7 @@ const MessageList: React.FC<MessageListProps> = ({
 
   const hiddenMessageCount = Math.max(0, messageWindowStart);
   const visibleMessages = messages.slice(messageWindowStart);
-
-  const [signal, setSignal] = React.useState({
-    symbol: "BTCUSD",
-    sentiment: "BULLISH",
-    strength: 89,
-    confidence: "High",
-    dataStreams: 14,
-    description: "The FinQuant Engine has aggregated real-time sentiment from 14 global data streams. High-probability trade setups identified in the BTC/USD pair."
-  });
-
-  React.useEffect(() => {
-    if (activeSpace?.slug !== 'trading-space') return;
-
-    const symbols = ["BTCUSD", "ETHUSD", "EURUSD", "GBPUSD", "SPX500", "TSLA", "USOIL", "XAUUSD", "ZARUSD", "STX40"];
-    const sentiments = ["BULLISH", "BEARISH"];
-    const confidences = ["High", "Medium", "Extreme"];
-
-    const interval = setInterval(() => {
-      const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-      const sentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
-      const confidence = confidences[Math.floor(Math.random() * confidences.length)];
-      const strength = Math.floor(Math.random() * 25) + 73; // 73% to 97%
-      const dataStreams = Math.floor(Math.random() * 12) + 8; // 8 to 19
-
-      const description = sentiment === "BULLISH"
-        ? `The FinQuant Engine has aggregated real-time sentiment from ${dataStreams} global data streams. High-probability bullish setups identified in the ${symbol} pair.`
-        : `The FinQuant Engine has aggregated real-time sentiment from ${dataStreams} global data streams. High-probability bearish setups identified in the ${symbol} pair.`;
-
-      setSignal({
-        symbol,
-        sentiment,
-        strength,
-        confidence,
-        dataStreams,
-        description
-      });
-    }, 4500);
-
-    return () => clearInterval(interval);
-  }, [activeSpace]);
+  const { signal } = useTradingMarket();
 
   return (
     <main className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide relative z-10">
@@ -123,13 +85,13 @@ const MessageList: React.FC<MessageListProps> = ({
                         <h3 className="text-sm font-black text-white uppercase tracking-widest">Market Signals Analysis Node</h3>
                       </div>
                       <h2 className="text-4xl font-black text-white mb-4 tracking-tighter leading-none">
-                        {signal.sentiment} <span className={signal.sentiment === 'BULLISH' ? 'text-emerald-500' : 'text-rose-500'}>SENTIMENT</span> DETECTED
+                        {signal.sentiment} <span className={signal.sentiment === 'BULLISH' ? 'text-emerald-500' : signal.sentiment === 'BEARISH' ? 'text-rose-500' : 'text-amber-400'}>SENTIMENT</span> DETECTED
                       </h2>
                       <p className="text-gray-400 text-sm font-medium mb-8 max-w-md leading-relaxed">
                         {signal.description}
                       </p>
                       <div className="flex gap-4">
-                        <div className={`px-4 py-2 text-black text-[10px] font-black uppercase tracking-widest rounded-lg ${signal.sentiment === 'BULLISH' ? 'bg-emerald-500' : 'bg-rose-500'}`}>Strength: {signal.strength}%</div>
+                        <div className={`px-4 py-2 text-black text-[10px] font-black uppercase tracking-widest rounded-lg ${signal.sentiment === 'BULLISH' ? 'bg-emerald-500' : signal.sentiment === 'BEARISH' ? 'bg-rose-500' : 'bg-amber-400'}`}>Strength: {signal.strength}%</div>
                         <div className="px-4 py-2 bg-white/5 text-gray-400 text-[10px] font-black uppercase tracking-widest rounded-lg border border-white/5">Confidence: {signal.confidence}</div>
                       </div>
                     </div>
