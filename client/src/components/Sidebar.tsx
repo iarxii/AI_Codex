@@ -54,6 +54,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Swipe gesture handlers to close sidebar on mobile
   const touchStartX = useRef<number | null>(null);
   const touchCurrentX = useRef<number | null>(null);
+  const workspaceRequestId = useRef(0);
+  const spaceRequestId = useRef(0);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -88,7 +90,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       localStorage.setItem("lastConvId", currentConversationId.toString());
     }
   }, [currentConversationId]);
-  const [loading, setLoading] = useState(false);
+  const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
+  const [isLoadingSpaces, setIsLoadingSpaces] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -117,7 +120,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   useEffect(() => {
-    fetchConversations();
     fetchSpaces();
   }, []);
 
@@ -132,14 +134,18 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [activeSpace]);
 
   useEffect(() => {
-    if (activeTab === 'spaces') {
-      if (activeSpace) {
-        fetchSpaceConversations(activeSpace.slug);
-      } else {
-        fetchAllSpaceConversations();
-      }
+    const controller = new AbortController();
+
+    if (activeTab === 'workspaces') {
+      fetchConversations(controller.signal);
+    } else if (activeSpace) {
+      fetchSpaceConversations(activeSpace.slug, controller.signal);
+    } else {
+      fetchAllSpaceConversations(controller.signal);
     }
-  }, [activeSpace, activeTab]);
+
+    return () => controller.abort();
+  }, [activeTab, activeSpace?.slug, isPremiumSpace]);
 
   const fetchSpaces = async () => {
     try {
@@ -155,42 +161,55 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   }
 
-  const fetchSpaceConversations = async (slug: string) => {
-    setLoading(true);
+  const fetchSpaceConversations = async (slug: string, signal?: AbortSignal) => {
+    const requestId = ++spaceRequestId.current;
+    setIsLoadingSpaces(true);
     try {
       const res = await fetch(`${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/spaces/${slug}/conversations`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        signal,
       });
       if (res.ok) {
         const data = await res.json();
         setSpaceConversations(data);
       }
     } catch (e) {
-      console.error("Failed to fetch space conversations", e);
+      if ((e as DOMException).name !== 'AbortError') {
+        console.error("Failed to fetch space conversations", e);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === spaceRequestId.current) {
+        setIsLoadingSpaces(false);
+      }
     }
   }
 
-  const fetchAllSpaceConversations = async () => {
-    setLoading(true);
+  const fetchAllSpaceConversations = async (signal?: AbortSignal) => {
+    const requestId = ++spaceRequestId.current;
+    setIsLoadingSpaces(true);
     try {
       const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/spaces/conversations/all`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        signal,
       });
       if (res.ok) {
         const data = await res.json();
         setSpaceConversations(data);
       }
     } catch (e) {
-      console.error("Failed to fetch all space conversations", e);
+      if ((e as DOMException).name !== 'AbortError') {
+        console.error("Failed to fetch all space conversations", e);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === spaceRequestId.current) {
+        setIsLoadingSpaces(false);
+      }
     }
   }
 
-  const fetchConversations = async () => {
-    setLoading(true);
+  const fetchConversations = async (signal?: AbortSignal) => {
+    const requestId = ++workspaceRequestId.current;
+    setIsLoadingWorkspaces(true);
     try {
       const response = await fetch(
         `${getApiUrl(isPremiumSpace)}${config.API_V1_STR}/conversations/`,
@@ -198,6 +217,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
+          signal,
         },
       );
       if (response.ok) {
@@ -205,11 +225,17 @@ const Sidebar: React.FC<SidebarProps> = ({
         setConversations(data);
       }
     } catch (error) {
-      console.error("Failed to fetch conversations:", error);
+      if ((error as DOMException).name !== 'AbortError') {
+        console.error("Failed to fetch conversations:", error);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === workspaceRequestId.current) {
+        setIsLoadingWorkspaces(false);
+      }
     }
   };
+
+  const isLoading = activeTab === 'spaces' ? isLoadingSpaces : isLoadingWorkspaces;
 
   return (
     <>
@@ -389,14 +415,17 @@ const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 sm:p-3 space-y-2 sm:space-y-1.5 scrollbar-hide">
-          {loading && (
-            <div className="text-center py-4 text-[var(--text-secondary)] text-xs uppercase tracking-widest font-semibold animate-pulse">
-              Syncing History...
+        <div className="relative flex-1 overflow-y-auto p-3 sm:p-3 space-y-2 sm:space-y-1.5 scrollbar-hide" aria-busy={isLoading}>
+          {isLoading && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[var(--bg-primary)]/70 backdrop-blur-sm">
+              <ArrowPathIcon className="w-6 h-6 text-[var(--accent)] animate-spin" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">
+                Loading {activeTab === 'spaces' ? 'CodexSpace workspaces' : 'standard workspaces'}
+              </span>
             </div>
           )}
 
-          {!loading && activeTab === 'workspaces' && conversations.length === 0 && (
+          {!isLoading && activeTab === 'workspaces' && conversations.length === 0 && (
             <div className="text-center py-10 px-4">
               <p className="text-xs text-[var(--text-muted)] font-medium">
                 No active sessions.
@@ -404,7 +433,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {!loading && activeTab === 'spaces' && activeSpace && spaceConversations.length === 0 && (
+          {!isLoading && activeTab === 'spaces' && activeSpace && spaceConversations.length === 0 && (
             <div className="text-center py-10 px-4">
               <p className="text-xs text-[var(--text-muted)] font-medium">
                 No active sessions in this space.
@@ -412,7 +441,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {!loading && activeTab === 'spaces' && spaceConversations.length === 0 && (
+          {!isLoading && activeTab === 'spaces' && !activeSpace && spaceConversations.length === 0 && (
             <div className="text-center py-10 px-4">
               <CubeTransparentIcon className="w-8 h-8 text-[var(--text-muted)]/50 mx-auto mb-2" />
               <p className="text-xs text-[var(--text-muted)] font-medium leading-relaxed">
