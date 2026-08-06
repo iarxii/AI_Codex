@@ -5,6 +5,7 @@ import { useAI } from "../../contexts/AIContext";
 import NeuralFunctionSwitch from "./NeuralFunctionSwitch";
 import ProviderBadgeIcon from "./ProviderBadgeIcon";
 import InterfaceThemeToggle from "../layout/InterfaceThemeToggle";
+import ScreenOrientationToggle from "../layout/ScreenOrientationToggle";
 
 interface ChatHeaderProps {
   isSidebarOpen: boolean;
@@ -146,8 +147,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           <button
             onClick={() => setIsHarnessOpen(!isHarnessOpen)}
             className={`lg:hidden p-2.5 rounded-2xl border transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-sm ${isHarnessOpen
-                ? "bg-[#fd3b12]/15 text-[#fd3b12] border-[#fd3b12]/30 shadow-[#fd3b12]/10"
-                : "bg-white/40 border-black/[0.05] text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-white/60"
+              ? "bg-[#fd3b12]/15 text-[#fd3b12] border-[#fd3b12]/30 shadow-[#fd3b12]/10"
+              : "bg-white/40 border-black/[0.05] text-[#4A4D5E] hover:text-[#fd3b12] hover:bg-white/60"
               }`}
             title="Toggle Spirit Bird Interaction Harness"
           >
@@ -176,6 +177,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
         <div className="sticky right-0 z-10 flex items-center gap-3 bg-gradient-to-r from-transparent via-[#fd3b12]/90 to-[#fd3b12] pl-10 pr-4 h-full shrink-0">
           <InterfaceThemeToggle />
+          <ScreenOrientationToggle />
           {/* System Function Shifter Dropdown */}
           <NeuralFunctionSwitch
             isCanvasOpen={isCanvasOpen}
@@ -191,8 +193,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             {currentLatency && (
               <div
                 className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${loading
-                    ? "bg-white/20 border-white/30 text-white"
-                    : "bg-white/10 border-white/20 text-white/90"
+                  ? "bg-white/20 border-white/30 text-white"
+                  : "bg-white/10 border-white/20 text-white/90"
                   }`}
               >
                 <span className="text-[10px] font-semibold uppercase tracking-tight">
@@ -206,8 +208,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           <button
             onClick={() => setIsSettingsOpen(true)}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all cursor-pointer ${connected
-                ? "bg-white/20 border-white/25 hover:bg-white/30 text-white"
-                : "bg-red-500/30 border-red-500/40 text-red-100"
+              ? "bg-white/20 border-white/25 hover:bg-white/30 text-white"
+              : "bg-red-500/30 border-red-500/40 text-red-100"
               }`}
             title={`Provider: ${activeProviderInfo.label} — Click to change`}
           >

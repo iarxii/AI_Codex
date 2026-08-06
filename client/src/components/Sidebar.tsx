@@ -15,6 +15,7 @@ import {
 import { useAI } from "../contexts/AIContext";
 import { config, getApiUrl } from "../config";
 import PortalSwitcher from "./layout/PortalSwitcher";
+import { getIcon } from "./SpaceCard";
 
 type Conversation = {
   id: number;
@@ -41,7 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { provider, userProfile, activeSpace, setActiveSpace, setAvailableSpaces, setViewSpacesCatalog, isPremiumSpace, isPremiumBackendOnline } = useAI();
+  const { provider, userProfile, activeSpace, availableSpaces, setActiveSpace, setAvailableSpaces, setViewSpacesCatalog, isPremiumSpace, isPremiumBackendOnline } = useAI();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [spaceConversations, setSpaceConversations] = useState<Conversation[]>([]);
   const [activeTab, setActiveTab] = useState<'workspaces' | 'spaces'>(() => {
@@ -438,14 +439,20 @@ const Sidebar: React.FC<SidebarProps> = ({
                 if (window.innerWidth < 1024) onClose();
               }}
               className={`w-full text-left p-4 sm:p-3 rounded-xl transition-all group relative overflow-hidden ${currentConversationId === conv.id
-                  ? "bg-[var(--accent)]/12 border border-[var(--accent)]/25 shadow-sm"
-                  : "hover:bg-black/[0.04] border border-transparent"
+                ? "bg-[var(--accent)]/12 border border-[var(--accent)]/25 shadow-sm"
+                : "hover:bg-black/[0.04] border border-transparent"
                 }`}
             >
               <div className="flex items-center gap-3">
-                <div
-                  className={`w-2 h-2 rounded-full transition-all ${currentConversationId === conv.id ? "bg-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)]" : "bg-[var(--text-muted)]"}`}
-                ></div>
+                <div className={`w-5 h-5 shrink-0 transition-colors ${currentConversationId === conv.id ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`}>
+                  {activeTab === 'workspaces'
+                    ? <RectangleStackIcon className="w-5 h-5" />
+                    : getIcon(
+                      availableSpaces.find((space) => space.slug === conv.space_type)?.icon ?? null,
+                      "w-5 h-5",
+                      "w-5 h-5 object-contain",
+                    )}
+                </div>
                 <div className="flex-1 min-w-0 flex items-center justify-between group/item">
                   <div className="flex-1 min-w-0">
                     {activeTab === 'spaces' && conv.space_name && (
