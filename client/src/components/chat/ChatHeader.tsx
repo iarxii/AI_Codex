@@ -175,7 +175,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </button>
         )}
 
-        <div className="sticky right-0 z-10 flex items-center gap-3 bg-gradient-to-r from-transparent via-[#fd3b12]/90 to-[#fd3b12] pl-10 pr-4 h-full shrink-0">
+        <div className="sticky right-0 z-10 flex items-center gap-1 bg-gradient-to-r from-transparent via-[#fd3b12]/90 to-[#fd3b12] pl-10 pr-4 h-full shrink-0">
           <InterfaceThemeToggle />
           <ScreenOrientationToggle />
           {/* System Function Shifter Dropdown */}
