@@ -85,6 +85,7 @@ def build_system_prompt(
     tool_binding_status: str = "",
     client_type: str = "web",
     client_capabilities: Optional[Iterable[str]] = None,
+    tool_manifest: str = "",
 ) -> str:
     """
     Assembles the System Prompt from modular markdown files (SOUL, USER, MEMORY, AGENTS).
@@ -92,6 +93,7 @@ def build_system_prompt(
     Injects the Workspace Sentinel status for persistent session awareness.
     Injects mandatory and situational skills from the skills/ directory.
     Optionally injects tool-binding telemetry so the model knows which tools are available.
+    Optionally injects the exact bound-tool manifest so the model never invents tool names.
     """
     soul = compress_markdown(load_profile_file("SOUL.md", "You are AICodex, an elite agentic assistant."))
     user = compress_markdown(load_profile_file("USER.md", "The user is a software developer."))
@@ -115,6 +117,17 @@ def build_system_prompt(
     
     # Tool-binding telemetry injection (Layer 3)
     tool_status_line = f"\n11. TOOL STATUS: {tool_binding_status}" if tool_binding_status else ""
+    
+    # Exact bound-tool manifest for honest self-reporting and no hallucination
+    tool_manifest_block = ""
+    if tool_manifest:
+        tool_manifest_block = (
+            f"\n\n[AVAILABLE TOOLS]\n"
+            f"{tool_manifest}\n"
+            "These tools are bound and callable in this session. When asked what tools you "
+            "have, report ONLY the exact names above. Never invent tool names; if a tool is "
+            "not listed above, it is not available to you."
+        )
     
     prompt = f"""[SOUL]
 {soul}
@@ -146,6 +159,7 @@ INSTRUCTIONS:
 9. Always ask for confirmation before making permanent file changes.
 10. CRITICAL: Writing code inside a [CANVAS:...] block does NOT save it to disk. To physically create or modify files, you MUST call the appropriate tool. Use 'workspace_patcher' to modify existing files by replacing a specific block of text. Use 'workspace_writer' ONLY for creating brand new files. NEVER output raw markdown code blocks to write to a file without calling a tool. Call the tool FIRST, then optionally show a Canvas block afterward.
 {tool_status_line}
+{tool_manifest_block}
 """
     return prompt
 

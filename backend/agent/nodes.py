@@ -700,6 +700,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         has_tool_support = "Tools" in capabilities
         
         tool_binding_status = ""
+        tool_manifest = ""
         is_short_process = state.get("is_short_process", False)
         
         if is_short_process:
@@ -709,6 +710,10 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             logger.info(f"PIPELINE: Binding {len(valid_tools)} tools to LLM (Model: {model})")
             llm = llm.bind_tools(valid_tools)
             tool_binding_status = f"Tools bound successfully: {[t.name for t in valid_tools]}. You MUST use these tools for file/command operations."
+            tool_manifest = "\n".join(
+                f"- {t.name}: {t.description or 'No description provided'}"
+                for t in valid_tools
+            )
         elif valid_tools:
             logger.info(f"PIPELINE: Skipping tool binding for '{model}' (Capability 'Tools' not found in {capabilities})")
             tool_binding_status = f"WARNING: Tool binding was SKIPPED for this model ({model}). You cannot call tools. Respond conversationally only."
@@ -734,6 +739,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         conversation_id,
         allowed_skills,
         tool_binding_status,
+        tool_manifest=tool_manifest,
         client_type=client_type,
         client_capabilities=client_capabilities,
     )
@@ -1115,7 +1121,13 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
             "aidock": {"workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"}
         }
         
-        delegated_for_client = CLIENT_DELEGATED_TOOLS.get(client_type, set())
+        delegated_for_client = set(CLIENT_DELEGATED_TOOLS.get(client_type, set()))
+        # Any tool the client itself advertises (scratchpad.mcp_tools) is delegated
+        # back to that client for execution. This lets new client capabilities
+        # (browser, PiCodex CLI, etc.) work without per-tool server changes.
+        for advertised in mcp_tools_list:
+            if advertised.get("name"):
+                delegated_for_client.add(advertised.get("name"))
         is_client_tool = tool_name in delegated_for_client
         
         if tool_name == "compact_context":
