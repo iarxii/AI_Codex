@@ -7,17 +7,24 @@ from backend.agent.skill_routing import resolve_client_capabilities
 
 logger = logging.getLogger(__name__)
 
-def skill_to_langchain_tool(skill: BaseSkill) -> StructuredTool:
+def skill_to_langchain_tool(skill: BaseSkill, execution_mode: str = "sequential") -> StructuredTool:
     """
     Wraps a BaseSkill's execute method into a LangChain StructuredTool.
     StructuredTool.from_function will inspect the 'execute' signature 
     to create the appropriate arguments schema.
+    
+    Args:
+        execution_mode: "sequential" or "parallel" - determines how this tool
+                        is executed in the tool loop
     """
-    return StructuredTool.from_function(
+    tool = StructuredTool.from_function(
         coroutine=skill.execute,
         name=skill.name,
         description=skill.description,
     )
+    # Attach execution mode as tool attribute for graph node to read
+    tool.execution_mode = execution_mode
+    return tool
 
 def make_wrapped_workspace_writer(skill: BaseSkill, conversation_id: str):
     async def wrapped_workspace_writer(filename: str, content: str, type: str = "code", tutor_explanation: str = None):
@@ -78,46 +85,15 @@ def get_agent_tools(
 
         try:
             # We must preserve the signature for StructuredTool.from_function to work.
-            if skill.name == "workspace_writer":
-                tool = StructuredTool.from_function(
-                    coroutine=make_wrapped_workspace_writer(skill, conversation_id),
-                    name=skill.name,
-                    description=skill.description,
-                )
-            elif skill.name == "workspace_patcher":
-                tool = StructuredTool.from_function(
-                    coroutine=make_wrapped_workspace_patcher(skill, conversation_id),
-                    name=skill.name,
-                    description=skill.description,
-                )
-            elif skill.name == "shell_exec":
-                tool = StructuredTool.from_function(
-                    coroutine=make_wrapped_shell_exec(skill, conversation_id),
-                    name=skill.name,
-                    description=skill.description,
-                )
-            elif skill.name == "workspace_reader":
-                tool = StructuredTool.from_function(
-                    coroutine=make_wrapped_workspace_reader(skill, conversation_id),
-                    name=skill.name,
-                    description=skill.description,
-                )
-            elif skill.name == "harness_dispatch":
-                tool = StructuredTool.from_function(
-                    coroutine=make_wrapped_harness_dispatch(skill, conversation_id),
-                    name=skill.name,
-                    description=skill.description,
-                )
-            else:
-                # Generic fallback for other skills (can be expanded)
-                # To prevent closure capture issues here too, we use a default argument trick
-                async def wrapped_generic(*args, skill=skill, **kwargs):
-                    return await skill.execute(*args, **kwargs)
-                tool = StructuredTool.from_function(
-                    coroutine=wrapped_generic,
-                    name=skill.name,
-                    description=skill.description,
-                )
+            execution_modes = {
+                "workspace_writer": "parallel",
+                "workspace_patcher": "sequential",
+                "shell_exec": "sequential",
+                "workspace_reader": "sequential",
+                "harness_dispatch": "sequential",
+            }
+            exec_mode = execution_modes.get(skill.name, "sequential")
+            tool = skill_to_langchain_tool(skill, execution_mode=exec_mode)
             tools.append(tool)
             logger.info(f"Converted skill to tool: {skill.name}")
         except Exception as e:
@@ -131,9 +107,13 @@ def get_agent_tools(
         tools.append(get_terminal_viewport)
         
     tools.append(mt5_dispatch_signal)
+    tools[-1].execution_mode = "sequential"
     tools.append(compact_context)
+    tools[-1].execution_mode = "sequential"
     tools.append(write_scratchpad)
+    tools[-1].execution_mode = "sequential"
     tools.append(read_full_tool_output)
+    tools[-1].execution_mode = "sequential"
     
     return tools
 

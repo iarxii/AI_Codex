@@ -47,3 +47,4 @@ mcp/build/
 deploy_production.bat
 deploy_frontend.bat
 
+.opencode

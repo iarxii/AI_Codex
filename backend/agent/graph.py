@@ -3,7 +3,7 @@ from .state import AgentState
 from .nodes import (
     reason_node, execute_tool_node, init_node, guard_node,
     validate_response_node, verification_node, evaluate_turn_node,
-    final_report_node, handle_blocker_node, planner_node
+    prepare_next_turn_node, final_report_node, handle_blocker_node, planner_node
 )
 from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node
 
@@ -147,6 +147,7 @@ def create_agent_graph():
     workflow.add_node("trading_debate", bull_bear_debate_node)
     workflow.add_node("mql5_enforcer", mql5_execution_enforcer_node)
     workflow.add_node("evaluate_turn", evaluate_turn_node)
+    workflow.add_node("prepare_next_turn", prepare_next_turn_node)
     workflow.add_node("final_report", final_report_node)
     workflow.add_node("handle_blocker", handle_blocker_node)
     
@@ -186,9 +187,12 @@ def create_agent_graph():
         }
     )
     
-    # Evaluate Turn → Final Report / Blocker / Guard
+    # Evaluate Turn → Prepare Next Turn (always)
+    workflow.add_edge("evaluate_turn", "prepare_next_turn")
+    
+    # Prepare Next Turn → Final Report / Blocker / Guard
     workflow.add_conditional_edges(
-        "evaluate_turn",
+        "prepare_next_turn",
         route_after_evaluation,
         {
             "final_report": "final_report",

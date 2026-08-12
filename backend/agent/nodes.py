@@ -492,53 +492,6 @@ async def summarize_history(messages: List[BaseMessage], config: RunnableConfig)
     response = await llm.ainvoke([HumanMessage(content=f"{str(to_summarize)}\n\n{summary_prompt}")])
     return response.content
 
-def resolve_llm_fallback(current_provider: str, current_model: str, api_keys: dict) -> tuple[str, str, str]:
-    """
-    Resolves the next fallback provider, model name, and API key.
-    Ensures zero-cost local Ollama fallback is always available.
-    """
-    fallback_chain = ["ollama_cloud", "openrouter", "groq", "gemini", "local"]
-    
-    # Normalize model mapping from current model to fallback models
-    model_mappings = {
-        "ollama_cloud": {
-            "default": "llama3",
-            "llama3": "llama3"
-        },
-        "openrouter": {
-            "default": "meta-llama/llama-3-8b-instruct",
-            "meta-llama/llama-3-8b-instruct": "meta-llama/llama-3-8b-instruct",
-            "google/gemini-flash-1.5": "google/gemini-flash-1.5"
-        },
-        "groq": {
-            "default": "llama3-8b-8192",
-            "llama3-8b-8192": "llama3-8b-8192",
-            "llama3-70b-8192": "llama3-70b-8192"
-        },
-        "gemini": {
-            "default": "gemini-1.5-flash",
-            "gemini-1.5-flash": "gemini-1.5-flash",
-            "gemini-1.5-pro": "gemini-1.5-pro"
-        },
-        "local": {
-            "default": "default"
-        }
-    }
-    
-    for provider in fallback_chain:
-        if provider == current_provider:
-            continue
-        
-        # Check if API key is available (local doesn't need a key)
-        key = api_keys.get(provider)
-        if key or provider == "local":
-            provider_models = model_mappings.get(provider, {})
-            # Map equivalent model
-            fallback_model = provider_models.get(current_model, provider_models.get("default", "default"))
-            return provider, fallback_model, key
-            
-    return None, None, None
-
 async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
     Main reasoning node. Serves as the 'Planner'. 
@@ -595,55 +548,19 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         "colab_bridge": "Colab Bridge",
     }.get(provider, provider.title())
 
-    # Early Auth Check for Cloud Providers
+    # Early Auth Check for Cloud Providers — no fallback, single provider model
     if provider in ["groq", "openrouter", "gemini", "ollama_cloud"]:
         api_keys = config.get("configurable", {}).get("api_keys", {}) or {}
         api_key = resolve_provider_api_key(provider, config.get("configurable", {}).get("api_key"), api_keys)
         
         is_missing = not api_key
         if is_missing:
-            # Try to resolve fallback since primary key is missing
-            fallback_prov, fallback_model, fallback_key = resolve_llm_fallback(provider, model, api_keys)
-            
-            if fallback_prov:
-                logger.warning(f"PIPELINE WARNING: Provider [{provider}] API key is missing. Automatically falling back to [{fallback_prov}]...")
-                
-                # Notify UI via WebSocket stream
-                websocket = config.get("configurable", {}).get("websocket")
-                if websocket:
-                    try:
-                        await websocket.send_json({
-                            "type": "token",
-                            "content": f"\n\n[WARNING] *[{provider.upper()}] API key missing. Switching to [{fallback_prov.upper()}] ({fallback_model})...*\n\n",
-                            "node": "provider_fallback"
-                        })
-                    except Exception as ws_err:
-                        logger.error(f"PIPELINE ERROR: Failed to stream fallback message: {ws_err}")
-                
-                # Construct config override for fallback
-                config_copy = dict(config)
-                config_copy["configurable"] = dict(config.get("configurable", {}))
-                config_copy["configurable"]["provider"] = fallback_prov
-                config_copy["configurable"]["model"] = fallback_model
-                config_copy["configurable"]["api_key"] = fallback_key
-                config = config_copy
-                
-                # Record failed attempt and update loop variables
-                telemetry = state.get("telemetry", {})
-                if "provider_attempts" not in telemetry:
-                    telemetry["provider_attempts"] = []
-                telemetry["provider_attempts"].append(f"{provider} ({model}) - failed: API key missing")
-                
-                provider = fallback_prov
-                model = fallback_model
-                # Fallback applied — continue execution with new provider
-            else:
-                # No fallback available — return an error to the user
-                return {
-                    "messages": [AIMessage(content=f"[ERROR] **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core.")],
-                    "current_tool_calls": [],
-                    "context_data": {"error": "auth_missing"}
-                }
+            # Single provider model: no fallback, return clear error
+            return {
+                "messages": [AIMessage(content=f"[ERROR] **{p_label} API Key Missing**\nPlease open the **Settings** (gear icon) and add your API key for {p_label} to enable this Neural core.")],
+                "current_tool_calls": [],
+                "context_data": {"error": "auth_missing"}
+            }
 
     logger.info(f"PIPELINE: Initializing context builder for provider={provider}...")
     context_builder = get_context_builder(provider=provider)
@@ -1107,16 +1024,120 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
     tool_map = {t.name: t for t in tools}
 
     websocket = config.get("configurable", {}).get("websocket")
-    client_tool_responses = config.get("configurable", {}).get("client_tool_responses")
+    client_tool_response_queues = config.get("configurable", {}).get("client_tool_response_queues", {})
 
     state_updates = {}
 
-    for tool_call in last_message.tool_calls:
-        tool_name = tool_call["name"]
-        tool_args = tool_call["args"]
-        tool_id = tool_call["id"]
+    # Check if any tool has execution_mode="parallel"
+    parallel_execution = any(
+        getattr(tool_map.get(tc["name"]), "execution_mode", None) == "parallel"
+        for tc in last_message.tool_calls
+        if tool_map.get(tc["name"])
+    )
+
+    if parallel_execution:
+        # Execute all tools in parallel using asyncio.gather
+        tool_tasks = []
+        websocket = config.get("configurable", {}).get("websocket")
+        client_tool_response_queues = config.get("configurable", {}).get("client_tool_response_queues", {})
         
-        CLIENT_DELEGATED_TOOLS = {
+        for tool_call in last_message.tool_calls:
+            tool_name = tool_call["name"]
+            tool_args = tool_call["args"]
+            tool_id = tool_call["id"]
+            
+            tool = tool_map.get(tool_name)
+            if not tool:
+                continue
+            
+            # Create response queue for this tool (if using client delegation)
+            if websocket and client_tool_response_queues:
+                tool_response_queue = asyncio.Queue()
+                pending_client_tools = config.get("configurable", {}).get("pending_client_tools", {})
+                pending_client_tools[tool_id] = tool_response_queue
+            
+            async def _execute_and_collect(tool, args, tid, wss, queues, pctools):
+                try:
+                    result = await tool.ainvoke(args)
+                    # Handle result formatting
+                    if hasattr(result, "success"):
+                        output = result.output or result.error or "Success (no output)"
+                    else:
+                        output = str(result)
+                    
+                    # Send end notification via queue
+                    if queues and tool_id in queues:
+                        try:
+                            await queues[tool_id].put({
+                                "output": output,
+                                "tool_id": tool_id,
+                                "tool_name": tool_name,
+                                "status": "completed"
+                            })
+                        except Exception:
+                            pass
+                    
+                    # Send WebSocket end notification
+                    if wss:
+                        try:
+                            await wss.send_json({
+                                "type": "tool_execution_end",
+                                "tool_id": tool_id,
+                                "tool_name": tool_name,
+                                "status": "completed"
+                            })
+                        except Exception:
+                            pass
+                    
+                    return {"tool_name": tool_name, "tool_id": tool_id, "output": output, "success": True}
+                except Exception as e:
+                    # Send error notification
+                    if websocket and client_tool_response_queues:
+                        try:
+                            await client_tool_response_queues.get(tool_id, asyncio.Queue()).put({
+                                "output": str(e),
+                                "tool_id": tool_id,
+                                "tool_name": tool_name,
+                                "status": "error"
+                            })
+                        except Exception:
+                            pass
+                    if wss:
+                        try:
+                            await wss.send_json({
+                                "type": "tool_execution_end",
+                                "tool_id": tool_id,
+                                "tool_name": tool_name,
+                                "status": "error"
+                            })
+                        except Exception:
+                            pass
+                    return {"tool_name": tool_name, "tool_id": tool_id, "output": str(e), "success": False}
+            
+            tool_tasks.append(_execute_and_collect(tool, tool_args, tool_id, websocket, client_tool_response_queues, pending_client_tools))
+        
+        tool_results = await asyncio.gather(*tool_tasks)
+        
+        # Return results as messages
+        # Convert results to tool messages
+        from langchain_core.messages import ToolMessage
+        tool_messages = []
+        for result in tool_results:
+            tool_messages.append(ToolMessage(
+                content=result["output"],
+                name=result["tool_name"],
+                tool_call_id=result["tool_id"]
+            ))
+        
+        return {"messages": tool_messages, "current_tool_calls": []}
+    else:
+        # Sequential execution - use existing loop
+        for tool_call in last_message.tool_calls:
+            tool_name = tool_call["name"]
+            tool_args = tool_call["args"]
+            tool_id = tool_call["id"]
+            
+            CLIENT_DELEGATED_TOOLS = {
             "vscode": {"workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"},
             "aidock": {"workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"}
         }
@@ -1184,8 +1205,14 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
             except Exception as e:
                 tool_result = f"Error updating planning board: {str(e)}"
                 
-        elif is_client_tool and websocket and client_tool_responses:
+        elif is_client_tool and websocket and client_tool_response_queues:
             logger.info(f"Delegating tool execution to VS Code client: {tool_name} with args: {tool_args}")
+            
+            # Create a dedicated response queue for this tool call
+            tool_response_queue = asyncio.Queue()
+            pending_client_tools = config.get("configurable", {}).get("pending_client_tools", {})
+            pending_client_tools[tool_id] = tool_response_queue
+            
             try:
                 # Send tool execution request to client
                 await websocket.send_json({
@@ -1194,13 +1221,56 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                     "args": tool_args,
                     "id": tool_id
                 })
-                # Wait for tool response from client (120s timeout)
-                response_payload = await asyncio.wait_for(client_tool_responses.get(), timeout=120.0)
+                # Notify UI that tool execution started
+                await websocket.send_json({
+                    "type": "tool_execution_start",
+                    "tool_id": tool_id,
+                    "tool_name": tool_name,
+                    "status": "started"
+                })
+                
+                # Wait for tool response from client (no hard timeout - tool runs until complete or cancelled)
+                # Use a long timeout (1 hour) as safety net; actual cancellation handled via cancel signal
+                response_payload = await asyncio.wait_for(tool_response_queue.get(), timeout=3600.0)
                 tool_result = response_payload.get("output", "")
+                
+                # Notify UI that tool execution completed
+                await websocket.send_json({
+                    "type": "tool_execution_end",
+                    "tool_id": tool_id,
+                    "tool_name": tool_name,
+                    "status": "completed"
+                })
             except asyncio.TimeoutError:
-                tool_result = f"Error: Tool execution timed out on the client."
+                tool_result = f"Error: Tool execution timed out on the client (1 hour safety limit)."
+                await websocket.send_json({
+                    "type": "tool_execution_end",
+                    "tool_id": tool_id,
+                    "tool_name": tool_name,
+                    "status": "timeout"
+                })
+            except asyncio.CancelledError:
+                tool_result = "Error: Tool execution cancelled by user."
+                await websocket.send_json({
+                    "type": "tool_execution_end",
+                    "tool_id": tool_id,
+                    "tool_name": tool_name,
+                    "status": "cancelled"
+                })
+                raise
             except Exception as e:
                 tool_result = f"Error during client tool execution delegation: {str(e)}"
+                await websocket.send_json({
+                    "type": "tool_execution_end",
+                    "tool_id": tool_id,
+                    "tool_name": tool_name,
+                    "status": "error",
+                    "error": str(e)
+                })
+            finally:
+                # Clean up pending tool tracking
+                if tool_id in pending_client_tools:
+                    del pending_client_tools[tool_id]
         else:
             logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
             start_time = time.perf_counter()
@@ -1550,6 +1620,106 @@ async def evaluate_turn_node(state: AgentState, config: RunnableConfig) -> Dict[
         "quality_history": quality_history,
         "consideration_vector": eval_report.get("consideration_vector", {}),
         "include_tutor": include_tutor
+    }
+
+
+async def prepare_next_turn_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    Prepare Next Turn Node — Pi CLI's `prepareNextTurn` equivalent.
+    Called after evaluate_turn. Allows dynamic model/reasoning switching between turns.
+    """
+    eval_report = state.get("evaluation_report") or {}
+    consideration_vector = eval_report.get("consideration_vector", {}) or {}
+    quality_score = eval_report.get("quality_score", 1.0)
+    goal_achieved = eval_report.get("goal_achieved", False)
+    
+    # Get current provider and model from config
+    current_provider = config.get("configurable", {}).get("provider", "local")
+    current_model = config.get("configurable", {}).get("model")
+    
+    config_overrides: Dict[str, Any] = {}
+    
+    # Decision logic for model tier switching
+    priority = consideration_vector.get("priority", "")
+    focus_area = consideration_vector.get("focus_area", "")
+    
+    # If goal not achieved and quality is declining, consider switching to more powerful model
+    quality_history = state.get("quality_history") or []
+    quality_declining = len(quality_history) >= 2 and quality_history[-2] > quality_history[-1]
+    
+    # Switch to coder tier for code-heavy tasks or when quality declining
+    should_use_coder_tier = (
+        priority in ("BUG_FIX", "REFACTOR", "ADDITION_PREFERRED") or
+        "code" in str(focus_area).lower() or
+        "implementation" in str(focus_area).lower() or
+        "fix" in str(focus_area).lower() or
+        quality_declining
+    )
+    
+    # Switch to reasoning tier for complex planning/analysis
+    should_use_reasoning_tier = (
+        not goal_achieved and
+        not should_use_coder_tier and
+        (quality_score < 0.7 or "analysis" in str(focus_area).lower() or "planning" in str(focus_area).lower())
+    )
+    
+    # Determine target tier
+    target_tier = "reasoning"
+    if should_use_coder_tier:
+        target_tier = "coder"
+    elif should_use_reasoning_tier:
+        target_tier = "reasoning"
+    else:
+        target_tier = "reasoning"
+    
+    # Map tier to model for current provider
+    tier_model_map = {
+        "gemini": {
+            "reasoning": "gemini-1.5-flash",
+            "coder": "gemini-1.5-pro",
+        },
+        "groq": {
+            "reasoning": "llama-3.1-8b-instant",
+            "coder": "llama-3.3-70b-versatile",
+        },
+        "openrouter": {
+            "reasoning": "meta-llama/llama-3-8b-instruct",
+            "coder": "anthropic/claude-sonnet-4",
+        },
+        "local": {
+            "reasoning": "llama3.2:3b",
+            "coder": "codellama",
+        },
+    }
+    
+    provider_models = tier_model_map.get(current_provider, {})
+    target_model = provider_models.get(target_tier, current_model)
+    
+    if target_model and target_model != current_model:
+        config_overrides["model"] = target_model
+        logger.info(f"PREPARE_NEXT_TURN: Switching model from {current_model} to {target_model} (tier: {target_tier})")
+        
+        # Notify UI via WebSocket
+        websocket = config.get("configurable", {}).get("websocket")
+        if websocket:
+            try:
+                await websocket.send_json({
+                    "type": "model_switch",
+                    "from_model": current_model,
+                    "to_model": target_model,
+                    "tier": target_tier,
+                    "reason": f"Priority: {priority}, Quality: {quality_score:.2f}, Declining: {quality_declining}"
+                })
+            except Exception as ws_err:
+                logger.error(f"PREPARE_NEXT_TURN: Failed to stream model switch: {ws_err}")
+    
+    # Allow steering messages to be injected (Pi CLI pattern)
+    steering_messages = []
+    # This could be extended to inject contextual hints based on evaluation
+    
+    return {
+        "config_overrides": config_overrides,
+        "steering_messages": steering_messages,
     }
 
 

@@ -121,7 +121,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             
     logger.debug(f"WebSocket connected on /ws/agent for user: {user.username}")
     active_tasks: Set[asyncio.Task] = set()
-    client_tool_responses = asyncio.Queue()
+    # Map of tool_id -> asyncio.Queue for streaming tool responses
+    client_tool_response_queues: Dict[str, asyncio.Queue] = {}
     
     # Sleepy AI Time Checker state
     current_node_name = "idle"
@@ -461,7 +462,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "space_slug": space_type,
                         "client_type": payload_data.get("client_type", "web"),
                         "websocket": websocket,
-                        "client_tool_responses": client_tool_responses
+                        "client_tool_response_queues": client_tool_response_queues
                     },
                     "recursion_limit": max_graph_iterations
                 }
@@ -845,7 +846,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 continue
             
             if payload.get("type") == "tool_response":
-                await client_tool_responses.put(payload)
+                tool_id = payload.get("id")
+                if tool_id and tool_id in client_tool_response_queues:
+                    await client_tool_response_queues[tool_id].put(payload)
+                else:
+                    logger.warning(f"Received tool_response for unknown tool_id: {tool_id}")
                 continue
             
             if payload.get("type") == "cancel":
