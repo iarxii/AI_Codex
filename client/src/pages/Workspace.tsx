@@ -732,6 +732,24 @@ const workspace: React.FC = () => {
             }
           }
         }, 0);
+      } else if (data.type === "model_switch") {
+        // Model switch event from backend — logged in thought log for visibility.
+        // Does not perform provider+model switching; the backend manages tier changes
+        // autonomously based on quality/priority evaluation.
+        setThoughtLog((prev) => {
+          const updated = [
+            ...prev,
+            {
+              text: `Model switched from ${data.from_model} to ${data.to_model}`,
+              timestamp: Date.now(),
+              type: "model_switch",
+              details: `Tier: ${data.tier}, Reason: ${data.reason}`,
+            },
+          ].slice(-MAX_THOUGHT_LOG_ENTRIES);
+          thoughtLogRef.current = updated;
+          return updated;
+        });
+        console.log(`[WS] model_switch: ${data.from_model} → ${data.to_model} (${data.tier})`);
       } else if (data.type === "error") {
         flushStreamBuffer();
         streamErroredRef.current = true;
