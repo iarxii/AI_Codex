@@ -11,7 +11,7 @@ from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage, BaseMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from .state import AgentState
-from .tools import get_agent_tools, bind_mcp_tools
+from .tools import get_agent_tools, bind_mcp_tools, TOOL_EXECUTION_MODES
 from backend.config import settings
 from backend.skills.registry import registry
 from backend.integrations.ollamaopt_bridge import get_context_builder, get_retriever
@@ -1030,7 +1030,7 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
 
     # Check if any tool has execution_mode="parallel"
     parallel_execution = any(
-        getattr(tool_map.get(tc["name"]), "execution_mode", None) == "parallel"
+        TOOL_EXECUTION_MODES.get(tc["name"]) == "parallel"
         for tc in last_message.tool_calls
         if tool_map.get(tc["name"])
     )

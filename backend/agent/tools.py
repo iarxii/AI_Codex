@@ -7,6 +7,11 @@ from backend.agent.skill_routing import resolve_client_capabilities
 
 logger = logging.getLogger(__name__)
 
+# Module-level dictionary to store execution modes for tools.
+# This avoids the pydantic field issue where StructuredTool does not allow
+# arbitrary attributes (e.g. "StructuredTool object has no field execution_mode").
+TOOL_EXECUTION_MODES: dict[str, str] = {}
+
 def skill_to_langchain_tool(skill: BaseSkill, execution_mode: str = "sequential") -> StructuredTool:
     """
     Wraps a BaseSkill's execute method into a LangChain StructuredTool.
@@ -22,8 +27,9 @@ def skill_to_langchain_tool(skill: BaseSkill, execution_mode: str = "sequential"
         name=skill.name,
         description=skill.description,
     )
-    # Attach execution mode as tool attribute for graph node to read
-    tool.execution_mode = execution_mode
+    # Store execution mode in module-level dict to avoid pydantic field error:
+    # "StructuredTool object has no field execution_mode"
+    TOOL_EXECUTION_MODES[skill.name] = execution_mode
     return tool
 
 def make_wrapped_workspace_writer(skill: BaseSkill, conversation_id: str):
@@ -107,13 +113,9 @@ def get_agent_tools(
         tools.append(get_terminal_viewport)
         
     tools.append(mt5_dispatch_signal)
-    tools[-1].execution_mode = "sequential"
     tools.append(compact_context)
-    tools[-1].execution_mode = "sequential"
     tools.append(write_scratchpad)
-    tools[-1].execution_mode = "sequential"
     tools.append(read_full_tool_output)
-    tools[-1].execution_mode = "sequential"
     
     return tools
 
