@@ -8,6 +8,10 @@ import { clearAuthSession, getValidToken } from '../utils/authToken';
 export type { ProviderId };
 
 export interface UserProfile {
+  id?: number;
+  username?: string;
+  email?: string | null;
+  phone?: string | null;
   title?: string;
   first_name?: string;
   surname?: string;
@@ -209,7 +213,7 @@ export const AIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       });
       if (res.ok) {
         const data = await res.json();
-        setUserProfile(data.profile);
+        setUserProfile({ id: data.id, username: data.username, ...data.profile });
         if (data.settings) {
           try {
             const synced = JSON.parse(data.settings);

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { 
   UsersIcon, 
   ShieldCheckIcon, 
-  UserMinusIcon, 
   KeyIcon,
   SearchIcon,
   CheckCircleIcon,
@@ -16,7 +15,7 @@ import { useAI } from '../contexts/AIContext';
 import AdminSpaces from 'codex_spaces/client/src/components/admin/AdminSpaces';
 import { AdminApi, AdminApiError } from '../utils/adminApi';
 import { 
-  canEditUser, canDeleteUser, canResetPassword, canPromoteTo, roleBadgeColor, type Role 
+  canEditUser, canDeleteUser, canResetPassword, canPromoteTo, type Role 
 } from '../utils/rbac';
 import { UserManagementModal } from '../components/admin/UserManagementModal';
 
@@ -120,7 +119,7 @@ const AdminDashboard: React.FC = () => {
   );
 
   // Actor for RBAC
-  const actor = { id: userProfile?.id ?? null, role: (userProfile?.role as Role) || 'user' };
+  const actor = { id: (userProfile as unknown as { id?: number })?.id ?? null, role: (userProfile?.role as Role) || 'user' };
 
   // If loading user profile, show skeleton
   if (!userProfile) return null;
@@ -292,7 +291,10 @@ const AdminDashboard: React.FC = () => {
                       <td className="px-6 py-4">
                         <select 
                           value={u.role}
-                          onChange={(e) => canPromoteTo(actor, e.target.value as Role) && handleUpdateUser(u.id, { role: e.target.value })}
+                          onChange={(e) => {
+                            const nextRole = e.target.value as Role;
+                            if (canPromoteTo(actor, nextRole)) void handleUpdateUser(u.id, { role: nextRole });
+                          }}
                           disabled={!canPromoteTo(actor, u.role) || (u.role === 'super_admin' && actor.role !== 'super_admin')}
                           className={`bg-white/50 border border-black/[0.05] rounded-xl px-3 py-1.5 text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 transition-all ${!canPromoteTo(actor, u.role) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                         >
