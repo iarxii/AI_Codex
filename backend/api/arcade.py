@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 
 from backend.db.session import get_db
-from backend.api.auth import get_current_user
+from backend.api.deps import get_current_user
 from backend.db.models import User, ArcadeScore
 from backend.agent.models import get_llm
 from langchain_core.messages import HumanMessage

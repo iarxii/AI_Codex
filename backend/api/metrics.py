@@ -2,7 +2,7 @@ import asyncio
 import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from backend.integrations.ollamaopt_bridge import get_metrics_collector
-from backend.api.auth import get_user_from_token
+from backend.api.deps import get_user_from_token
 from backend.db.session import AsyncSessionLocal
 
 router = APIRouter()

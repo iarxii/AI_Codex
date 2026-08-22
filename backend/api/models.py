@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from backend.config import settings
 from backend.db.session import get_db
 from backend.db.models import User
-from backend.api.auth import get_current_user_optional
+from backend.api.deps import get_current_user_optional
 
 router = APIRouter()
 

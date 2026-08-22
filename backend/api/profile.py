@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from typing import Optional
 from backend.db.session import get_db
-from backend.api.auth import get_current_user
+from backend.api.deps import get_current_user
 from backend.db.models import User
 
 router = APIRouter()

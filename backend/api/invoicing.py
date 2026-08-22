@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api.auth import get_current_user
+from backend.api.deps import get_current_user
 from backend.db.models import Invoice, InvoiceClient, InvoiceItem, InvoicePayment, User
 from backend.db.session import get_db
 

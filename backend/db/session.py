@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from .models import Base, User, ArcadeScore
+from .models import Base, User, ArcadeScore, IntegrationProvider
 from sqlalchemy import select
 from backend.config import settings
 from passlib.context import CryptContext
@@ -146,6 +146,28 @@ async def init_db():
                         setattr(existing_space, key, value)
                     print(f"Updated existing space: {space_data['slug']}")
             
+            await session.commit()
+
+            # Seed Integration Providers
+            import json
+            from backend.integrations.oauth import PROVIDERS
+            for slug, cfg in PROVIDERS.items():
+                result = await session.execute(select(IntegrationProvider).filter_by(id=slug))
+                existing = result.scalar_one_or_none()
+                if not existing:
+                    new_provider = IntegrationProvider(
+                        id=slug,
+                        name=cfg.name,
+                        slug=cfg.slug,
+                        oauth_authorize_url_template=cfg.oauth_authorize_url,
+                        oauth_token_url=cfg.oauth_token_url,
+                        scopes_json=json.dumps(cfg.scopes),
+                        icon_url=cfg.icon,
+                        config_schema_json=json.dumps(cfg.client_kwargs) if cfg.client_kwargs else None,
+                        is_active=True,
+                    )
+                    session.add(new_provider)
+                    print(f"Seeded integration provider: {slug}")
             await session.commit()
     except Exception as e:
         print(f"Warning: Database initialization failed. Server starting without DB connectivity. Error: {e}")

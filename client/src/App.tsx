@@ -7,6 +7,7 @@ import WorkspaceChat from './pages/Workspace';
 import LiteChat from './pages/LiteChat';
 import AdminOverview from './pages/AdminOverview';
 import AdminDashboard from './pages/AdminDashboard';
+import Integrations from './pages/Integrations';
 import { AIProvider, useAI } from './contexts/AIContext';
 import P5Background from './components/P5Background';
 import { DisciplineProvider } from './contexts/DisciplineContext';
@@ -19,7 +20,8 @@ import './App.css';
 const isProtectedPath = (pathname: string): boolean =>
   pathname.startsWith('/workspace') ||
   pathname.startsWith('/chat') ||
-  pathname.startsWith('/admin');
+  pathname.startsWith('/admin') ||
+  pathname.startsWith('/integrations');
 
 const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const location = useLocation();
@@ -81,6 +83,7 @@ const AppContent: React.FC = () => {
           <Route path="/register" element={<Register />} />
           <Route path="/workspace" element={<RequireAuth><WorkspaceChat /></RequireAuth>} />
           <Route path="/chat" element={<RequireAuth><LiteChat /></RequireAuth>} />
+          <Route path="/integrations" element={<RequireAuth><Integrations /></RequireAuth>} />
           <Route path="/admin/overview" element={<RequireAuth><AdminOverview /></RequireAuth>} />
           <Route path="/admin/users" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
           {/* Fallback to login */}

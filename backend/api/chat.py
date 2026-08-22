@@ -7,7 +7,7 @@ from typing import List, Annotated, Set
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from backend.utils.logger import log_debug, log_error
-from backend.api.auth import get_user_from_token, get_current_user, get_current_user_optional
+from backend.api.deps import get_user_from_token, get_current_user, get_current_user_optional
 from backend.utils.telemetry import get_model_capabilities, estimate_tokens
 
 from datetime import datetime

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from backend.api.auth import get_current_user
+from backend.api.deps import get_current_user
 from backend.utils.storage import save_scratchpad_file
 import os
 

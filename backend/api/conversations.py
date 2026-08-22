@@ -8,7 +8,7 @@ from datetime import datetime
 
 from backend.db.session import get_db
 from backend.db.models import Conversation, Message, User
-from backend.api.auth import get_current_user
+from backend.api.deps import get_current_user
 
 router = APIRouter()
 

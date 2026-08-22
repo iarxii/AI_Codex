@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Integer, Float, Index
+from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, Integer, Float, Index, Enum as SQLEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 from backend.config import settings
+import enum
 
 class Base(DeclarativeBase):
     pass
@@ -35,6 +36,8 @@ class User(Base):
     settings_json: Mapped[Optional[str]] = mapped_column(Text) # JSON string for UI/Model preferences
     
     conversations: Mapped[List["Conversation"]] = relationship(back_populates="user")
+    connections: Mapped[List["UserConnection"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    flows: Mapped[List["IntegrationFlow"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
 
 class Conversation(Base):
     __tablename__ = "conversations"
@@ -202,6 +205,114 @@ class CachedStream(Base):
     viewer_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+
+class IntegrationProvider(Base):
+    __tablename__ = "integration_providers"
+    
+    id: Mapped[str] = mapped_column(String(50), primary_key=True) # e.g., "google", "github", "slack"
+    name: Mapped[str] = mapped_column(String(100))
+    slug: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    oauth_authorize_url_template: Mapped[Optional[str]] = mapped_column(Text) # {state_param} gets replaced
+    oauth_token_url: Mapped[str] = mapped_column(String(200))
+    scopes_json: Mapped[str] = mapped_column(Text) # JSON array of scopes
+    icon_url: Mapped[Optional[str]] = mapped_column(Text)
+    config_schema_json: Mapped[Optional[str]] = mapped_column(Text) # JSON schema for connection config
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class UserConnection(Base):
+    __tablename__ = "user_connections"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    provider_id: Mapped[str] = mapped_column(String(50), ForeignKey("integration_providers.id"), index=True)
+    access_token_enc: Mapped[str] = mapped_column(Text)
+    refresh_token_enc: Mapped[Optional[str]] = mapped_column(Text)
+    scopes: Mapped[Optional[str]] = mapped_column(Text)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    status: Mapped[str] = mapped_column(String(20), default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user: Mapped["User"] = relationship(back_populates="connections")
+    provider_relation: Mapped["IntegrationProvider"] = relationship(foreign_keys=[provider_id])
+    space_relations: Mapped[List["SpaceConnection"]] = relationship(back_populates="connection")
+
+class SpaceConnection(Base):
+    __tablename__ = "space_connections"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    space_id: Mapped[int] = mapped_column(ForeignKey("codex_spaces.id"), index=True)
+    connection_id: Mapped[int] = mapped_column(ForeignKey("user_connections.id"), index=True)
+    enabled: Mapped[bool] = mapped_column(default=True)
+    config_json: Mapped[Optional[str]] = mapped_column(Text) # provider-specific config (e.g., Drive folder ID)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    space: Mapped["CodexSpace"] = relationship(back_populates="connections")
+    connection: Mapped["UserConnection"] = relationship(back_populates="space_relations")
+    
+    __table_args__ = (
+        Index("ix_space_connections_space_id", "space_id"),
+    )
+
+class IntegrationFlow(Base):
+    __tablename__ = "integration_flows"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    trigger_connection_id: Mapped[int] = mapped_column(ForeignKey("user_connections.id"), index=True)
+    enabled: Mapped[bool] = mapped_column(default=True)
+    schedule_cron: Mapped[Optional[str]] = mapped_column(String(50)) # e.g., "*/5 * * * *" for every 5 min
+    config_json: Mapped[Optional[str]] = mapped_column(Text) # e.g., time windows, dedup keys
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    owner: Mapped["User"] = relationship(back_populates="flows")
+    trigger_connection: Mapped["UserConnection"] = relationship(foreign_keys=[trigger_connection_id])
+    steps: Mapped[List["IntegrationStep"]] = relationship(back_populates="flow", order_by="IntegrationStep.step_index")
+    runs: Mapped[List["IntegrationFlowRun"]] = relationship(back_populates="flow", order_by="IntegrationFlowRun.started_at.desc()")
+    
+    __table_args__ = (
+        Index("ix_integration_flows_owner_id", owner_id),
+    )
+
+class IntegrationStep(Base):
+    __tablename__ = "integration_steps"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    flow_id: Mapped[int] = mapped_column(ForeignKey("integration_flows.id"), index=True)
+    step_index: Mapped[int] = mapped_column(Integer)
+    action_connection_id: Mapped[int] = mapped_column(ForeignKey("user_connections.id"), index=True)
+    action_name: Mapped[str] = mapped_column(String(100)) # e.g., "send_message", "create_document"
+    action_config_json: Mapped[Optional[str]] = mapped_column(Text) # JSON config specific to the action
+    action_output_json: Mapped[Optional[str]] = mapped_column(Text) # Output of this step
+    error_handling: Mapped[str] = mapped_column(String(20), default="stop") # stop, continue, retry
+    retry_config_json: Mapped[Optional[str]] = mapped_column(Text) # max_attempts, backoff_seconds
+    step_order: Mapped[int] = mapped_column(Integer, default=0)
+    
+    flow: Mapped["IntegrationFlow"] = relationship(back_populates="steps")
+    
+    __table_args__ = (
+        Index("ix_integration_steps_flow_id_step", "flow_id", "step_index"),
+    )
+
+class IntegrationFlowRun(Base):
+    __tablename__ = "integration_flow_runs"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    flow_id: Mapped[int] = mapped_column(ForeignKey("integration_flows.id"), index=True)
+    trigger_connection_id: Mapped[Optional[int]] = mapped_column(ForeignKey("user_connections.id"), index=True)
+    status: Mapped[str] = mapped_column(String(30), default="pending") # pending, running, success, failed, cancelled
+    trigger_payload_json: Mapped[Optional[str]] = mapped_column(Text) # JSON input from trigger
+    steps_output_json: Mapped[Optional[str]] = mapped_column(Text) # JSON output from all steps
+    error_text: Mapped[Optional[str]] = mapped_column(Text)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    duration_ms: Mapped[Optional[int]] = mapped_column(Integer)
+    
+    flow: Mapped["IntegrationFlow"] = relationship(back_populates="runs")
 
 class PortalSyncMetadata(Base):
     __tablename__ = "portal_sync_metadata"

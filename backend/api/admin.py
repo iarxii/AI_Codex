@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from backend.db.session import get_db, pwd_context
 from backend.db.models import User, CodexSpace, CodexSpaceAccess
-from backend.api.auth import get_current_user
+from backend.api.deps import get_current_user
 
 router = APIRouter()
 

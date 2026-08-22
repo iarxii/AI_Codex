@@ -7,7 +7,7 @@ from datetime import datetime
 
 from backend.db.session import get_db
 from backend.db.models import CodexSpace, CodexSpaceAccess, User, Conversation, Message
-from backend.api.auth import get_current_user
+from backend.api.deps import get_current_user
 from backend.api.conversations import ConversationRead
 from codex_spaces.backend.agent.space_config import get_space_config
 
