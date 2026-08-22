@@ -153,6 +153,7 @@ class SpaceCreate(BaseModel):
     required_role: str = "user"
     capacity: int = 5
     config_json: str | None = None
+    harness: str | None = None  # e.g. fintrader | gemma-sandbox | microsoft-agent | spirit-book-chat
 
 class SpaceUpdate(BaseModel):
     name: str | None = None
@@ -164,6 +165,7 @@ class SpaceUpdate(BaseModel):
     required_role: str | None = None
     capacity: int | None = None
     config_json: str | None = None
+    harness: str | None = None
 
 class SpaceAccessGrant(BaseModel):
     user_id: int
@@ -174,15 +176,83 @@ async def create_space(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_current_admin)
 ):
-    result = await db.execute(select(CodexSpace).filter_by(slug=payload.slug))
+    # Delegate validation + filesystem mechanics to codex_spaces submodule
+    from codex_spaces.backend.space_scaffold import (
+        validate_slug, validate_harness, build_config_json,
+        scaffold_space_files, register_space_config, sync_spaces_to_gcs
+    )
+    import json as _json
+
+    # Normalize slug
+    raw_slug = payload.slug.strip().lower()
+    try:
+        validate_slug(raw_slug)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Validate harness
+    harness = payload.harness.strip() if payload.harness else None
+    if harness == "":
+        harness = None
+    try:
+        validate_harness(harness)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Build canonical config_json (merges harness defaults + raw JSON)
+    try:
+        canonical_config_json = build_config_json(harness, payload.config_json)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Validate config_json is not silently invalid harness mismatch
+    if canonical_config_json:
+        try:
+            _json.loads(canonical_config_json)
+        except Exception:
+            raise HTTPException(status_code=400, detail="config_json must be valid JSON")
+
+    result = await db.execute(select(CodexSpace).filter_by(slug=raw_slug))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Space slug already exists")
-        
-    space = CodexSpace(**payload.model_dump())
+
+    # Validate required_role / capacity
+    if payload.required_role not in ("user", "admin", "super_admin"):
+        raise HTTPException(status_code=400, detail="required_role must be user|admin|super_admin")
+    if not (1 <= payload.capacity <= 100):
+        raise HTTPException(status_code=400, detail="capacity must be 1..100")
+
+    space = CodexSpace(
+        slug=raw_slug,
+        name=payload.name.strip(),
+        description=payload.description.strip(),
+        icon=payload.icon,
+        color=payload.color,
+        is_public=payload.is_public,
+        required_role=payload.required_role,
+        capacity=payload.capacity,
+        config_json=canonical_config_json,
+    )
     db.add(space)
     await db.commit()
     await db.refresh(space)
-    return {"message": "Space created successfully", "space_id": space.id}
+
+    # Filesystem scaffold + in-memory registry + GCS sync (best-effort, never block creation)
+    try:
+        scaffold_space_files(raw_slug, payload.name.strip(), payload.description.strip(), payload.icon, payload.color, canonical_config_json)
+    except Exception as e:
+        print(f"[ADMIN] scaffold_space_files failed for {raw_slug}: {e}")
+    try:
+        register_space_config(raw_slug, canonical_config_json)
+    except Exception as e:
+        print(f"[ADMIN] register_space_config failed for {raw_slug}: {e}")
+    try:
+        # Fire-and-forget GCS sync; don't await blocking I/O inside request if possible, but keep simple for now
+        sync_spaces_to_gcs(raw_slug)
+    except Exception as e:
+        print(f"[ADMIN] sync_spaces_to_gcs warning for {raw_slug}: {e}")
+
+    return {"message": "Space created successfully", "space_id": space.id, "slug": raw_slug, "config_json": canonical_config_json}
 
 @router.patch("/spaces/{space_id}", response_model=dict)
 async def update_space(
@@ -195,11 +265,47 @@ async def update_space(
     space = result.scalar_one_or_none()
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
-        
-    for key, value in payload.model_dump(exclude_unset=True).items():
+
+    # Handle harness+config_json merge if either provided
+    updates = payload.model_dump(exclude_unset=True)
+    if "harness" in updates or "config_json" in updates:
+        from codex_spaces.backend.space_scaffold import validate_harness, build_config_json, register_space_config
+        harness = updates.pop("harness", None)
+        raw_cfg = updates.get("config_json", space.config_json)
+        # If harness explicitly passed (even None to clear), validate
+        if "harness" in payload.model_fields_set:
+            h = harness.strip() if isinstance(harness, str) and harness.strip() != "" else None
+            try:
+                validate_harness(h)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            harness = h
+        else:
+            harness = None
+            # Preserve existing harness from DB if not overriding
+            try:
+                import json as _j
+                existing = _j.loads(space.config_json) if space.config_json else {}
+                harness = existing.get("harness")
+            except Exception:
+                harness = None
+        try:
+            canonical = build_config_json(harness, raw_cfg if isinstance(raw_cfg, str) else None)
+            updates["config_json"] = canonical
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    for key, value in updates.items():
         setattr(space, key, value)
         
     await db.commit()
+    # Re-register in-memory config if config_json changed
+    if "config_json" in updates:
+        try:
+            from codex_spaces.backend.space_scaffold import register_space_config
+            register_space_config(space.slug, space.config_json)
+        except Exception as e:
+            print(f"[ADMIN] register_space_config on update failed for {space.slug}: {e}")
     return {"message": "Space updated successfully"}
 
 @router.post("/spaces/{space_id}/access", response_model=dict)

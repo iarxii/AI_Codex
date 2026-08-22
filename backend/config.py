@@ -87,3 +87,5 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 WORKSPACES_DIR = DATA_DIR / "workspaces"
 WORKSPACES_DIR.mkdir(parents=True, exist_ok=True)
+SPACES_DIR = DATA_DIR / "spaces"
+SPACES_DIR.mkdir(parents=True, exist_ok=True)

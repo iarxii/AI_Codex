@@ -9,12 +9,15 @@ import {
 } from 'lucide-react';
 import type { CodexSpace } from '../../contexts/AIContext';
 import { config } from '../../config';
+import { SpaceCreateModal, type SpaceCreatePayload } from './SpaceCreateModal';
 
 const AdminSpaces: React.FC = () => {
   const [spaces, setSpaces] = useState<CodexSpace[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createSuccess, setCreateSuccess] = useState<string | null>(null);
 
   const fetchSpaces = async () => {
     try {
@@ -57,38 +60,23 @@ const AdminSpaces: React.FC = () => {
     }
   };
 
-  const handleCreateSpace = async () => {
-    const slug = prompt('Enter a unique slug for the new space (e.g. data_science):');
-    if (!slug) return;
-    const name = prompt('Enter the display name for the new space:');
-    if (!name) return;
-    const desc = prompt('Enter a description:');
-    
-    try {
-      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/admin/spaces`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          slug,
-          name,
-          description: desc || "A new specialized workspace.",
-          icon: "cube",
-          color: "blue",
-          is_public: false,
-          capacity: 5
-        })
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Creation failed');
-      }
-      fetchSpaces();
-    } catch (err: any) {
-      alert(err.message);
+  const handleCreateSpace = async (payload: SpaceCreatePayload) => {
+    const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/admin/spaces`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(errorData.detail || 'Creation failed');
     }
+    const data = await response.json().catch(() => ({}));
+    setCreateSuccess(`Space '${payload.slug}' created — scaffolding via codex_spaces (DB #${data.space_id ?? '?'}, GCS sync, harness=${payload.harness ?? 'none'})`);
+    setTimeout(() => setCreateSuccess(null), 6000);
+    await fetchSpaces();
   };
 
   const filteredSpaces = spaces.filter(s => 
@@ -104,7 +92,7 @@ const AdminSpaces: React.FC = () => {
           Space Management
         </h2>
         <button 
-          onClick={handleCreateSpace}
+          onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white rounded-xl text-sm font-bold shadow hover:bg-[#e0310d] transition-all active:scale-95"
         >
           <PlusIcon className="w-4 h-4" />
@@ -112,6 +100,15 @@ const AdminSpaces: React.FC = () => {
         </button>
       </div>
 
+      {createSuccess && (
+        <div className="p-4 bg-green-50 border border-green-200 text-green-800 rounded-2xl flex items-center gap-3 text-sm font-medium">
+          <CheckCircleIcon className="w-5 h-5 text-green-600" />
+          <span>{createSuccess}</span>
+          <button onClick={() => setCreateSuccess(null)} className="ml-auto text-green-600 hover:text-green-800">
+            <XCircleIcon className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       {error && (
         <div className="p-4 bg-red-100 border border-red-200 text-red-700 rounded-2xl flex items-center gap-3">
           <XCircleIcon className="w-5 h-5" />
@@ -121,6 +118,7 @@ const AdminSpaces: React.FC = () => {
           </button>
         </div>
       )}
+      <SpaceCreateModal open={showCreate} onClose={() => setShowCreate(false)} onCreate={handleCreateSpace} />
 
       <div className="bg-white/70 backdrop-blur-2xl rounded-[32px] border border-white/40 shadow-xl overflow-hidden">
         <div className="p-6 border-b border-black/[0.05] flex items-center justify-between bg-white/30">

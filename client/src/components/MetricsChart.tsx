@@ -8,7 +8,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ReferenceArea,
 } from "recharts";
 
 interface MetricsData {
@@ -96,22 +95,6 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
               fill: "#7A7D8E",
             }}
           />
-          <YAxis
-            yAxisId="latency"
-            orientation="right"
-            domain={[0, "auto"]}
-            tick={{ fontSize: 9, fill: "#10B981", fontWeight: 600 }}
-            axisLine={false}
-            tickLine={false}
-            label={{
-              value: "ms",
-              angle: 90,
-              position: "insideRight",
-              offset: 10,
-              fontSize: 8,
-              fill: "#10B981",
-            }}
-          />
           <Tooltip content={<CustomTooltip />} />
           <Legend
             verticalAlign="bottom"
@@ -124,12 +107,6 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
               textTransform: "uppercase",
               letterSpacing: "0.1em",
             }}
-          />
-          <ReferenceArea
-            yAxisId="percentage"
-            y1={0}
-            y2={100}
-            fill="url(#heatGradient)"
           />
           <Line
             yAxisId="percentage"
@@ -172,16 +149,6 @@ const MetricsChart: React.FC<MetricsChartProps> = ({ data }) => {
             stroke="#8B5CF6" // Purple
             strokeWidth={2}
             strokeDasharray="5 5"
-            dot={false}
-            isAnimationActive={false}
-          />
-          <Line
-            yAxisId="latency"
-            name="Latency"
-            type="monotone"
-            dataKey="latency"
-            stroke="#10B981" // Green
-            strokeWidth={1}
             dot={false}
             isAnimationActive={false}
           />
