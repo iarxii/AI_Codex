@@ -185,12 +185,12 @@ const TradingSpaceHeader: React.FC<TradingSpaceHeaderProps> = ({ connected = fal
                   <BarChart2 className="w-5 h-5 text-[#fd3b12]" /> Global Chart Module
                 </h2>
                 {/* Close Button on Mobile (aligned right in header row) */}
-                <button
+                {/* <button
                   onClick={() => setActiveChart(null)}
                   className="sm:hidden p-2.5 bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 rounded-full transition-colors z-20 cursor-pointer touch-44"
                 >
                   <X className="w-5 h-5" />
-                </button>
+                </button> */}
               </div>
 
               {/* Tab Selector on Mobile/Tablet */}
