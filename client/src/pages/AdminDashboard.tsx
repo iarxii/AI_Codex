@@ -7,19 +7,25 @@ import {
   SearchIcon,
   CheckCircleIcon,
   XCircleIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  EditIcon,
+  Trash2Icon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAI } from '../contexts/AIContext';
-import { config } from '../config';
 import AdminSpaces from 'codex_spaces/client/src/components/admin/AdminSpaces';
+import { AdminApi, AdminApiError } from '../utils/adminApi';
+import { 
+  canEditUser, canDeleteUser, canResetPassword, canPromoteTo, roleBadgeColor, type Role 
+} from '../utils/rbac';
+import { UserManagementModal } from '../components/admin/UserManagementModal';
 
 interface AdminUser {
   id: number;
   username: string;
   first_name: string | null;
   surname: string | null;
-  role: string;
+  role: Role;
   is_active: boolean;
   created_at: string;
 }
@@ -32,6 +38,7 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'users' | 'spaces'>('users');
+  const [userModal, setUserModal] = useState<{ mode: 'view' | 'edit', user: AdminUser | null }>({ mode: 'view', user: null });
 
   // RBAC Check
   useEffect(() => {
@@ -42,16 +49,10 @@ const AdminDashboard: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/admin/users`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!response.ok) throw new Error('Failed to fetch users');
-      const data = await response.json();
+      const data = await AdminApi.listUsers();
       setUsers(data);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.detail || err.message || 'Failed to fetch users');
     } finally {
       setLoading(false);
     }
@@ -63,40 +64,53 @@ const AdminDashboard: React.FC = () => {
 
   const handleUpdateUser = async (userId: number, updates: Partial<AdminUser>) => {
     try {
-      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/admin/users/${userId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(updates)
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Update failed');
-      }
-      // Refresh list
-      fetchUsers();
+      await AdminApi.updateUser(userId, updates);
+      await fetchUsers();
     } catch (err: any) {
-      alert(err.message);
+      if (err instanceof AdminApiError) {
+        alert(err.detail);
+      } else {
+        alert(err.message);
+      }
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    if (!confirm(`Delete user "${user.username}"? This cannot be undone.`)) return;
+    try {
+      await AdminApi.deleteUser(userId);
+      await fetchUsers();
+    } catch (err: any) {
+      if (err instanceof AdminApiError) {
+        alert(err.detail);
+      } else {
+        alert(err.message);
+      }
     }
   };
 
   const handleResetPassword = async (userId: number) => {
-    if (!confirm('Are you sure you want to reset this user\'s password?')) return;
+    if (!confirm('Reset this user\'s password to a temporary one?')) return;
     try {
-      const response = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/admin/users/${userId}/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      if (!response.ok) throw new Error('Reset failed');
-      const data = await response.json();
+      const data = await AdminApi.resetPassword(userId);
       alert(data.message);
     } catch (err: any) {
-      alert(err.message);
+      if (err instanceof AdminApiError) {
+        alert(err.detail);
+      } else {
+        alert(err.message);
+      }
     }
+  };
+
+  const openUserModal = (mode: 'view' | 'edit', user: AdminUser) => {
+    setUserModal({ mode, user });
+  };
+
+  const closeUserModal = () => {
+    setUserModal({ mode: 'view', user: null });
   };
 
   const filteredUsers = users.filter(u => 
@@ -104,6 +118,9 @@ const AdminDashboard: React.FC = () => {
     u.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.surname?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Actor for RBAC
+  const actor = { id: userProfile?.id ?? null, role: (userProfile?.role as Role) || 'user' };
 
   // If loading user profile, show skeleton
   if (!userProfile) return null;
@@ -254,70 +271,96 @@ const AdminDashboard: React.FC = () => {
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-[var(--text-muted)] font-medium">No architects found matching your criteria.</td>
                   </tr>
-                ) : filteredUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-white/40 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-gray-200 to-gray-300 flex items-center justify-center text-xs font-bold text-gray-600 border border-white shadow-sm">
-                          {u.username.substring(0, 2).toUpperCase()}
+                ) : filteredUsers.map((u) => {
+                  const target = { id: u.id, role: u.role };
+                  const canEdit = canEditUser(actor, target);
+                  const canDelete = canDeleteUser(actor, target);
+                  const canReset = canResetPassword(actor, target);
+                  return (
+                    <tr key={u.id} className="hover:bg-white/40 transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-gray-200 to-gray-300 flex items-center justify-center text-xs font-bold text-gray-600 border border-white shadow-sm">
+                            {u.username.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-[var(--text-primary)]">{u.username}</p>
+                            <p className="text-[11px] text-[var(--text-muted)]">{u.first_name} {u.surname}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-bold text-[var(--text-primary)]">{u.username}</p>
-                          <p className="text-[11px] text-[var(--text-muted)]">{u.first_name} {u.surname}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <select 
-                        value={u.role}
-                        onChange={(e) => handleUpdateUser(u.id, { role: e.target.value })}
-                        disabled={u.role === 'super_admin' && userProfile?.role !== 'super_admin'}
-                        className="bg-white/50 border border-black/[0.05] rounded-xl px-3 py-1.5 text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 transition-all cursor-pointer disabled:opacity-50"
-                      >
-                        <option value="user">USER</option>
-                        <option value="admin">ADMIN</option>
-                        <option value="super_admin">SUPER ADMIN</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button 
-                        onClick={() => handleUpdateUser(u.id, { is_active: !u.is_active })}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all ${
-                          u.is_active 
+                      </td>
+                      <td className="px-6 py-4">
+                        <select 
+                          value={u.role}
+                          onChange={(e) => canPromoteTo(actor, e.target.value as Role) && handleUpdateUser(u.id, { role: e.target.value })}
+                          disabled={!canPromoteTo(actor, u.role) || (u.role === 'super_admin' && actor.role !== 'super_admin')}
+                          className={`bg-white/50 border border-black/[0.05] rounded-xl px-3 py-1.5 text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 transition-all ${!canPromoteTo(actor, u.role) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        >
+                          <option value="user">USER</option>
+                          <option value="admin">ADMIN</option>
+                          <option value="super_admin">SUPER ADMIN</option>
+                        </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button 
+                          onClick={() => canEdit && handleUpdateUser(u.id, { is_active: !u.is_active })}
+                          disabled={!canEdit}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all ${!canEdit ? 'opacity-50 cursor-not-allowed' : u.is_active 
                             ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                            : 'bg-red-100 text-red-700 hover:bg-red-200'
-                        }`}
-                      >
-                        {u.is_active ? <CheckCircleIcon className="w-3 h-3" /> : <XCircleIcon className="w-3 h-3" />}
-                        {u.is_active ? 'ACTIVE' : 'SUSPENDED'}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 text-[11px] font-medium text-[var(--text-muted)]">
-                      {new Date(u.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => handleResetPassword(u.id)}
-                          className="p-2 rounded-xl bg-white/50 hover:bg-white text-gray-500 hover:text-[var(--accent)] border border-black/[0.05] transition-all group/btn"
-                          title="Reset Password"
+                            : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
                         >
-                          <KeyIcon className="w-4 h-4" />
+                          {u.is_active ? <CheckCircleIcon className="w-3 h-3" /> : <XCircleIcon className="w-3 h-3" />}
+                          {u.is_active ? 'ACTIVE' : 'SUSPENDED'}
                         </button>
-                        <button 
-                          className="p-2 rounded-xl bg-white/50 hover:bg-red-50 text-gray-500 hover:text-red-600 border border-black/[0.05] transition-all"
-                          title="Delete User (Locked)"
-                          disabled
-                        >
-                          <UserMinusIcon className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4 text-[11px] font-medium text-[var(--text-muted)]">
+                        {new Date(u.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button 
+                            onClick={() => openUserModal('view', u)}
+                            className="p-2 rounded-xl bg-white/50 hover:bg-white text-gray-500 hover:text-[var(--accent)] border border-black/[0.05] transition-all"
+                            title="View Details"
+                          >
+                            <EditIcon className="w-4 h-4" />
+                          </button>
+                          {canReset && (
+                            <button 
+                              onClick={() => handleResetPassword(u.id)}
+                              className="p-2 rounded-xl bg-white/50 hover:bg-white text-gray-500 hover:text-[var(--accent)] border border-black/[0.05] transition-all"
+                              title="Reset Password"
+                            >
+                              <KeyIcon className="w-4 h-4" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button 
+                              onClick={() => handleDeleteUser(u.id)}
+                              className="p-2 rounded-xl bg-white/50 hover:bg-red-50 text-gray-500 hover:text-red-600 border border-black/[0.05] transition-all"
+                              title="Delete User"
+                            >
+                              <Trash2Icon className="w-4 h-4" />
+                            </button>
+                          )}
+                          {!canDelete && (
+                            <button 
+                              className="p-2 rounded-xl bg-white/50 hover:bg-red-50 text-gray-500 hover:text-red-600 border border-black/[0.05] transition-all"
+                              title="Delete User (Requires super_admin)"
+                              disabled
+                            >
+                              <Trash2Icon className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+          {userModal.user && <UserManagementModal user={userModal.user} mode={userModal.mode} onClose={closeUserModal} onUpdate={handleUpdateUser} />}
         </div>
         ) : (
           <AdminSpaces />

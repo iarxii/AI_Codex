@@ -354,3 +354,78 @@ async def revoke_space_access(
     await db.delete(access)
     await db.commit()
     return {"message": "Access revoked successfully"}
+
+
+@router.delete("/spaces/{space_id}", response_model=dict)
+async def delete_space(
+    space_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    # RBAC: only super_admin can delete spaces (prevents admin accidental deletion of production labs)
+    if admin.role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super_admins can delete spaces")
+    result = await db.execute(select(CodexSpace).filter_by(id=space_id))
+    space = result.scalar_one_or_none()
+    if not space:
+        raise HTTPException(status_code=404, detail="Space not found")
+    # Protect built-in spaces from deletion
+    if space.slug in ("general", "trading-space", "code-lab"):
+        raise HTTPException(status_code=400, detail=f"Protected space '{space.slug}' cannot be deleted (deactivate instead)")
+    await db.delete(space)
+    # Also cascade delete related access rows
+    access_res = await db.execute(select(CodexSpaceAccess).filter_by(space_id=space_id))
+    for acc in access_res.scalars().all():
+        await db.delete(acc)
+    await db.commit()
+    # Best-effort filesystem + GCS cleanup via codex_spaces scaffold helper
+    try:
+        from backend.config import SPACES_DIR
+        import shutil
+        space_dir = SPACES_DIR / space.slug
+        if space_dir.exists():
+            shutil.rmtree(space_dir, ignore_errors=True)
+            print(f"[ADMIN] Deleted space dir {space_dir}")
+    except Exception as e:
+        print(f"[ADMIN] Warning: failed to clean space dir for {space.slug}: {e}")
+    # Hot-unregister from SPACE_CONFIGS
+    try:
+        from codex_spaces.backend.agent.space_config import SPACE_CONFIGS
+        SPACE_CONFIGS.pop(space.slug, None)
+        print(f"[ADMIN] Unregistered SPACE_CONFIGS['{space.slug}']")
+    except Exception:
+        pass
+    # Sync DB to GCS
+    try:
+        from codex_spaces.backend.space_scaffold import sync_spaces_to_gcs
+        sync_spaces_to_gcs()
+    except Exception as e:
+        print(f"[ADMIN] GCS sync warning after delete: {e}")
+    return {"message": f"Space '{space.slug}' deleted successfully"}
+
+
+@router.get("/spaces/{space_id}/access", response_model=dict)
+async def list_space_access(
+    space_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    space_res = await db.execute(select(CodexSpace).filter_by(id=space_id))
+    space = space_res.scalar_one_or_none()
+    if not space:
+        raise HTTPException(status_code=404, detail="Space not found")
+    access_res = await db.execute(select(CodexSpaceAccess).filter_by(space_id=space_id))
+    accesses = access_res.scalars().all()
+    # Enrich with usernames
+    result = []
+    for acc in accesses:
+        user_res = await db.execute(select(User).filter_by(id=acc.user_id))
+        user = user_res.scalar_one_or_none()
+        result.append({
+            "access_id": acc.id,
+            "user_id": acc.user_id,
+            "username": user.username if user else "unknown",
+            "granted_at": acc.granted_at.isoformat() if acc.granted_at else None,
+            "granted_by": acc.granted_by,
+        })
+    return {"space_id": space_id, "slug": space.slug, "access": result}
