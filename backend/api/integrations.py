@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_, or_
 from typing import List, Optional, Dict, Any
 import urllib.parse
+from pydantic import BaseModel
 
 # Simple in-memory PKCE state store (MVP) — replace with Redis in production
 # Structure: {state: {"code_verifier": str, "user_id": int, "provider": str, "redirect_uri": str, "expires_at": float}}
@@ -140,9 +141,168 @@ async def list_my_connections(
                     "status": c.status,
                     "expires_at": c.expires_at.isoformat() if c.expires_at else None,
                     "created_at": c.created_at.isoformat(),
-                }
-            )
+}
+        )
     return out
+
+
+# ---------------------------------------------------------------
+# 6. MCP Server Registry Sync (VSCode Extension ↔ Backend)
+# ---------------------------------------------------------------
+
+
+class MCPServerConfigIn(BaseModel):
+    name: str
+    transport_type: str  # "stdio" | "http"
+    command: Optional[str] = None
+    args: List[str] = []
+    cwd: Optional[str] = None
+    env: Dict[str, str] = {}
+    url: Optional[str] = None
+    headers: Dict[str, str] = {}
+    enabled: bool = True
+
+
+class MCPServerConfigOut(MCPServerConfigIn):
+    status: str  # "connected" | "disconnected" | "error"
+    tool_count: int
+    tools: List[Dict[str, Any]] = []
+
+
+@router.get("/mcp/servers", response_model=List[MCPServerConfigOut])
+async def list_mcp_servers(
+    current_user: User = Depends(get_current_active_user),
+) -> List[dict]:
+    """List all registered MCP servers with their connection status and tools."""
+    mcp_manager = get_mcp_client_manager()
+    
+    # Get configs from extension sync (in-memory for now)
+    # In production, these would be persisted per user
+    default_configs = load_default_mcp_servers()
+    
+    out = []
+    for config in default_configs:
+        transport = mcp_manager.transports.get(config.name)
+        tools = mcp_manager.tools.get(config.name, {})
+        
+        out.append({
+            "name": config.name,
+            "transport_type": config.transport_type,
+            "command": config.command,
+            "args": config.args,
+            "cwd": config.cwd,
+            "env": config.env,
+            "url": config.url,
+            "headers": config.headers,
+            "enabled": config.enabled,
+            "status": "connected" if transport and transport.is_connected else "disconnected",
+            "tool_count": len(tools),
+            "tools": list(tools.values()),
+        })
+    return out
+
+
+@router.post("/mcp/servers", response_model=dict)
+async def register_mcp_server(
+    *,
+    config: MCPServerConfigIn,
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Register a new MCP server (synced from VSCode extension)."""
+    mcp_manager = get_mcp_client_manager()
+    
+    server_config = MCPServerConfig(
+        name=config.name,
+        transport_type=config.transport_type,
+        command=config.command,
+        args=config.args,
+        cwd=config.cwd,
+        env=config.env,
+        url=config.url,
+        headers=config.headers,
+        enabled=config.enabled,
+    )
+    
+    # Remove existing if any
+    if config.name in mcp_manager.transports:
+        await mcp_manager.transports[config.name].disconnect()
+        mcp_manager.transports.pop(config.name, None)
+        mcp_manager.tools.pop(config.name, None)
+    
+    mcp_manager.add_server(server_config)
+    
+    # Connect immediately
+    try:
+        await mcp_manager._connect_server(config.name, server_config)
+        return {"status": "connected", "message": f"MCP server '{config.name}' registered and connected"}
+    except Exception as e:
+        logger.error(f"Failed to connect MCP server '{config.name}': {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@router.delete("/mcp/servers/{name}", response_model=dict)
+async def unregister_mcp_server(
+    *,
+    name: str,
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Unregister an MCP server."""
+    mcp_manager = get_mcp_client_manager()
+    mcp_manager.remove_server(name)
+    return {"status": "ok", "message": f"MCP server '{name}' unregistered"}
+
+
+@router.post("/mcp/servers/{name}/connect", response_model=dict)
+async def connect_mcp_server(
+    *,
+    name: str,
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Manually connect to an MCP server."""
+    mcp_manager = get_mcp_client_manager()
+    
+    config = mcp_manager.servers.get(name)
+    if not config:
+        raise HTTPException(status_code=404, detail=f"MCP server '{name}' not registered")
+    
+    try:
+        await mcp_manager._connect_server(name, config)
+        return {"status": "connected", "message": f"Connected to MCP server '{name}'"}
+    except Exception as e:
+        logger.error(f"Failed to connect MCP server '{name}': {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@router.post("/mcp/servers/{name}/disconnect", response_model=dict)
+async def disconnect_mcp_server(
+    *,
+    name: str,
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Manually disconnect from an MCP server."""
+    mcp_manager = get_mcp_client_manager()
+    
+    if name in mcp_manager.transports:
+        await mcp_manager.transports[name].disconnect()
+        mcp_manager.transports.pop(name, None)
+        mcp_manager.tools.pop(name, None)
+    
+    return {"status": "disconnected", "message": f"Disconnected from MCP server '{name}'"}
+
+
+@router.get("/mcp/tools", response_model=List[dict])
+async def list_mcp_tools(
+    current_user: User = Depends(get_current_active_user),
+) -> List[dict]:
+    """List all tools from all connected MCP servers."""
+    mcp_manager = get_mcp_client_manager()
+    return get_mcp_structured_tools(mcp_manager)
+
+
+# Import required models
+from pydantic import BaseModel
+from typing import Optional
+from backend.integrations.mcp_client import MCPServerConfig, load_default_mcp_servers, get_mcp_structured_tools
 
 
 @router.post("/connect/{slug}")

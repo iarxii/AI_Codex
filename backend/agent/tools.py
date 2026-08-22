@@ -1,11 +1,24 @@
 import logging
-from typing import List
+from typing import List, Optional
 from langchain_core.tools import StructuredTool
 from backend.skills.registry import registry
 from backend.skills.base import BaseSkill
 from backend.agent.skill_routing import resolve_client_capabilities
+from backend.integrations.mcp_client import MCPClientManager, get_mcp_structured_tools
 
 logger = logging.getLogger(__name__)
+
+# Global MCP client manager instance
+_mcp_client_manager: Optional[MCPClientManager] = None
+
+
+def get_mcp_client_manager() -> MCPClientManager:
+    """Get or create the global MCP client manager."""
+    global _mcp_client_manager
+    if _mcp_client_manager is None:
+        _mcp_client_manager = MCPClientManager()
+    return _mcp_client_manager
+
 
 # Module-level dictionary to store execution modes for tools.
 # This avoids the pydantic field issue where StructuredTool does not allow
@@ -122,6 +135,15 @@ def get_agent_tools(
     tools.append(compact_context)
     tools.append(write_scratchpad)
     tools.append(read_full_tool_output)
+    
+    # Add MCP tools from connected servers
+    mcp_manager = get_mcp_client_manager()
+    try:
+        mcp_tools = get_mcp_structured_tools(mcp_manager)
+        tools.extend(mcp_tools)
+        logger.info(f"Added {len(mcp_tools)} MCP tools from connected servers")
+    except Exception as e:
+        logger.warning(f"Failed to load MCP tools: {e}")
     
     return tools
 

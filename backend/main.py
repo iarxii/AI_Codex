@@ -140,11 +140,28 @@ async def lifespan(app: FastAPI):
     from backend.integrations.runner import load_and_schedule_flows
     await load_and_schedule_flows()
     print("[LIFESPAN] Integration Flow Scheduler started.")
+
+    # Initialize MCP Client Manager
+    print("[LIFESPAN] Starting MCP Client Manager...")
+    from backend.integrations.mcp_client import MCPClientManager, load_default_mcp_servers
+    mcp_manager = get_mcp_client_manager()
+    for server_config in load_default_mcp_servers():
+        mcp_manager.add_server(server_config)
+    await mcp_manager.connect_all()
+    print("[LIFESPAN] MCP Client Manager started.")
     
     yield
     
     # Shutdown logic
     print("[LIFESPAN] Shutting down...")
+    
+    # Shutdown MCP Client Manager
+    print("[LIFESPAN] Stopping MCP Client Manager...")
+    from backend.integrations.mcp_client import get_mcp_client_manager
+    mcp_manager = get_mcp_client_manager()
+    await mcp_manager.disconnect_all()
+    print("[LIFESPAN] MCP Client Manager stopped.")
+
     if sidecar_proc:
         print(f"[LIFESPAN] Terminating Go Sidecar (PID {sidecar_proc.pid})...")
         sidecar_proc.terminate()

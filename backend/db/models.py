@@ -38,6 +38,7 @@ class User(Base):
     conversations: Mapped[List["Conversation"]] = relationship(back_populates="user")
     connections: Mapped[List["UserConnection"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     flows: Mapped[List["IntegrationFlow"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
+    mcp_servers: Mapped[List["UserMCPServer"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 class Conversation(Base):
     __tablename__ = "conversations"
@@ -321,5 +322,33 @@ class PortalSyncMetadata(Base):
     platform: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     last_sync_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     sync_status: Mapped[str] = mapped_column(String(50), default="success")
+
+
+class UserMCPServer(Base):
+    """Per-user MCP server configuration, synced from VSCode extension."""
+    __tablename__ = "user_mcp_servers"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(50))  # e.g., "git", "filesystem", "github"
+    transport_type: Mapped[str] = mapped_column(String(20))  # "stdio" | "http"
+    command: Mapped[Optional[str]] = mapped_column(Text)
+    args_json: Mapped[Optional[str]] = mapped_column(Text)  # JSON array
+    cwd: Mapped[Optional[str]] = mapped_column(Text)
+    env_json: Mapped[Optional[str]] = mapped_column(Text)  # JSON object
+    url: Mapped[Optional[str]] = mapped_column(Text)
+    headers_json: Mapped[Optional[str]] = mapped_column(Text)  # JSON object
+    enabled: Mapped[bool] = mapped_column(default=True)
+    status: Mapped[str] = mapped_column(String(20), default="disconnected")  # connected, disconnected, error
+    last_connected_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    user: Mapped["User"] = relationship(back_populates="mcp_servers")
+    
+    __table_args__ = (
+        Index("ix_user_mcp_servers_user_id", "user_id"),
+        Index("ix_user_mcp_servers_user_name", "user_id", "name", unique=True),
+    )
 
 
