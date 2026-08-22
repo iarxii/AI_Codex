@@ -347,14 +347,17 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier:
                 )
             
         if bind_tools:
-            # Skip tool binding for local NativeLocalClient:
+# Skip tool binding for local NativeLocalClient:
             # llama-server (turboquant) doesn't support OpenAI-compatible function calling.
             if provider == "local" and isinstance(llm, NativeLocalClient):
                 logger.debug(f"DEBUG: Skipping tool binding for provider '{provider}' (not supported by native client)")
                 return llm
             try:
                 conv_id = config.get("configurable", {}).get("conversation_id")
-                tools = get_agent_tools(conversation_id=conv_id)
+                tools = get_agent_tools(
+                    conversation_id=conv_id,
+                    space_id=config.get("configurable", {}).get("space_id"),
+                )
                 # Try to bind tools, but catch if the model/provider doesn't support it
                 return llm.bind_tools(tools)
             except Exception as e:
@@ -585,6 +588,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         allowed_skills,
         client_type=client_type,
         client_capabilities=client_capabilities,
+        space_id=config.get("configurable", {}).get("space_id"),
     )
     
     # Dynamically bind client-side MCP tools from scratchpad
@@ -1009,6 +1013,7 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
         conversation_id,
         client_type=client_type,
         client_capabilities=client_capabilities,
+        space_id=config.get("configurable", {}).get("space_id"),
     )
     
     # Dynamically bind client-side MCP tools from scratchpad

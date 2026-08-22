@@ -411,21 +411,165 @@ async def run_flow_now(
     flow_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    trigger_payload: Optional[dict] = None,
 ) -> dict:
     """Execute a flow immediately (manual trigger)."""
-    from backend.integrations.runner import execute_flow_run  # TODO: create runner module
+    from backend.integrations.runner import execute_flow_run
 
     # Verify ownership
-    flow = db.get(IntegrationFlow, flow_id)
+    flow = await db.get(IntegrationFlow, flow_id)
     if not flow or flow.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Flow not found")
 
-    # Kick off run (async via queue in production)
-    # For now, execute synchronously (limited by timeout)
-    # TODO: integrate with APScheduler / Celery
+    # Execute flow
+    flow_run = await execute_flow_run(flow_id, trigger_payload, flow.trigger_connection_id)
+    
+    return {
+        "run_id": flow_run.id,
+        "status": flow_run.status,
+        "message": "Flow executed",
+        "outputs": json.loads(flow_run.steps_output_json) if flow_run.steps_output_json else None,
+        "error": flow_run.error_text,
+    }
 
-    # Placeholder: return run initiation
-    return {"id": flow_id, "status": "queued", "message": "Flow run queued"}
+
+@router.get("/flows/{flow_id}/runs", response_model=List[dict])
+async def list_flow_runs(
+    *,
+    flow_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    limit: int = 50,
+    offset: int = 0,
+) -> List[dict]:
+    """List run history for a flow."""
+    # Verify ownership
+    flow = await db.get(IntegrationFlow, flow_id)
+    if not flow or flow.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Flow not found")
+
+    stmt = (
+        select(IntegrationFlowRun)
+        .where(IntegrationFlowRun.flow_id == flow_id)
+        .order_by(IntegrationFlowRun.started_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await db.execute(stmt)
+    runs = result.scalars().all()
+
+    return [
+        {
+            "id": r.id,
+            "status": r.status,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+            "duration_ms": r.duration_ms,
+            "error": r.error_text,
+            "trigger_payload": json.loads(r.trigger_payload_json) if r.trigger_payload_json else None,
+        }
+        for r in runs
+    ]
+
+
+@router.get("/flows/{flow_id}/runs/{run_id}", response_model=dict)
+async def get_flow_run(
+    *,
+    flow_id: int,
+    run_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Get detailed run information including step outputs."""
+    # Verify ownership
+    flow = await db.get(IntegrationFlow, flow_id)
+    if not flow or flow.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Flow not found")
+
+    run = await db.get(IntegrationFlowRun, run_id)
+    if not run or run.flow_id != flow_id:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    return {
+        "id": run.id,
+        "flow_id": run.flow_id,
+        "status": run.status,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "duration_ms": run.duration_ms,
+        "error": run.error_text,
+        "trigger_payload": json.loads(run.trigger_payload_json) if run.trigger_payload_json else None,
+        "steps_output": json.loads(run.steps_output_json) if run.steps_output_json else None,
+    }
+
+
+@router.post("/flows/{flow_id}/runs/{run_id}/replay", response_model=dict)
+async def replay_flow_run(
+    *,
+    flow_id: int,
+    run_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Replay a flow run with the original trigger payload."""
+    from backend.integrations.runner import execute_flow_run
+
+    # Verify ownership
+    flow = await db.get(IntegrationFlow, flow_id)
+    if not flow or flow.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Flow not found")
+
+    run = await db.get(IntegrationFlowRun, run_id)
+    if not run or run.flow_id != flow_id:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    # Get original trigger payload
+    trigger_payload = json.loads(run.trigger_payload_json) if run.trigger_payload_json else None
+    
+    # Execute flow with same payload
+    flow_run = await execute_flow_run(flow_id, trigger_payload, flow.trigger_connection_id)
+    
+    return {
+        "run_id": flow_run.id,
+        "status": flow_run.status,
+        "message": "Flow replay executed",
+    }
+
+
+# ---------------------------------------------------------------
+# 5. Webhook endpoints for flow triggers
+# ---------------------------------------------------------------
+
+
+@router.post("/webhooks/{provider}/{flow_id}", response_model=dict)
+async def webhook_trigger(
+    *,
+    provider: str,
+    flow_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Handle incoming webhook trigger for a flow.
+    
+    Validates HMAC signature if configured, then executes the flow.
+    """
+    from backend.integrations.runner import handle_webhook_trigger
+
+    # Get raw body for HMAC verification
+    body = await request.body()
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    headers = dict(request.headers)
+    
+    result = await handle_webhook_trigger(provider, flow_id, payload, headers)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    return result
 
 
 # ---------------------------------------------------------------

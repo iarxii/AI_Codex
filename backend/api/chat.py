@@ -328,6 +328,11 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 
                 s_config = get_space_config(space_type)
                 
+                # Extract space_id for integration capability resolution
+                space_id = None
+                if space_type != "general" and space:
+                    space_id = space.id
+                
                 # Apply provider/model recommendations if not explicitly provided by user
                 if not provider and s_config.get("recommended_provider"):
                     provider = s_config["recommended_provider"]
@@ -460,6 +465,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "local_backend_mode": local_backend_mode,
                         "user_id": user.id,
                         "space_slug": space_type,
+                        "space_id": space_id,
                         "client_type": payload_data.get("client_type", "web"),
                         "websocket": websocket,
                         "client_tool_response_queues": client_tool_response_queues

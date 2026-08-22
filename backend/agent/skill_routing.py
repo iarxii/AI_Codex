@@ -42,6 +42,54 @@ CLIENT_CAPABILITIES = {
     "android": frozenset(),
 }
 
+# Integration capability prefixes (granted via OAuth scopes)
+INTEGRATION_CAPABILITY_PREFIXES = frozenset({
+    "google.drive",
+    "google.gmail",
+    "github",
+    "slack",
+})
+
+
+def get_integration_capabilities(
+    *,
+    space_id: Optional[int] = None,
+    conversation_id: Optional[int] = None,
+) -> frozenset[str]:
+    """Get capabilities granted by enabled integrations in a space/conversation.
+    
+    This is a synchronous helper - the actual implementation should be async
+    and fetch from the database. For now returns empty set.
+    """
+    # TODO: Implement async DB lookup for space_connections and user_connections
+    # Map provider + scopes to capabilities:
+    # - google + drive.file -> "google.drive.read", "google.drive.write"
+    # - google + gmail.send -> "google.gmail.send"
+    # - github + repo -> "github.repo.read", "github.repo.write"
+    # - slack + chat:write -> "slack.chat.write"
+    return frozenset()
+
+
+def resolve_client_capabilities(
+    client_type: Optional[str],
+    additional_capabilities: Optional[Iterable[str]] = None,
+    *,
+    space_id: Optional[int] = None,
+    conversation_id: Optional[int] = None,
+) -> frozenset[str]:
+    """Resolve an untrusted client identifier to an unprivileged baseline,
+    merging in integration capabilities from the workspace/conversation context."""
+    normalized_client = (client_type or "web").lower()
+    capabilities = set(CLIENT_CAPABILITIES.get(normalized_client, CLIENT_CAPABILITIES["web"]))
+    if additional_capabilities:
+        capabilities.update(additional_capabilities)
+    # Merge integration capabilities
+    capabilities.update(get_integration_capabilities(
+        space_id=space_id,
+        conversation_id=conversation_id,
+    ))
+    return frozenset(capabilities)
+
 
 @dataclass(frozen=True)
 class PromptSkillManifest:
@@ -250,11 +298,27 @@ def validate_prompt_skills(skills_dir: Path) -> list[SkillDiagnostic]:
                     ))
             
             # 2. Mandatory skills must not require privileged capabilities
+            # Integration capabilities (google.drive.*, github.*, slack.*) are allowed
+            # but shell.execute, workspace.write, workspace.read, codebase.search, vscode.webview are not
             if kind == "mandatory" and manifest.requires_capabilities:
-                errors.append(SkillDiagnostic(
-                    skill.source_path,
-                    f"mandatory skill requires privileged capabilities: {', '.join(manifest.requires_capabilities)}"
-                ))
+                privileged_caps = [c for c in manifest.requires_capabilities 
+                                 if not any(c.startswith(prefix) for prefix in INTEGRATION_CAPABILITY_PREFIXES)]
+                if privileged_caps:
+                    errors.append(SkillDiagnostic(
+                        skill.source_path,
+                        f"mandatory skill requires privileged capabilities: {', '.join(privileged_caps)}"
+                    ))
+            
+            # 2b. Situational skills should not require shell.execute or vscode.webview
+            # (these are platform capabilities, not integration capabilities)
+            if kind == "situational" and manifest.requires_capabilities:
+                restricted_caps = [c for c in manifest.requires_capabilities 
+                                 if c in {"shell.execute", "vscode.webview"}]
+                if restricted_caps:
+                    errors.append(SkillDiagnostic(
+                        skill.source_path,
+                        f"situational skill should not require restricted capabilities: {', '.join(restricted_caps)}"
+                    ))
 
             # 3. Situational skills should have triggers or be selected by path
             if kind == "situational" and not manifest.triggers:

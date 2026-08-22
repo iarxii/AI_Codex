@@ -62,12 +62,18 @@ def get_agent_tools(
     allowed_skills: List[str] = None,
     client_type: str = "web",
     client_capabilities=None,
+    space_id: int = None,
 ) -> List[StructuredTool]:
     """
     Discovers all skills and returns them as a list of LangChain tools.
     Filters by allowed_skills if provided, and strictly filters by client_type capability.
     """
-    resolved_capabilities = resolve_client_capabilities(client_type, client_capabilities)
+    resolved_capabilities = resolve_client_capabilities(
+        client_type, 
+        client_capabilities,
+        space_id=space_id,
+        conversation_id=int(conversation_id) if conversation_id and conversation_id.isdigit() else None,
+    )
     skill_capabilities = {
         "workspace_writer": "workspace.write",
         "workspace_patcher": "workspace.write",

@@ -46,3 +46,7 @@ sse-starlette
 # Invoicing — PDF generation + templating
 weasyprint
 jinja2
+
+# Integration Platform
+apscheduler
+cryptography

@@ -129,11 +129,18 @@ async def lifespan(app: FastAPI):
         print(f"[LIFESPAN] Warning: nexus-architect seeding/elevation failed: {e}")
     
     
-    # Initialize OllamaOpt bridge
+# Initialize OllamaOpt bridge
     print("[LIFESPAN] Setting up OllamaOpt bridge...")
     from backend.integrations.ollamaopt_bridge import setup_ollamaopt_bridge
     setup_ollamaopt_bridge()
     print("[LIFESPAN] Initialization complete. Server ready.")
+
+    # Initialize Integration Flow Scheduler
+    print("[LIFESPAN] Starting Integration Flow Scheduler...")
+    from backend.integrations.runner import load_and_schedule_flows
+    await load_and_schedule_flows()
+    print("[LIFESPAN] Integration Flow Scheduler started.")
+    
     yield
     
     # Shutdown logic
