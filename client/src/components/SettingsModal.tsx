@@ -12,6 +12,7 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
   ArrowPathIcon,
+  ServerIcon,
 } from "@heroicons/react/24/solid";
 
 type SettingsModalProps = {
@@ -25,6 +26,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
     useAI();
   const [activeProvider, setActiveProvider] = useState<ProviderId>(provider);
   const [moreProvidersOpen, setMoreProvidersOpen] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState("providers");
   const [openAiKey, setOpenAiKey] = useState("");
   const [openAiBaseUrl, setOpenAiBaseUrl] = useState("");
   const [openRouterKey, setOpenRouterKey] = useState("");
@@ -532,13 +534,39 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
               <Dialog.Panel className="w-full max-w-lg transform overflow-hidden rounded-2xl bg-[#E2E6EC] border border-black/[0.06] p-6 text-left align-middle shadow-2xl transition-all">
                 {/* Header */}
                 <div className="flex justify-between items-center mb-5">
-                  <Dialog.Title
+<Dialog.Title
                     as="h3"
                     className="text-lg font-semibold leading-6 text-[#1A1D2E] flex items-center gap-2"
                   >
                     <Cog6ToothIcon className="w-5 h-5 text-[#fd3b12]" />
-                    Provider Settings
+                    {activeSettingsTab === "providers" ? "Provider Settings" : "Integrations"}
                   </Dialog.Title>
+                  <div className="flex gap-2 mb-4" role="tablist" aria-label="Settings sections">
+                    <button
+                      role="tab"
+                      aria-selected={activeSettingsTab === "providers"}
+                      onClick={() => setActiveSettingsTab("providers")}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${activeSettingsTab === "providers"
+                        ? "bg-[#fd3b12] text-white shadow-lg shadow-[#fd3b12]/30"
+                        : "bg-[#D8DCE4] text-[#4A4D5E] hover:bg-[#D0D4DC] hover:text-[#1A1D2E]"
+                      }`}
+                    >
+                      <Cog6ToothIcon className="w-4 h-4" />
+                      <span>Providers</span>
+                    </button>
+                    <button
+                      role="tab"
+                      aria-selected={activeSettingsTab === "integrations"}
+                      onClick={() => setActiveSettingsTab("integrations")}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${activeSettingsTab === "integrations"
+                        ? "bg-[#fd3b12] text-white shadow-lg shadow-[#fd3b12]/30"
+                        : "bg-[#D8DCE4] text-[#4A4D5E] hover:bg-[#D0D4DC] hover:text-[#1A1D2E]"
+                      }`}
+                    >
+                      <ServerIcon className="w-4 h-4" />
+                      <span>Integrations</span>
+                    </button>
+                  </div>
                   <button
                     onClick={() => setIsOpen(false)}
                     className="text-[#7A7D8E] hover:text-[#1A1D2E] transition-colors"
@@ -1461,6 +1489,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                     </button>
                   </div>
                 </div>
+
+                {activeSettingsTab === "integrations" && (
+                  <div className="p-6 bg-white/50 border border-black/[0.05] rounded-xl mt-4">
+                    <p className="text-[#7A7D8E] text-sm">
+                      Integrations tab is active. Configure your MCP servers and
+                      third-party service connections here.
+                    </p>
+                  </div>
+                )}
 
                 {/* Footer */}
                 <div className="mt-8 flex justify-end gap-3">
