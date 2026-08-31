@@ -1,6 +1,16 @@
 import React, { Fragment, useState, useEffect } from "react";
 import { Dialog, Transition } from "@headlessui/react";
-import { Cog6ToothIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import {
+  Cog6ToothIcon,
+  XMarkIcon,
+  PlusIcon,
+  TrashIcon,
+  ArrowTopRightOnSquareIcon,
+  ShieldCheckIcon,
+  CubeIcon,
+  BoltIcon,
+} from "@heroicons/react/24/outline";
+import { getValidToken } from "../utils/authToken";
 import { useNavigate } from "react-router-dom";
 import { PROVIDERS } from "./providerMeta";
 import { useAI, type VisualSettings, type ProviderId } from "../contexts/AIContext";
@@ -12,7 +22,6 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
   ArrowPathIcon,
-  ServerIcon,
 } from "@heroicons/react/24/solid";
 
 type SettingsModalProps = {
@@ -26,7 +35,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
     useAI();
   const [activeProvider, setActiveProvider] = useState<ProviderId>(provider);
   const [moreProvidersOpen, setMoreProvidersOpen] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState("providers");
   const [openAiKey, setOpenAiKey] = useState("");
   const [openAiBaseUrl, setOpenAiBaseUrl] = useState("");
   const [openRouterKey, setOpenRouterKey] = useState("");
@@ -55,6 +63,190 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const [langsmithProject, setLangsmithProject] = useState("");
   const [privateWorkspace, setPrivateWorkspace] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState("providers");
+
+  // Integrations Tab State
+  const [integrationsSubTab, setIntegrationsSubTab] = useState<"connex" | "mcp">("connex");
+  const [integrationProviders, setIntegrationProviders] = useState<any[]>([]);
+  const [userConnections, setUserConnections] = useState<any[]>([]);
+  const [mcpServers, setMcpServers] = useState<any[]>([]);
+  const [mcpServerName, setMcpServerName] = useState("");
+  const [mcpTransport, setMcpTransport] = useState<"stdio" | "http">("stdio");
+  const [mcpCommand, setMcpCommand] = useState("");
+  const [mcpArgs, setMcpArgs] = useState("");
+  const [mcpUrl, setMcpUrl] = useState("");
+  const [isAddingMcp, setIsAddingMcp] = useState(false);
+  const [integrationsLoading, setIntegrationsLoading] = useState(false);
+  const [integrationsError, setIntegrationsError] = useState<string | null>(null);
+  const [integrationsSuccess, setIntegrationsSuccess] = useState<string | null>(null);
+  const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+
+  const fetchIntegrationsData = async () => {
+    setIntegrationsLoading(true);
+    setIntegrationsError(null);
+    try {
+      const token = getValidToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const [providersRes, connectionsRes, mcpRes] = await Promise.all([
+        fetch(`${config.API_BASE_URL}${config.API_V1_STR}/integrations/providers`, { headers }),
+        fetch(`${config.API_BASE_URL}${config.API_V1_STR}/integrations/my-connections`, { headers }),
+        fetch(`${config.API_BASE_URL}${config.API_V1_STR}/integrations/mcp/servers`, { headers }),
+      ]);
+
+      if (providersRes.ok) {
+        const data = await providersRes.json();
+        setIntegrationProviders(data);
+      }
+      if (connectionsRes.ok) {
+        const data = await connectionsRes.json();
+        setUserConnections(data);
+      }
+      if (mcpRes.ok) {
+        const data = await mcpRes.json();
+        setMcpServers(data);
+      }
+    } catch (e: any) {
+      console.error("Failed to load integrations:", e);
+    } finally {
+      setIntegrationsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && activeSettingsTab === "integrations") {
+      fetchIntegrationsData();
+    }
+  }, [isOpen, activeSettingsTab]);
+
+  const handleConnectOAuth = async (providerSlug: string) => {
+    setConnectingProvider(providerSlug);
+    setIntegrationsError(null);
+    try {
+      const token = getValidToken();
+      const redirectUri = `${window.location.origin}/integrations/callback`;
+      const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/integrations/connect/${providerSlug}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ redirect_uri: redirectUri }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Failed to initiate connection" }));
+        throw new Error(err.detail || "Failed to initiate connection");
+      }
+      const { authorization_url } = await res.json();
+      if (authorization_url) {
+        const popup = window.open(authorization_url, "oauth_popup", "width=600,height=700");
+        const timer = setInterval(async () => {
+          if (!popup || popup.closed) {
+            clearInterval(timer);
+            setConnectingProvider(null);
+            fetchIntegrationsData();
+            return;
+          }
+          try {
+            const checkRes = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/integrations/my-connections`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            if (checkRes.ok) {
+              const conns = await checkRes.json();
+              const found = conns.find((c: any) => c.provider === providerSlug && c.status === "active");
+              if (found) {
+                clearInterval(timer);
+                if (popup && !popup.closed) popup.close();
+                setConnectingProvider(null);
+                setIntegrationsSuccess(`Connected to ${providerSlug} successfully!`);
+                fetchIntegrationsData();
+                setTimeout(() => setIntegrationsSuccess(null), 4000);
+              }
+            }
+          } catch {}
+        }, 2000);
+      }
+    } catch (e: any) {
+      setIntegrationsError(e.message || "Failed to connect");
+      setConnectingProvider(null);
+    }
+  };
+
+  const handleRegisterMcpServer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mcpServerName.trim()) return;
+    setIntegrationsError(null);
+    try {
+      const token = getValidToken();
+      const payload: any = {
+        name: mcpServerName.trim(),
+        transport_type: mcpTransport,
+        enabled: true,
+      };
+      if (mcpTransport === "stdio") {
+        payload.command = mcpCommand.trim();
+        payload.args = mcpArgs ? mcpArgs.split(" ").filter(Boolean) : [];
+      } else {
+        payload.url = mcpUrl.trim();
+      }
+      const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/integrations/mcp/servers`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setIntegrationsSuccess(`MCP server '${mcpServerName}' registered.`);
+        setMcpServerName("");
+        setMcpCommand("");
+        setMcpArgs("");
+        setMcpUrl("");
+        setIsAddingMcp(false);
+        fetchIntegrationsData();
+        setTimeout(() => setIntegrationsSuccess(null), 3000);
+      } else {
+        const err = await res.json().catch(() => ({ detail: "Failed to add MCP server" }));
+        setIntegrationsError(err.detail || "Failed to add MCP server");
+      }
+    } catch (e: any) {
+      setIntegrationsError(e.message || "Error adding MCP server");
+    }
+  };
+
+  const handleToggleMcpServer = async (name: string, isConnected: boolean) => {
+    try {
+      const token = getValidToken();
+      const endpoint = isConnected ? "disconnect" : "connect";
+      const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/integrations/mcp/servers/${encodeURIComponent(name)}/${endpoint}`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        fetchIntegrationsData();
+      }
+    } catch (e: any) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteMcpServer = async (name: string) => {
+    if (!confirm(`Remove MCP server '${name}'?`)) return;
+    try {
+      const token = getValidToken();
+      const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/integrations/mcp/servers/${encodeURIComponent(name)}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        fetchIntegrationsData();
+      }
+    } catch (e: any) {
+      console.error(e);
+    }
+  };
   const [testResult, setTestResult] = useState<{
     success: boolean;
     message: string;
@@ -534,36 +726,38 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
               <Dialog.Panel className="w-full max-w-lg transform overflow-hidden rounded-2xl bg-[#E2E6EC] border border-black/[0.06] p-6 text-left align-middle shadow-2xl transition-all">
                 {/* Header */}
                 <div className="flex justify-between items-center mb-5">
-<Dialog.Title
+                  <Dialog.Title
                     as="h3"
                     className="text-lg font-semibold leading-6 text-[#1A1D2E] flex items-center gap-2"
                   >
                     <Cog6ToothIcon className="w-5 h-5 text-[#fd3b12]" />
                     {activeSettingsTab === "providers" ? "Provider Settings" : "Integrations"}
                   </Dialog.Title>
-                  <div className="flex gap-2 mb-4" role="tablist" aria-label="Settings sections">
+                  <div className="flex gap-2" role="tablist" aria-label="Settings sections">
                     <button
                       role="tab"
                       aria-selected={activeSettingsTab === "providers"}
                       onClick={() => setActiveSettingsTab("providers")}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${activeSettingsTab === "providers"
-                        ? "bg-[#fd3b12] text-white shadow-lg shadow-[#fd3b12]/30"
-                        : "bg-[#D8DCE4] text-[#4A4D5E] hover:bg-[#D0D4DC] hover:text-[#1A1D2E]"
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                        activeSettingsTab === "providers"
+                          ? "bg-[#fd3b12] text-white shadow-md shadow-[#fd3b12]/30"
+                          : "bg-[#D8DCE4] text-[#4A4D5E] hover:bg-[#D0D4DC] hover:text-[#1A1D2E]"
                       }`}
                     >
-                      <Cog6ToothIcon className="w-4 h-4" />
+                      <Cog6ToothIcon className="w-3.5 h-3.5" />
                       <span>Providers</span>
                     </button>
                     <button
                       role="tab"
                       aria-selected={activeSettingsTab === "integrations"}
                       onClick={() => setActiveSettingsTab("integrations")}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${activeSettingsTab === "integrations"
-                        ? "bg-[#fd3b12] text-white shadow-lg shadow-[#fd3b12]/30"
-                        : "bg-[#D8DCE4] text-[#4A4D5E] hover:bg-[#D0D4DC] hover:text-[#1A1D2E]"
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                        activeSettingsTab === "integrations"
+                          ? "bg-[#fd3b12] text-white shadow-md shadow-[#fd3b12]/30"
+                          : "bg-[#D8DCE4] text-[#4A4D5E] hover:bg-[#D0D4DC] hover:text-[#1A1D2E]"
                       }`}
                     >
-                      <ServerIcon className="w-4 h-4" />
+                      <ServerIcon className="w-3.5 h-3.5" />
                       <span>Integrations</span>
                     </button>
                   </div>
@@ -575,11 +769,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                   </button>
                 </div>
 
-                <p className="text-xs text-[#4A4D5E] mb-6 leading-relaxed">
-                  Select your default AI provider and configure API keys. Keys
-                  are stored in your browser's local storage and sent directly
-                  to the inference engine.
-                </p>
+                {activeSettingsTab === "providers" && (
+                  <>
+                    <p className="text-xs text-[#4A4D5E] mb-6 leading-relaxed">
+                      Select your default AI provider and configure API keys. Keys
+                      are stored in your browser's local storage and sent directly
+                      to the inference engine.
+                    </p>
 
                 {/* Provider Radio Group */}
                 <div className="mb-6">
@@ -1490,12 +1686,291 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                   </div>
                 </div>
 
+                  </>
+                )}
+
                 {activeSettingsTab === "integrations" && (
-                  <div className="p-6 bg-white/50 border border-black/[0.05] rounded-xl mt-4">
-                    <p className="text-[#7A7D8E] text-sm">
-                      Integrations tab is active. Configure your MCP servers and
-                      third-party service connections here.
+                  <div className="space-y-4">
+                    <p className="text-xs text-[#4A4D5E] mb-4 leading-relaxed">
+                      Manage external OAuth integrations (Connex) and Model Context Protocol (MCP) servers for expanded agent capabilities.
                     </p>
+
+                    {/* Sub-tab pills */}
+                    <div className="flex gap-2 border-b border-black/[0.08] pb-3">
+                      <button
+                        type="button"
+                        onClick={() => setIntegrationsSubTab("connex")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          integrationsSubTab === "connex"
+                            ? "bg-black/10 text-[#1A1D2E] font-bold"
+                            : "text-[#7A7D8E] hover:text-[#1A1D2E]"
+                        }`}
+                      >
+                        OAuth Connections (Connex)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIntegrationsSubTab("mcp")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          integrationsSubTab === "mcp"
+                            ? "bg-black/10 text-[#1A1D2E] font-bold"
+                            : "text-[#7A7D8E] hover:text-[#1A1D2E]"
+                        }`}
+                      >
+                        MCP Servers ({mcpServers.length})
+                      </button>
+                    </div>
+
+                    {integrationsSuccess && (
+                      <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-xl text-xs text-green-700 flex items-center gap-2">
+                        <CheckCircleIcon className="w-4 h-4 flex-shrink-0" />
+                        <span>{integrationsSuccess}</span>
+                      </div>
+                    )}
+                    {integrationsError && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-700 flex items-center gap-2">
+                        <ExclamationCircleIcon className="w-4 h-4 flex-shrink-0" />
+                        <span>{integrationsError}</span>
+                      </div>
+                    )}
+
+                    {integrationsLoading ? (
+                      <div className="py-8 flex justify-center items-center">
+                        <ArrowPathIcon className="w-6 h-6 animate-spin text-[#fd3b12]" />
+                      </div>
+                    ) : integrationsSubTab === "connex" ? (
+                      <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                        {(integrationProviders.length > 0
+                          ? integrationProviders
+                          : [
+                              { id: "google", name: "Google Workspace", slug: "google", scopes: ["Gmail", "Drive"] },
+                              { id: "github", name: "GitHub", slug: "github", scopes: ["Repos", "Issues", "PRs"] },
+                              { id: "slack", name: "Slack", slug: "slack", scopes: ["Channels", "Messages"] },
+                              { id: "notion", name: "Notion", slug: "notion", scopes: ["Pages", "Databases"] },
+                            ]
+                        ).map((p: any) => {
+                          const conn = userConnections.find((c: any) => c.provider === p.slug);
+                          const isConnected = conn && conn.status === "active";
+                          const isConnecting = connectingProvider === p.slug;
+
+                          return (
+                            <div
+                              key={p.slug}
+                              className="flex items-center justify-between p-3.5 bg-white/60 border border-black/[0.06] rounded-xl hover:border-black/[0.12] transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center p-1 border border-black/[0.04]">
+                                  <img
+                                    src={`/media/brand-icons/integrations/${p.slug}.svg`}
+                                    alt={p.name}
+                                    className="w-6 h-6 object-contain"
+                                    onError={(e: any) => {
+                                      e.target.style.display = "none";
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-xs font-bold text-[#1A1D2E] flex items-center gap-2">
+                                    {p.name}
+                                    {isConnected && (
+                                      <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 font-semibold rounded-md">
+                                        Active
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] text-[#7A7D8E]">
+                                    {p.scopes ? (Array.isArray(p.scopes) ? p.scopes.join(", ") : String(p.scopes)) : "Standard scopes"}
+                                  </div>
+                                </div>
+                              </div>
+                              <div>
+                                {isConnected ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleConnectOAuth(p.slug)}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-black/5 text-[#4A4D5E] hover:bg-black/10 transition-all"
+                                  >
+                                    Reconnect
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={isConnecting}
+                                    onClick={() => handleConnectOAuth(p.slug)}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#fd3b12] text-white hover:bg-[#E65C00] shadow-sm transition-all flex items-center gap-1.5"
+                                  >
+                                    {isConnecting ? (
+                                      <>
+                                        <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
+                                        <span>Connecting...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
+                                        <span>Connect</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs font-semibold text-[#4A4D5E]">Configured MCP Servers</span>
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingMcp(!isAddingMcp)}
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#fd3b12] text-white hover:bg-[#E65C00] transition-all flex items-center gap-1"
+                          >
+                            <PlusIcon className="w-3.5 h-3.5" />
+                            <span>{isAddingMcp ? "Cancel" : "Add Server"}</span>
+                          </button>
+                        </div>
+
+                        {isAddingMcp && (
+                          <form onSubmit={handleRegisterMcpServer} className="p-3.5 bg-white/80 border border-[#fd3b12]/30 rounded-xl space-y-3 mb-3">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-[#4A4D5E] mb-1">Server Name</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. filesystem"
+                                  value={mcpServerName}
+                                  onChange={(e) => setMcpServerName(e.target.value)}
+                                  className="w-full text-xs p-2 rounded-lg bg-white border border-black/[0.1] focus:outline-none focus:border-[#fd3b12]"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-semibold text-[#4A4D5E] mb-1">Transport</label>
+                                <select
+                                  value={mcpTransport}
+                                  onChange={(e) => setMcpTransport(e.target.value as any)}
+                                  className="w-full text-xs p-2 rounded-lg bg-white border border-black/[0.1] focus:outline-none focus:border-[#fd3b12]"
+                                >
+                                  <option value="stdio">stdio (Local Subprocess)</option>
+                                  <option value="http">http / SSE (Remote URL)</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {mcpTransport === "stdio" ? (
+                              <>
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-[#4A4D5E] mb-1">Command</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. npx -y @modelcontextprotocol/server-filesystem"
+                                    value={mcpCommand}
+                                    onChange={(e) => setMcpCommand(e.target.value)}
+                                    className="w-full text-xs p-2 rounded-lg bg-white border border-black/[0.1] focus:outline-none focus:border-[#fd3b12]"
+                                    required
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-[#4A4D5E] mb-1">Args (space-separated)</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. /workspace"
+                                    value={mcpArgs}
+                                    onChange={(e) => setMcpArgs(e.target.value)}
+                                    className="w-full text-xs p-2 rounded-lg bg-white border border-black/[0.1] focus:outline-none focus:border-[#fd3b12]"
+                                  />
+                                </div>
+                              </>
+                            ) : (
+                              <div>
+                                <label className="block text-[11px] font-semibold text-[#4A4D5E] mb-1">Server URL</label>
+                                <input
+                                  type="url"
+                                  placeholder="https://mcp.example.com/sse"
+                                  value={mcpUrl}
+                                  onChange={(e) => setMcpUrl(e.target.value)}
+                                  className="w-full text-xs p-2 rounded-lg bg-white border border-black/[0.1] focus:outline-none focus:border-[#fd3b12]"
+                                  required
+                                />
+                              </div>
+                            )}
+
+                            <div className="flex justify-end gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setIsAddingMcp(false)}
+                                className="px-3 py-1 text-xs text-[#4A4D5E] hover:text-[#1A1D2E]"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                className="px-3 py-1 rounded-lg text-xs font-semibold bg-[#fd3b12] text-white hover:bg-[#E65C00]"
+                              >
+                                Save Server
+                              </button>
+                            </div>
+                          </form>
+                        )}
+
+                        {mcpServers.length === 0 ? (
+                          <div className="p-6 text-center text-xs text-[#7A7D8E] bg-white/40 border border-black/[0.05] rounded-xl">
+                            No MCP servers configured. Click "+ Add Server" to register a local or remote server.
+                          </div>
+                        ) : (
+                          mcpServers.map((server: any) => (
+                            <div
+                              key={server.name}
+                              className="flex items-center justify-between p-3.5 bg-white/60 border border-black/[0.06] rounded-xl hover:border-black/[0.12] transition-all"
+                            >
+                              <div>
+                                <div className="text-xs font-bold text-[#1A1D2E] flex items-center gap-2">
+                                  {server.name}
+                                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 font-semibold rounded-md">
+                                    {server.transport_type}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${
+                                      server.status === "connected"
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-gray-100 text-gray-600"
+                                    }`}
+                                  >
+                                    {server.status || "disconnected"}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-[#7A7D8E] truncate max-w-[280px]">
+                                  {server.transport_type === "stdio" ? server.command : server.url}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleMcpServer(server.name, server.status === "connected")}
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                                    server.status === "connected"
+                                      ? "bg-black/5 text-[#4A4D5E] hover:bg-black/10"
+                                      : "bg-[#fd3b12] text-white hover:bg-[#E65C00]"
+                                  }`}
+                                >
+                                  {server.status === "connected" ? "Disconnect" : "Connect"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMcpServer(server.name)}
+                                  className="p-1 text-[#7A7D8E] hover:text-red-600 transition-colors"
+                                  title="Delete server"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

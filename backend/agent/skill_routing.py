@@ -50,24 +50,84 @@ INTEGRATION_CAPABILITY_PREFIXES = frozenset({
     "slack",
 })
 
+# Mapping of OAuth provider + scope to granted skill capabilities
+SCOPE_CAPABILITY_MAP: dict[str, list[str]] = {
+    "google:gmail.send": ["google.gmail.send"],
+    "google:gmail.readonly": ["google.gmail.read"],
+    "google:drive.file": ["google.drive.read", "google.drive.write"],
+    "google:drive.readonly": ["google.drive.read"],
+    "github:repo": ["github.repo.read", "github.repo.write", "github.issues.write"],
+    "github:issues": ["github.issues.read", "github.issues.write"],
+    "slack:chat:write": ["slack.chat.write"],
+    "slack:channels:read": ["slack.channels.read"],
+}
+
+
+async def get_integration_capabilities_async(
+    db_session,
+    *,
+    space_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+) -> frozenset[str]:
+    """Get capabilities granted by enabled integrations in a space or for a user."""
+    from backend.db.models import SpaceConnection, UserConnection, IntegrationProvider
+    from sqlalchemy import select
+
+    granted: set[str] = set()
+    if not db_session:
+        return frozenset(granted)
+
+    try:
+        if space_id:
+            stmt = (
+                select(UserConnection, IntegrationProvider)
+                .join(SpaceConnection, SpaceConnection.connection_id == UserConnection.id)
+                .outerjoin(IntegrationProvider, UserConnection.provider_id == IntegrationProvider.id)
+                .where(SpaceConnection.space_id == space_id, SpaceConnection.enabled == True, UserConnection.status == "active")
+            )
+            result = await db_session.execute(stmt)
+            for uc, ip in result.all():
+                provider_slug = ip.slug if ip else uc.provider_id
+                scopes = (uc.scopes or "").split(" ")
+                for scope in scopes:
+                    key = f"{provider_slug}:{scope}"
+                    if key in SCOPE_CAPABILITY_MAP:
+                        granted.update(SCOPE_CAPABILITY_MAP[key])
+        elif user_id:
+            stmt = (
+                select(UserConnection, IntegrationProvider)
+                .outerjoin(IntegrationProvider, UserConnection.provider_id == IntegrationProvider.id)
+                .where(UserConnection.user_id == user_id, UserConnection.status == "active")
+            )
+            result = await db_session.execute(stmt)
+            for uc, ip in result.all():
+                provider_slug = ip.slug if ip else uc.provider_id
+                scopes = (uc.scopes or "").split(" ")
+                for scope in scopes:
+                    key = f"{provider_slug}:{scope}"
+                    if key in SCOPE_CAPABILITY_MAP:
+                        granted.update(SCOPE_CAPABILITY_MAP[key])
+    except Exception:
+        pass
+
+    return frozenset(granted)
+
 
 def get_integration_capabilities(
     *,
     space_id: Optional[int] = None,
     conversation_id: Optional[int] = None,
+    active_scopes: Optional[dict[str, list[str]]] = None,
 ) -> frozenset[str]:
-    """Get capabilities granted by enabled integrations in a space/conversation.
-    
-    This is a synchronous helper - the actual implementation should be async
-    and fetch from the database. For now returns empty set.
-    """
-    # TODO: Implement async DB lookup for space_connections and user_connections
-    # Map provider + scopes to capabilities:
-    # - google + drive.file -> "google.drive.read", "google.drive.write"
-    # - google + gmail.send -> "google.gmail.send"
-    # - github + repo -> "github.repo.read", "github.repo.write"
-    # - slack + chat:write -> "slack.chat.write"
-    return frozenset()
+    """Get capabilities granted by active integration scopes synchronously."""
+    granted: set[str] = set()
+    if active_scopes:
+        for provider, scopes in active_scopes.items():
+            for scope in scopes:
+                key = f"{provider}:{scope}"
+                if key in SCOPE_CAPABILITY_MAP:
+                    granted.update(SCOPE_CAPABILITY_MAP[key])
+    return frozenset(granted)
 
 
 def resolve_client_capabilities(

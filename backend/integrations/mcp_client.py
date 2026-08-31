@@ -587,24 +587,97 @@ def get_mcp_structured_tools(client_manager: MCPClientManager) -> List[Structure
 class MCPRegistry:
     """Registry for MCP server configurations with persistence."""
     
-    def __init__(self, db_session_factory):
+    def __init__(self, db_session_factory=None, user_id: Optional[int] = None):
         self.db_session_factory = db_session_factory
+        self.user_id = user_id
         self.client_manager = MCPClientManager()
     
-    async def load_from_db(self) -> None:
+    async def load_from_db(self, user_id: Optional[int] = None) -> None:
         """Load MCP server configs from database."""
-        # TODO: Implement DB loading
-        pass
+        from backend.db.models import UserMCPServer
+        from sqlalchemy import select
+        target_user_id = user_id or self.user_id
+        if not target_user_id or not self.db_session_factory:
+            return
+        async with self.db_session_factory() as session:
+            stmt = select(UserMCPServer).where(
+                UserMCPServer.user_id == target_user_id,
+                UserMCPServer.enabled == True,
+            )
+            result = await session.execute(stmt)
+            servers = result.scalars().all()
+            for s in servers:
+                args = json.loads(s.args_json) if s.args_json else []
+                env = json.loads(s.env_json) if s.env_json else {}
+                headers = json.loads(s.headers_json) if s.headers_json else {}
+                config = MCPServerConfig(
+                    name=s.name,
+                    transport_type=s.transport_type,
+                    command=s.command,
+                    args=args,
+                    cwd=s.cwd,
+                    env=env,
+                    url=s.url,
+                    headers=headers,
+                    enabled=s.enabled,
+                )
+                self.client_manager.add_server(config)
     
-    async def save_to_db(self, config: MCPServerConfig) -> None:
+    async def save_to_db(self, config: MCPServerConfig, user_id: Optional[int] = None) -> None:
         """Save MCP server config to database."""
-        # TODO: Implement DB saving
-        pass
+        from backend.db.models import UserMCPServer
+        from sqlalchemy import select
+        target_user_id = user_id or self.user_id
+        if not target_user_id or not self.db_session_factory:
+            self.client_manager.add_server(config)
+            return
+        async with self.db_session_factory() as session:
+            stmt = select(UserMCPServer).where(
+                UserMCPServer.user_id == target_user_id,
+                UserMCPServer.name == config.name,
+            )
+            result = await session.execute(stmt)
+            existing = result.scalar_one_or_none()
+            if existing:
+                existing.transport_type = config.transport_type
+                existing.command = config.command
+                existing.args_json = json.dumps(config.args) if config.args else None
+                existing.cwd = config.cwd
+                existing.env_json = json.dumps(config.env) if config.env else None
+                existing.url = config.url
+                existing.headers_json = json.dumps(config.headers) if config.headers else None
+                existing.enabled = config.enabled
+            else:
+                new_server = UserMCPServer(
+                    user_id=target_user_id,
+                    name=config.name,
+                    transport_type=config.transport_type,
+                    command=config.command,
+                    args_json=json.dumps(config.args) if config.args else None,
+                    cwd=config.cwd,
+                    env_json=json.dumps(config.env) if config.env else None,
+                    url=config.url,
+                    headers_json=json.dumps(config.headers) if config.headers else None,
+                    enabled=config.enabled,
+                )
+                session.add(new_server)
+            await session.commit()
+            self.client_manager.add_server(config)
     
-    async def delete_from_db(self, name: str) -> None:
+    async def delete_from_db(self, name: str, user_id: Optional[int] = None) -> None:
         """Delete MCP server config from database."""
-        # TODO: Implement DB deletion
-        pass
+        from backend.db.models import UserMCPServer
+        from sqlalchemy import delete
+        target_user_id = user_id or self.user_id
+        if target_user_id and self.db_session_factory:
+            async with self.db_session_factory() as session:
+                stmt = delete(UserMCPServer).where(
+                    UserMCPServer.user_id == target_user_id,
+                    UserMCPServer.name == name,
+                )
+                await session.execute(stmt)
+                await session.commit()
+        self.client_manager.remove_server(name)
     
     async def start(self) -> None:
         """Start all registered servers."""

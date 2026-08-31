@@ -750,7 +750,7 @@ async def bind_connection_to_space(
     # Verify space ownership/access
     from backend.db.models import CodexSpaceAccess
 
-    space = db.get(CodexSpace, space_id)
+    space = await db.get(CodexSpace, space_id)
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
 
@@ -809,7 +809,7 @@ async def list_space_connections(
     from backend.db.models import CodexSpaceAccess
 
     # Verify access
-    space = db.get(CodexSpace, space_id)
+    space = await db.get(CodexSpace, space_id)
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
 
@@ -825,22 +825,28 @@ async def list_space_connections(
         if not has_access:
             raise HTTPException(status_code=403, detail="Not a member of this space")
 
-    stmt = select(SpaceConnection).where(SpaceConnection.space_id == space_id, SpaceConnection.enabled == True)
+    stmt = (
+        select(SpaceConnection, UserConnection, IntegrationProvider)
+        .join(UserConnection, SpaceConnection.connection_id == UserConnection.id)
+        .outerjoin(IntegrationProvider, UserConnection.provider_id == IntegrationProvider.id)
+        .where(SpaceConnection.space_id == space_id, SpaceConnection.enabled == True)
+    )
     result = await db.execute(stmt)
-    connections = result.scalars().all()
+    rows = result.all()
 
     out = []
-    for sc in connections:
-        conn = await get_user_connection(
-            db_session=db, user_id=current_user.id, provider_slug="TODO lookup"
-        )
-        # In production, lookup by sc.connection_id
+    for sc, uc, ip in rows:
         out.append(
             {
+                "id": sc.id,
                 "connection_id": sc.connection_id,
+                "provider_id": uc.provider_id if uc else None,
+                "provider_name": ip.name if ip else None,
+                "provider_slug": ip.slug if ip else None,
+                "status": uc.status if uc else "unknown",
                 "enabled": sc.enabled,
                 "config": sc.config_json,
-                "created_at": sc.created_at.isoformat(),
+                "created_at": sc.created_at.isoformat() if sc.created_at else None,
             }
         )
     return out
