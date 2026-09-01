@@ -13,14 +13,21 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    environment: aicodex-lab
     permissions:
       contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
+
+      - name: Checkout CodexSpaces submodule
+        env:
+          CODEXSPACES_READ_TOKEN: ${{ secrets.CODEXSPACES_READ_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${CODEXSPACES_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git submodule update --init codex_spaces
+          git config --global --unset-all url."https://x-access-token:${CODEXSPACES_READ_TOKEN}@github.com/".insteadOf
 
       - name: Set up Python
         uses: actions/setup-python@v5
