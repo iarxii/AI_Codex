@@ -252,9 +252,7 @@ class SpaceConnection(Base):
     space: Mapped["CodexSpace"] = relationship(back_populates="connections")
     connection: Mapped["UserConnection"] = relationship(back_populates="space_relations")
     
-    __table_args__ = (
-        Index("ix_space_connections_space_id", "space_id"),
-    )
+
 
 class IntegrationFlow(Base):
     __tablename__ = "integration_flows"
@@ -275,9 +273,7 @@ class IntegrationFlow(Base):
     steps: Mapped[List["IntegrationStep"]] = relationship(back_populates="flow", order_by="IntegrationStep.step_index")
     runs: Mapped[List["IntegrationFlowRun"]] = relationship(back_populates="flow", order_by="IntegrationFlowRun.started_at.desc()")
     
-    __table_args__ = (
-        Index("ix_integration_flows_owner_id", owner_id),
-    )
+
 
 class IntegrationStep(Base):
     __tablename__ = "integration_steps"
@@ -347,7 +343,6 @@ class UserMCPServer(Base):
     user: Mapped["User"] = relationship(back_populates="mcp_servers")
     
     __table_args__ = (
-        Index("ix_user_mcp_servers_user_id", "user_id"),
         Index("ix_user_mcp_servers_user_name", "user_id", "name", unique=True),
     )
 

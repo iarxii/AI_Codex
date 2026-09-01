@@ -1,4 +1,5 @@
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import JSONResponse
@@ -16,144 +17,168 @@ mask_uvicorn_logs()
 # Global process handle for the Microsoft Agentic Code Lab Go sidecar
 sidecar_proc = None
 
+# Track initialization state for health checks
+_initialization_complete = False
+_initialization_error = None
+
+async def _run_initialization():
+    """Run heavy initialization in background after server starts."""
+    global _initialization_complete, _initialization_error
+    try:
+        print("[INIT] Starting background initialization...")
+        
+        # Start Go Sidecar if binary is present
+        import subprocess
+        global sidecar_proc
+        sidecar_bin = None
+        if os.path.exists("/app/ms_agent"):
+            sidecar_bin = "/app/ms_agent"
+        elif os.path.exists("codex_spaces/sidecar/ms_agent"):
+            sidecar_bin = "codex_spaces/sidecar/ms_agent"
+        elif os.path.exists("codex_spaces/sidecar/ms_agent.exe"):
+            sidecar_bin = "codex_spaces/sidecar/ms_agent.exe"
+
+        if sidecar_bin:
+            print(f"[INIT] Starting Go Sidecar: {sidecar_bin}")
+            try:
+                env = os.environ.copy()
+                env["PORT"] = "5005"
+                sidecar_proc = subprocess.Popen([sidecar_bin], env=env)
+                print(f"[INIT] Go Sidecar started (PID {sidecar_proc.pid}) on internal port 5005")
+            except Exception as e:
+                print(f"[INIT] Error starting Go Sidecar: {e}")
+        
+        # Sync SQLite from GCS if in Cloud Run
+        is_cloud_run = os.getenv("K_SERVICE") is not None
+        force_restart = os.getenv("FORCE_RESTART") == "1" or os.getenv("FORCE_RESTART") == "true"
+        
+        if is_cloud_run and settings.DB_TYPE == "sqlite":
+            if not force_restart:
+                print("[INIT] Cloud Run detected, syncing DB from GCS...")
+                from backend.utils.storage import download_db_from_gcs
+                download_db_from_gcs()
+            else:
+                print("[INIT] FORCE_RESTART enabled, skipping GCS sync to trigger fresh schema.")
+
+        # Initialize DB on startup
+        print(f"[INIT] Initializing database: {settings.async_database_url}")
+        await init_db()
+        
+        # Verify User table schema in logs
+        try:
+            from backend.db.session import engine
+            from sqlalchemy import text
+            async with engine.connect() as conn:
+                result = await conn.execute(text("PRAGMA table_info(users)"))
+                columns = [row[1] for row in result.fetchall()]
+                print(f"[INIT] Verified User columns: {columns}")
+        except Exception as e:
+            print(f"[INIT] Warning: Schema verification failed: {e}")
+
+        print("[INIT] Database initialized.")
+        
+        # Seed Codex Spaces to ensure catalog is populated
+        from codex_spaces.backend.seed_spaces import seed
+        await seed()
+        print("[INIT] Codex Spaces seeded.")
+        
+        if is_cloud_run and settings.DB_TYPE == "sqlite" and force_restart:
+            print("[INIT] Schema updated via FORCE_RESTART. Performing immediate GCS sync...")
+            from backend.utils.storage import upload_db_to_gcs
+            upload_db_to_gcs()
+        
+        # Admin Account Migration
+        print("[INIT] Running Identity Migration (Scrubbing legacy admin, elevating nexus-architect)...")
+        from backend.db.session import AsyncSessionLocal
+        from backend.db.models import User
+        import uuid
+        
+        # 1. Deactivate legacy admin
+        try:
+            async with AsyncSessionLocal() as session:
+                scrambled_hash = f"disabled_{uuid.uuid4().hex}"
+                await session.execute(
+                    update(User).where(User.username == "admin").values(
+                        is_active=False, 
+                        hashed_password=scrambled_hash
+                    )
+                )
+                await session.commit()
+            print("[INIT] Admin account deactivated.")
+        except Exception as e:
+            print(f"[INIT] Warning: Admin deactivation failed: {e}")
+
+        # 2. Seed/Elevate nexus-architect
+        try:
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(User).filter_by(username="nexus-architect"))
+                architect = result.scalar_one_or_none()
+                if not architect:
+                    print("[INIT] Seeding nexus-architect super-user...")
+                    from backend.db.session import pwd_context
+                    new_architect = User(
+                        username="nexus-architect",
+                        hashed_password=pwd_context.hash("GOD_MODE_ON"),
+                        role="super_admin",
+                        first_name="Nexus",
+                        surname="Architect",
+                        profession="System Sovereign",
+                        is_active=True
+                    )
+                    session.add(new_architect)
+                else:
+                    print("[INIT] nexus-architect exists, ensuring super_admin elevation...")
+                    await session.execute(update(User).where(User.username == "nexus-architect").values(role="super_admin"))
+                await session.commit()
+            print("[INIT] nexus-architect identity verified.")
+        except Exception as e:
+            print(f"[INIT] Warning: nexus-architect seeding/elevation failed: {e}")
+        
+        
+        # Initialize OllamaOpt bridge
+        print("[INIT] Setting up OllamaOpt bridge...")
+        from backend.integrations.ollamaopt_bridge import setup_ollamaopt_bridge
+        setup_ollamaopt_bridge()
+        print("[INIT] Initialization complete. Server ready.")
+
+        # Initialize Integration Flow Scheduler
+        print("[INIT] Starting Integration Flow Scheduler...")
+        from backend.integrations.runner import load_and_schedule_flows
+        await load_and_schedule_flows()
+        print("[INIT] Integration Flow Scheduler started.")
+
+        # Initialize MCP Client Manager
+        print("[INIT] Starting MCP Client Manager...")
+        from backend.integrations.mcp_client import MCPClientManager, load_default_mcp_servers, get_mcp_client_manager
+        mcp_manager = get_mcp_client_manager()
+        for server_config in load_default_mcp_servers():
+            mcp_manager.add_server(server_config)
+        await mcp_manager.connect_all()
+        print("[INIT] MCP Client Manager started.")
+        
+        _initialization_complete = True
+        print("[INIT] Background initialization completed successfully.")
+    except Exception as e:
+        _initialization_error = e
+        print(f"[INIT] Background initialization failed: {e}")
+        import traceback
+        traceback.print_exc()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("[LIFESPAN] Starting initialization...")
-    
-    # Start Go Sidecar if binary is present
-    import subprocess
-    global sidecar_proc
-    sidecar_bin = None
-    if os.path.exists("/app/ms_agent"):
-        sidecar_bin = "/app/ms_agent"
-    elif os.path.exists("codex_spaces/sidecar/ms_agent"):
-        sidecar_bin = "codex_spaces/sidecar/ms_agent"
-    elif os.path.exists("codex_spaces/sidecar/ms_agent.exe"):
-        sidecar_bin = "codex_spaces/sidecar/ms_agent.exe"
-
-    if sidecar_bin:
-        print(f"[LIFESPAN] Starting Go Sidecar: {sidecar_bin}")
-        try:
-            # Overriding PORT to 5005 for the sidecar process to prevent it from inheriting 
-            # Cloud Run's default PORT=8080 and causing a port conflict with FastAPI.
-            env = os.environ.copy()
-            env["PORT"] = "5005"
-            sidecar_proc = subprocess.Popen([sidecar_bin], env=env)
-            print(f"[LIFESPAN] Go Sidecar started (PID {sidecar_proc.pid}) on internal port 5005")
-        except Exception as e:
-            print(f"[LIFESPAN] Error starting Go Sidecar: {e}")
-    # Sync SQLite from GCS if in Cloud Run
-    is_cloud_run = os.getenv("K_SERVICE") is not None
-    force_restart = os.getenv("FORCE_RESTART") == "1" or os.getenv("FORCE_RESTART") == "true"
-    
-    if is_cloud_run and settings.DB_TYPE == "sqlite":
-        if not force_restart:
-            print("[LIFESPAN] Cloud Run detected, syncing DB from GCS...")
-            from backend.utils.storage import download_db_from_gcs
-            download_db_from_gcs()
-        else:
-            print("[LIFESPAN] FORCE_RESTART enabled, skipping GCS sync to trigger fresh schema.")
-
-    # Initialize DB on startup
-    print(f"[LIFESPAN] Initializing database: {settings.async_database_url}")
-    await init_db()
-    
-    # Verify User table schema in logs
-    try:
-        from backend.db.session import engine
-        from sqlalchemy import text
-        async with engine.connect() as conn:
-            result = await conn.execute(text("PRAGMA table_info(users)"))
-            columns = [row[1] for row in result.fetchall()]
-            print(f"[LIFESPAN] Verified User columns: {columns}")
-    except Exception as e:
-        print(f"[LIFESPAN] Warning: Schema verification failed: {e}")
-
-    print("[LIFESPAN] Database initialized.")
-    
-    # Seed Codex Spaces to ensure catalog is populated
-    from codex_spaces.backend.seed_spaces import seed
-    await seed()
-    print("[LIFESPAN] Codex Spaces seeded.")
-    
-    if is_cloud_run and settings.DB_TYPE == "sqlite" and force_restart:
-        print("[LIFESPAN] Schema updated via FORCE_RESTART. Performing immediate GCS sync...")
-        from backend.utils.storage import upload_db_to_gcs
-        upload_db_to_gcs()
-    
-    # Admin Account Migration
-    print("[LIFESPAN] Running Identity Migration (Scrubbing legacy admin, elevating nexus-architect)...")
-    from backend.db.session import AsyncSessionLocal
-    from backend.db.models import User
-    import uuid
-    
-    # 1. Deactivate legacy admin
-    try:
-        async with AsyncSessionLocal() as session:
-            scrambled_hash = f"disabled_{uuid.uuid4().hex}"
-            await session.execute(
-                update(User).where(User.username == "admin").values(
-                    is_active=False, 
-                    hashed_password=scrambled_hash
-                )
-            )
-            await session.commit()
-        print("[LIFESPAN] Admin account deactivated.")
-    except Exception as e:
-        print(f"[LIFESPAN] Warning: Admin deactivation failed: {e}")
-
-    # 2. Seed/Elevate nexus-architect
-    try:
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(select(User).filter_by(username="nexus-architect"))
-            architect = result.scalar_one_or_none()
-            if not architect:
-                print("[LIFESPAN] Seeding nexus-architect super-user...")
-                from backend.db.session import pwd_context
-                new_architect = User(
-                    username="nexus-architect",
-                    hashed_password=pwd_context.hash("GOD_MODE_ON"), # Standard fallback, but GOD_MODE_ON bypasses anyway
-                    role="super_admin",
-                    first_name="Nexus",
-                    surname="Architect",
-                    profession="System Sovereign",
-                    is_active=True
-                )
-                session.add(new_architect)
-            else:
-                print("[LIFESPAN] nexus-architect exists, ensuring super_admin elevation...")
-                await session.execute(update(User).where(User.username == "nexus-architect").values(role="super_admin"))
-            await session.commit()
-        print("[LIFESPAN] nexus-architect identity verified.")
-    except Exception as e:
-        print(f"[LIFESPAN] Warning: nexus-architect seeding/elevation failed: {e}")
-    
-    
-# Initialize OllamaOpt bridge
-    print("[LIFESPAN] Setting up OllamaOpt bridge...")
-    from backend.integrations.ollamaopt_bridge import setup_ollamaopt_bridge
-    setup_ollamaopt_bridge()
-    print("[LIFESPAN] Initialization complete. Server ready.")
-
-    # Initialize Integration Flow Scheduler
-    print("[LIFESPAN] Starting Integration Flow Scheduler...")
-    from backend.integrations.runner import load_and_schedule_flows
-    await load_and_schedule_flows()
-    print("[LIFESPAN] Integration Flow Scheduler started.")
-
-    # Initialize MCP Client Manager
-    print("[LIFESPAN] Starting MCP Client Manager...")
-    from backend.integrations.mcp_client import MCPClientManager, load_default_mcp_servers
-    mcp_manager = get_mcp_client_manager()
-    for server_config in load_default_mcp_servers():
-        mcp_manager.add_server(server_config)
-    await mcp_manager.connect_all()
-    print("[LIFESPAN] MCP Client Manager started.")
+    # Start initialization in background - don't block startup
+    init_task = asyncio.create_task(_run_initialization())
     
     yield
     
     # Shutdown logic
     print("[LIFESPAN] Shutting down...")
+    
+    # Wait for initialization to complete (with timeout) before shutdown
+    try:
+        await asyncio.wait_for(init_task, timeout=30.0)
+    except asyncio.TimeoutError:
+        print("[LIFESPAN] Initialization task didn't complete in time, continuing shutdown...")
     
     # Shutdown MCP Client Manager
     print("[LIFESPAN] Stopping MCP Client Manager...")
@@ -172,6 +197,7 @@ async def lifespan(app: FastAPI):
             sidecar_proc.kill()
             print("[LIFESPAN] Go Sidecar killed.")
 
+    is_cloud_run = os.getenv("K_SERVICE") is not None
     if is_cloud_run and settings.DB_TYPE == "sqlite":
         print("[LIFESPAN] Cloud Run detected, uploading DB to GCS before shutdown...")
         from backend.utils.storage import upload_db_to_gcs
@@ -286,7 +312,21 @@ app.mount("/graph", StaticFiles(directory=str(WORKSPACES_DIR), html=True), name=
 @app.get("/healthz")
 async def health_check():
     from datetime import datetime
-    return {"status": "healthy", "timestamp": str(datetime.now())}
+    global _initialization_complete, _initialization_error
+    if _initialization_error:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "initialization_failed",
+                "error": str(_initialization_error),
+                "timestamp": str(datetime.now())
+            }
+        )
+    return {
+        "status": "healthy" if _initialization_complete else "initializing",
+        "initialization_complete": _initialization_complete,
+        "timestamp": str(datetime.now())
+    }
 
 # Include routers
 from backend.api import auth, chat, metrics, rag, skills, conversations, models, workspace, profile, admin, market, arcade, portal

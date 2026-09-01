@@ -449,17 +449,23 @@ def load_scheduled_flows() -> None:
 
 async def load_and_schedule_flows() -> None:
     """Load all enabled flows with cron schedules and schedule them."""
-    async with AsyncSessionLocal() as db:
-        stmt = select(IntegrationFlow).where(
-            and_(IntegrationFlow.enabled == True, IntegrationFlow.schedule_cron.is_not(None))
-        )
-        result = await db.execute(stmt)
-        flows = result.scalars().all()
-        
-        for flow in flows:
-            schedule_flow(flow)
-        
-        logger.info(f"Loaded {len(flows)} scheduled flows")
+    try:
+        async with AsyncSessionLocal() as db:
+            stmt = select(IntegrationFlow).where(
+                and_(IntegrationFlow.enabled == True, IntegrationFlow.schedule_cron.is_not(None))
+            )
+            result = await db.execute(stmt)
+            flows = result.scalars().all()
+            
+            for flow in flows:
+                schedule_flow(flow)
+            
+            logger.info(f"Loaded {len(flows)} scheduled flows")
+    except Exception as e:
+        # Gracefully handle case where the integration_flows table doesn't exist yet
+        # (e.g. restoring an older DB from GCS that predates this feature).
+        # The table will be created by init_db; flows will be scheduled on next startup.
+        logger.warning(f"[SCHEDULER] Could not load scheduled flows (table may not exist yet): {e}")
 
 
 # ---------------------------------------------------------------------------

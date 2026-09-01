@@ -109,6 +109,8 @@ async def migrate_db(conn):
             print(f"[MIGRATION] Warning: invoicing migration for {inv_table}: {e}")
 
 async def init_db():
+    # Step 1: Ensure all tables exist. This is the critical step and must not be
+    # swallowed by migration errors. Run it in its own isolated try/except.
     try:
         async with engine.begin() as conn:
             # Create pgvector extension if it doesn't exist (only for Postgres)
@@ -116,12 +118,20 @@ async def init_db():
                 from sqlalchemy import text
                 await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             
-            # await conn.run_sync(Base.metadata.drop_all) # Careful in prod
             await conn.run_sync(Base.metadata.create_all)
-            
-            # Run manual migrations for SQLite
+    except Exception as e:
+        print(f"Warning: Table creation (create_all) failed. Error: {e}")
+
+    # Step 2: Run migrations in a separate block so a duplicate-index error
+    # (from an already-existing DB restored from GCS) doesn't abort step 1.
+    try:
+        async with engine.begin() as conn:
             await migrate_db(conn)
-            
+    except Exception as e:
+        print(f"Warning: DB migration failed. Server will continue. Error: {e}")
+
+    # Step 3: Seed reference data.
+    try:
         async with AsyncSessionLocal() as session:
             # Admin seeding is disabled for production security. 
             # Use established Administrator accounts (e.g. nexus-architect).
@@ -170,7 +180,7 @@ async def init_db():
                     print(f"Seeded integration provider: {slug}")
             await session.commit()
     except Exception as e:
-        print(f"Warning: Database initialization failed. Server starting without DB connectivity. Error: {e}")
+        print(f"Warning: Database seeding failed. Server starting without full seed data. Error: {e}")
 
 async def get_db():
     async with AsyncSessionLocal() as session:

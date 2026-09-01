@@ -6,9 +6,7 @@ import {
   PlusIcon,
   TrashIcon,
   ArrowTopRightOnSquareIcon,
-  ShieldCheckIcon,
-  CubeIcon,
-  BoltIcon,
+  ServerIcon,
 } from "@heroicons/react/24/outline";
 import { getValidToken } from "../utils/authToken";
 import { useNavigate } from "react-router-dom";
