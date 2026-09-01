@@ -21,13 +21,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Checkout CodexSpaces submodule
-        env:
-          CODEXSPACES_READ_TOKEN: ${{ secrets.CODEXSPACES_READ_TOKEN }}
-        run: |
-          git config --global url."https://x-access-token:${CODEXSPACES_READ_TOKEN}@github.com/".insteadOf "https://github.com/"
-          git submodule update --init codex_spaces
-          git config --global --unset-all url."https://x-access-token:${CODEXSPACES_READ_TOKEN}@github.com/".insteadOf
+      - name: Checkout CodexSpaces source
+        uses: actions/checkout@v4
+        with:
+          repository: iarxii/CodexSpaces
+          token: ${{ secrets.CODEXSPACES_READ_TOKEN }}
+          path: codex_spaces
+          fetch-depth: 0
+
+      - name: Align CodexSpaces revision
+        run: git -C codex_spaces checkout "$(git ls-tree HEAD codex_spaces | awk '{print $3}')"
 
       - name: Set up Python
         uses: actions/setup-python@v5
