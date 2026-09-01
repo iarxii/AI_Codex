@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: false
 
       - name: Checkout CodexSpaces source
         uses: actions/checkout@v4
@@ -28,9 +30,7 @@ jobs:
           token: ${{ secrets.CODEXSPACES_READ_TOKEN }}
           path: codex_spaces
           fetch-depth: 0
-
-      - name: Align CodexSpaces revision
-        run: git -C codex_spaces checkout "$(git ls-tree HEAD codex_spaces | awk '{print $3}')"
+          submodules: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
