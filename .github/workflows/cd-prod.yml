@@ -1,0 +1,17 @@
+name: Alibaba Prod Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  production-gate:
+    runs-on: ubuntu-latest
+    environment: aicodex-lab
+    permissions:
+      contents: read
+
+    steps:
+      - name: Production validation gate
+        run: |
+          echo "Production deploy is intentionally blocked until the prod ECS/SLB/TLS model is approved."
+          echo "Use this workflow only after staging passes with smoke and contract checks."

@@ -1,0 +1,59 @@
+name: Alibaba Dev Deploy
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+jobs:
+  build-and-push-dev:
+    runs-on: ubuntu-latest
+    environment: aicodex-lab
+    permissions:
+      contents: read
+
+    env:
+      ALIBABA_REGION_ID: ${{ secrets.ALIBABA_REGION_ID }}
+      ALIBABA_REGISTRY: registry.${{ secrets.ALIBABA_REGION_ID }}.aliyuncs.com
+      IMAGE_NAME: aicodex/backend
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Alibaba Container Registry
+        run: |
+          echo "${{ secrets.ALIBABA_ACCESS_KEY_SECRET }}" | docker login \
+            --username "${{ secrets.ALIBABA_ACCESS_KEY_ID }}" \
+            --password-stdin \
+            "$ALIBABA_REGISTRY"
+
+      - name: Prepare Docker build context
+        run: |
+          rm -rf backend/codex_spaces_local backend/skills_local
+          mkdir -p backend/codex_spaces_local backend/skills_local
+          cp -R codex_spaces/. backend/codex_spaces_local/
+          cp -R skills/. backend/skills_local/
+
+      - name: Build backend image
+        run: |
+          docker build \
+            -f backend/Dockerfile \
+            -t "$ALIBABA_REGISTRY/$IMAGE_NAME:$IMAGE_TAG" \
+            -t "$ALIBABA_REGISTRY/$IMAGE_NAME:dev" \
+            .
+
+      - name: Push backend image
+        run: |
+          docker push "$ALIBABA_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+          docker push "$ALIBABA_REGISTRY/$IMAGE_NAME:dev"
+
+      - name: Smoke check guidance
+        run: |
+          echo "Image published to $ALIBABA_REGISTRY/$IMAGE_NAME:dev"
+          echo "Next step: deploy this image to the dev ECS GPU instance or Terraform-managed ECS target."

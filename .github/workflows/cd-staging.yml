@@ -1,0 +1,17 @@
+name: Alibaba Staging Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  staging-gate:
+    runs-on: ubuntu-latest
+    environment: aicodex-lab
+    permissions:
+      contents: read
+
+    steps:
+      - name: Staging validation gate
+        run: |
+          echo "Staging deploy is intentionally blocked until the Alibaba ECS/SLB topology is defined."
+          echo "Use this workflow as the promotion gate after dev is stable."
