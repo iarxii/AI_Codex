@@ -35,4 +35,6 @@ jobs:
         run: python -m compileall backend
 
       - name: Run backend tests
-        run: pytest backend --maxfail=1 -q
+        env:
+          SECRET_KEY: ci-test-secret-not-for-production
+        run: pytest backend --ignore=backend/OllamaOpt_local --ignore=backend/scratch --maxfail=1 -q

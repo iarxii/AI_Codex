@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import pytest
 from langchain_core.messages import HumanMessage, AIMessage
 
 # Add backend directory to Python path
@@ -22,6 +23,7 @@ class MockConfig:
     def get(self, key, default=None):
         return self.config.get(key, default)
 
+@pytest.mark.asyncio
 async def test_short_process_heuristics():
     print("Running short-process heuristic tests...")
     

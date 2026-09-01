@@ -16,7 +16,11 @@ async def test_final_report_node_with_tutor():
         "messages": [
             HumanMessage(content="Create a Python function to add two numbers"),
             AIMessage(content="I'll create a simple addition function."),
-            ToolMessage(name="file_edit", content="Created calculator.py with add function")
+            ToolMessage(
+                name="file_edit",
+                content="Created calculator.py with add function",
+                tool_call_id="test-file-edit",
+            )
         ],
         "task_goal": "Create a Python function to add two numbers",
         "include_tutor": True,
@@ -60,7 +64,7 @@ When creating functions, it's important to follow principles like single respons
     
     with patch('backend.agent.nodes.get_dynamic_llm') as mock_get_llm:
         mock_llm = AsyncMock()
-        mock_llm.ainvoke.return_value = mock_response
+        mock_llm.ainvoke.return_value = AIMessage(content=mock_response)
         mock_get_llm.return_value = mock_llm
         
         # Call the function
@@ -126,7 +130,7 @@ async def test_final_report_node_without_tutor():
     
     with patch('backend.agent.nodes.get_dynamic_llm') as mock_get_llm:
         mock_llm = AsyncMock()
-        mock_llm.ainvoke.return_value = mock_response
+        mock_llm.ainvoke.return_value = AIMessage(content=mock_response)
         mock_get_llm.return_value = mock_llm
         
         # Call the function
@@ -159,7 +163,11 @@ async def test_final_report_node_increased_context_window():
         "messages": [
             HumanMessage(content="Do something complex"),
             AIMessage(content=long_agent_message),
-            ToolMessage(name="complex_tool", content=long_tool_message)
+            ToolMessage(
+                name="complex_tool",
+                content=long_tool_message,
+                tool_call_id="test-complex-tool",
+            )
         ],
         "task_goal": "Do something complex",
         "include_tutor": True,
@@ -189,7 +197,7 @@ async def test_final_report_node_increased_context_window():
     
     with patch('backend.agent.nodes.get_dynamic_llm') as mock_get_llm:
         mock_llm = AsyncMock()
-        mock_llm.ainvoke.return_value = mock_response
+        mock_llm.ainvoke.return_value = AIMessage(content=mock_response)
         mock_get_llm.return_value = mock_llm
         
         # Call the function
@@ -200,10 +208,10 @@ async def test_final_report_node_increased_context_window():
         # The tool message should be truncated to 250 chars (not 100)
         mock_get_llm.assert_called_once()
         call_args = mock_llm.ainvoke.call_args
-        prompt_arg = call_args[0][0]  # First argument to ainvoke
+        prompt_messages = call_args[0][0]  # First argument to ainvoke
         
         # Check that the prompt contains our truncated content
-        prompt_content = prompt_arg.content
+        prompt_content = prompt_messages[0].content
         assert "A" * 500 in prompt_content  # First 500 chars of agent message
         assert "B" * 250 in prompt_content  # First 250 chars of tool message
         # The full original messages should NOT be in the prompt (they should be truncated)
