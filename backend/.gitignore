@@ -1,5 +1,7 @@
 debug.txt
 .env
+.env.debug
+debug_chat_failures.log
 __pycache__
 *.pyc
 *.pyo

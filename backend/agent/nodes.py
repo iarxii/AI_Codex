@@ -717,7 +717,6 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     base_timeout = 120.0 if provider in ("local", "ollama_cloud") else 60.0
     
     # Dynamically scale timeout based on context complexity (tool executions)
-    from langchain_core.messages import ToolMessage
     original_messages = state.get("messages", [])
     tool_turns = sum(1 for m in original_messages if getattr(m, "type", "") == "tool" or isinstance(m, ToolMessage))
     request_timeout = base_timeout + (tool_turns * 30.0)
@@ -1100,8 +1099,7 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
         tool_results = await asyncio.gather(*tool_tasks)
         
         # Return results as messages
-        # Convert results to tool messages
-        from langchain_core.messages import ToolMessage
+        # Convert results to tool messages (ToolMessage is imported at module level)
         tool_messages = []
         for result in tool_results:
             tool_messages.append(ToolMessage(
@@ -1133,7 +1131,7 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
         is_client_tool = tool_name in delegated_for_client
         
         if tool_name == "compact_context":
-            from langchain_core.messages import RemoveMessage, SystemMessage
+            from langchain_core.messages import RemoveMessage
             messages = state.get("messages", [])
             if not messages:
                 tool_result = "No history available to compact."
