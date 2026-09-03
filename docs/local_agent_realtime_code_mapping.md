@@ -160,6 +160,8 @@ These changes are limited to [`backend/debug_chat_cli.py`](../backend/debug_chat
 
 The CLI also validates interactive commands locally. Blank `/provider`, `/model`, `/apikey`, `/baseurl`, `/conv`, and `/raw` commands now print usage instead of mutating state, raising `ValueError`, or sending an empty frame. Invalid `/conv` values and malformed `/raw` JSON are rejected before transmission. If the server closes the socket, the receiver marks the session closed and send failures terminate the input loop instead of producing cascading errors.
 
+The CLI presentation is dependency-free and TTY-aware. Interactive terminals receive light ANSI styling; piped and redirected output stays plain. The console shows a session header, route and status labels, an `Assistant >` response stream, readable tool sections, and compact telemetry.
+
 ## Production endpoint evaluation
 
 Target: `https://aicodex-be-1096425756328.us-central1.run.app`
@@ -207,6 +209,14 @@ Hello! ... How can I help you today?
 ```
 
 Telemetry reported provider `ollama_cloud`, model `gpt-oss:20b`, node sequence `['init', 'planner', 'guard', 'reason']`, and backend total time about `11.07s`. No `localhost:11434` request occurred. This confirms the original issue was the CLI's hardcoded local provider and placeholder model, not production endpoint selection.
+
+The styled CLI was also verified against production with `Hi`: login, conversation creation, cloud model selection, `SHORT` routing, streamed assistant output, compact telemetry, `Ready`, and `done` all rendered successfully. The observed round trip was `2.95s`.
+
+## Prompt rendering fix
+
+The original console used blocking `input("You: ")` while the receiver task printed realtime events. When a response arrived after the next prompt was created, status and token output shared the active input row, causing the cursor to jump and overwrite earlier text.
+
+The CLI now serializes turns: after sending a normal prompt it waits for `done`, `error`, or socket closure before creating the next input prompt. Production verification with `Hi` showed the complete event sequence and assistant response first, followed by a single new `You:` prompt. This removes the output/input race without adding a terminal UI dependency.
 
 ## Open verification gap
 

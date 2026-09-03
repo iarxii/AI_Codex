@@ -59,6 +59,39 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env.debug")
 
 
+class ConsoleStyle:
+    """Small TTY-aware formatter so piped output remains plain and testable."""
+
+    def __init__(self) -> None:
+        self.enabled = sys.stdout.isatty() and os.environ.get("TERM") != "dumb"
+
+    def paint(self, text: str, code: str) -> str:
+        if not self.enabled:
+            return text
+        return f"\033[{code}m{text}\033[0m"
+
+    def bold(self, text: str) -> str:
+        return self.paint(text, "1")
+
+    def dim(self, text: str) -> str:
+        return self.paint(text, "2")
+
+    def cyan(self, text: str) -> str:
+        return self.paint(text, "36")
+
+    def green(self, text: str) -> str:
+        return self.paint(text, "32")
+
+    def yellow(self, text: str) -> str:
+        return self.paint(text, "33")
+
+    def red(self, text: str) -> str:
+        return self.paint(text, "31")
+
+
+UI = ConsoleStyle()
+
+
 def _default_provider(target: str) -> str:
     configured = os.environ.get("AICODEX_DEBUG_PROVIDER")
     if configured:
@@ -161,7 +194,9 @@ class SessionState:
     last_user_message: str = ""
     seen_first_token: bool = False
     connection_closed: asyncio.Event = field(default_factory=asyncio.Event)
+    turn_complete: asyncio.Event = field(default_factory=asyncio.Event)
     close_requested: bool = False
+    response_started: bool = False
 
     def log_failure(self, reason: str) -> None:
         entry = {
@@ -184,31 +219,62 @@ def _print_event(data: dict[str, Any], session: SessionState) -> None:
             ttft = time.monotonic() - session.last_send_time
             print(f"\n[ttft] {ttft:.2f}s")
             session.seen_first_token = True
+        if not session.response_started:
+            print(f"\n{UI.cyan('Assistant')} > ", end="", flush=True)
+            session.response_started = True
         # Streamed text — print inline without a newline so replies read naturally.
         content = data.get("delta") if etype == "token_delta" else data.get("content")
         print(content or "", end="", flush=True)
     elif etype == "status":
-        print(f"\n[status] node={data.get('node')} — {data.get('status')}")
+        print(f"\n{UI.dim('[status]')} {data.get('node')} | {data.get('status')}")
+    elif etype == "routing":
+        print(
+            f"\n{UI.cyan('[route]')} {UI.bold(str(data.get('process_mode', '?')).upper())}"
+            f" | {data.get('reason', 'unknown')} | client={data.get('client_type', '?')}"
+        )
     elif etype == "tool_call":
-        print(f"\n[tool_call] {json.dumps(data.get('tool_calls'), indent=2)}")
+        print(f"\n{UI.yellow('[tool call]')}\n{json.dumps(data.get('tool_calls'), indent=2)}")
     elif etype == "tool_result":
-        print(f"\n[tool_result] id={data.get('tool_call_id')} -> {data.get('content')}")
+        print(f"\n{UI.green('[tool result]')} {data.get('tool_call_id')} -> {data.get('content')}")
     elif etype == "a2ui_artifact":
-        print(f"\n[a2ui_artifact] {json.dumps(data, indent=2)[:500]}")
+        print(f"\n{UI.yellow('[artifact]')} {json.dumps(data, indent=2)[:500]}")
     elif etype == "model_switch":
-        print(f"\n[model_switch] {data}")
+        print(f"\n{UI.yellow('[model switch]')} {data}")
     elif etype == "error":
         elapsed = f"{time.monotonic() - session.last_send_time:.2f}s" if session.last_send_time else "?"
-        print(f"\n[ERROR] ({elapsed}) {data.get('message')}")
+        print(f"\n{UI.red('[error]')} ({elapsed}) {data.get('message')}")
         session.log_failure(str(data.get("message")))
+        session.turn_complete.set()
     elif etype == "done":
         rtt = f"{time.monotonic() - session.last_send_time:.2f}s" if session.last_send_time else "?"
-        print(f"\n[done] final_length={data.get('final_length')} final_seq={data.get('final_seq')} client_rtt={rtt}")
+        print(f"\n{UI.green('[done]')} length={data.get('final_length')} chunks={data.get('final_seq')} rtt={rtt}")
         session.seen_first_token = False
+        session.response_started = False
+        session.turn_complete.set()
     elif etype == "telemetry":
-        print(f"\n[telemetry] {data}")
+        telemetry = data.get("data") or {}
+        usage = telemetry.get("tokens") or telemetry.get("usage") or {}
+        nodes = " -> ".join(telemetry.get("node_sequence") or []) or "-"
+        print(
+            f"\n{UI.dim('[telemetry]')} provider={telemetry.get('provider', '?')}"
+            f" model={telemetry.get('model', '?')} nodes={nodes}"
+            f" tokens_in={usage.get('input', 0)} tokens_out={usage.get('output', 0)}"
+            f" llm_calls={telemetry.get('llm_call_count', 0)}"
+            f" total={telemetry.get('latencies', {}).get('total', '?')}s"
+        )
     else:
         print(f"\n[{etype}] {data}")
+
+
+def _print_banner(target: str, backend_url: str, session: SessionState) -> None:
+    print()
+    print(UI.bold("AICodex Debug Console"))
+    print(UI.dim("=" * 22))
+    print(f"Target   {target} | {backend_url}")
+    print(f"Provider {session.provider} | Model {session.model}")
+    print(f"Session  conversation {session.conversation_id}")
+    print(UI.dim("Commands: /provider /model /models /apikey /baseurl /conv /raw /quit"))
+    print()
 
 
 async def receiver(ws, session: SessionState) -> None:
@@ -223,6 +289,7 @@ async def receiver(ws, session: SessionState) -> None:
     except websockets.ConnectionClosed as e:
         print("\n[connection closed by server]")
         session.connection_closed.set()
+        session.turn_complete.set()
         if not session.close_requested:
             session.log_failure(f"WebSocket connection closed unexpectedly: {e}")
 
@@ -299,7 +366,7 @@ async def main() -> None:
 
     async with websockets.connect(ws_url, max_size=None) as ws:
         recv_task = asyncio.create_task(receiver(ws, session))
-        print("Connected. Type /quit to exit. Commands: /provider /model /models /apikey /baseurl /conv /raw\n")
+        _print_banner(args.target, backend_url, session)
 
         loop = asyncio.get_event_loop()
         try:
@@ -317,18 +384,18 @@ async def main() -> None:
                     elif cmd == "/provider":
                         value = arg.strip()
                         if not value:
-                            print("Usage: /provider <name>")
+                            print(UI.yellow("Usage: /provider <name>"))
                             continue
                         session.provider = value
-                        print(f"(provider set to {session.provider})")
+                        print(UI.green(f"[ok] provider -> {session.provider}"))
                         continue
                     elif cmd == "/model":
                         value = arg.strip()
                         if not value:
-                            print("Usage: /model <name>")
+                            print(UI.yellow("Usage: /model <name>"))
                             continue
                         session.model = value
-                        print(f"(model set to {session.model})")
+                        print(UI.green(f"[ok] model -> {session.model}"))
                         continue
                     elif cmd == "/models":
                         try:
@@ -344,38 +411,38 @@ async def main() -> None:
                     elif cmd == "/apikey":
                         value = arg.strip()
                         if not value:
-                            print("Usage: /apikey <key>")
+                            print(UI.yellow("Usage: /apikey <key>"))
                             continue
                         session.api_key = value
-                        print("(api key set)")
+                        print(UI.green("[ok] API key updated"))
                         continue
                     elif cmd == "/baseurl":
                         value = arg.strip()
                         if not value:
-                            print("Usage: /baseurl <url>")
+                            print(UI.yellow("Usage: /baseurl <url>"))
                             continue
                         session.base_url = value
-                        print(f"(base_url set to {session.base_url})")
+                        print(UI.green(f"[ok] base URL -> {session.base_url}"))
                         continue
                     elif cmd == "/conv":
                         value = arg.strip()
                         try:
                             conversation_id = int(value)
                         except ValueError:
-                            print("Usage: /conv <integer conversation id>")
+                            print(UI.yellow("Usage: /conv <integer conversation id>"))
                             continue
                         session.conversation_id = conversation_id
-                        print(f"(conversation_id set to {session.conversation_id})")
+                        print(UI.green(f"[ok] conversation -> {session.conversation_id}"))
                         continue
                     elif cmd == "/raw":
                         raw_payload = arg.strip()
                         if not raw_payload:
-                            print("Usage: /raw <json>")
+                            print(UI.yellow("Usage: /raw <json>"))
                             continue
                         try:
                             json.loads(raw_payload)
                         except json.JSONDecodeError as e:
-                            print(f"Invalid JSON for /raw: {e.msg}")
+                            print(UI.yellow(f"Invalid JSON for /raw: {e.msg}"))
                             continue
                         try:
                             await ws.send(raw_payload)
@@ -394,6 +461,8 @@ async def main() -> None:
 
                 session.last_user_message = line
                 session.seen_first_token = False
+                session.response_started = False
+                session.turn_complete.clear()
                 payload = {
                     "conversation_id": session.conversation_id,
                     "message": line,
@@ -411,8 +480,10 @@ async def main() -> None:
                     await ws.send(json.dumps(payload))
                 except websockets.ConnectionClosed as e:
                     session.log_failure(f"Failed to send message: {e}")
+                    session.turn_complete.set()
                     break
                 print()  # spacer before streamed tokens
+                await session.turn_complete.wait()
         except (KeyboardInterrupt, EOFError):
             pass
         except Exception as e:
