@@ -86,6 +86,7 @@ async def list_providers(
             "id": p.id,
             "name": p.name,
             "slug": p.slug,
+            "connection_type": p.connection_type,
             "icon_url": p.icon_url,
             "scopes": p.config_schema_json,  # placeholder; actual scopes from OAuth module
         }

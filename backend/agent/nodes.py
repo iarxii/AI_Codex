@@ -98,6 +98,7 @@ def log_performance(event: str, duration: float, metadata: dict = None):
     except queue.Full:
         logger.warning("PERF_LOG queue full; dropping event")
 
+
 async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier: str = "reasoning"):
     """
     Retrieves and configures the LLM provider based on the provided configuration.
@@ -752,45 +753,6 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             telemetry["provider_attempts"] = []
         telemetry["provider_attempts"].append(f"{provider} ({model}) - failed: {error_msg}")
         
-        # ─── DYNAMIC PROVIDER FALLBACK (LOOP ENGINEERING) ───
-        api_keys = config.get("configurable", {}).get("api_keys", {})
-        fallback_prov, fallback_model, fallback_key = resolve_llm_fallback(provider, model, api_keys)
-        
-        if fallback_prov:
-            logger.warning(f"PIPELINE WARNING: Provider [{provider}] failed with [{error_msg}]. Automatically switching to [{fallback_prov}] fallback...")
-            
-            # Notify UI via WebSocket stream
-            websocket = config.get("configurable", {}).get("websocket")
-            if websocket:
-                try:
-                    await websocket.send_json({
-                        "type": "token",
-                        "content": f"\n\n[WARNING] *[{provider.upper()}] rate/quota limit or connection error. Switching to [{fallback_prov.upper()}] ({fallback_model})...*\n\n",
-                        "node": "provider_fallback"
-                    })
-                except Exception as ws_err:
-                    logger.error(f"PIPELINE ERROR: Failed to stream fallback message: {ws_err}")
-            
-            try:
-                # Construct config override for fallback
-                config_copy = dict(config)
-                config_copy["configurable"] = dict(config.get("configurable", {}))
-                config_copy["configurable"]["provider"] = fallback_prov
-                config_copy["configurable"]["model"] = fallback_model
-                config_copy["configurable"]["api_key"] = fallback_key
-                
-                llm_fallback = await get_dynamic_llm(config_copy, bind_tools=True)
-                response = await _asyncio.wait_for(llm_fallback.ainvoke(messages), timeout=request_timeout)
-                
-                # Update loop variables on success
-                provider = fallback_prov
-                model = fallback_model
-                telemetry["provider_attempts"].append(f"{fallback_prov} ({fallback_model})")
-                invoke_err = None  # Clear error!
-            except Exception as fallback_err:
-                logger.error(f"PIPELINE ERROR: Fallback switch also failed: {fallback_err}")
-                error_msg = f"Original error: {error_msg}. Fallback to {fallback_prov} also failed: {fallback_err}"
-        
         # ─── TOOL FALLBACK ───
         if invoke_err:
             is_tool_error = "does not support tools" in error_msg or "invalid_request_error" in error_msg
@@ -813,15 +775,15 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
                 logger.error(f"PIPELINE ERROR: LLM invocation failed — {invoke_err}")
                 if not error_msg or error_msg == str(invoke_err):
                     error_msg = str(invoke_err)
-                # Parse common API errors
+                # Parse common API errors into a clear, provider/model-specific explanation
                 if "429" in error_msg:
-                    error_msg = "Rate limited by provider. Please wait and retry, or switch models."
+                    error_msg = "Rate limited by the provider. Please wait and retry, or switch to a different provider/model in Settings."
                 elif "401" in error_msg or "API key" in error_msg or "unauthorized" in error_msg.lower():
-                    error_msg = f"Authentication failed for {provider}. Please check your API key in Settings. (Original error: {error_msg})"
+                    error_msg = f"Authentication failed. Please check your API key for {provider} in Settings. (Original error: {error_msg})"
                 elif "Could not find model" in error_msg or "404" in error_msg:
-                    error_msg = "Model not found. Please select a different model."
+                    error_msg = f"Model '{model}' was not found for provider {provider}. Please select a different model in Settings."
             return {
-                "messages": [AIMessage(content=f"[ERROR] {error_msg}")],
+                "messages": [AIMessage(content=f"[ERROR] {provider} ({model}) failed: {error_msg}")],
                 "current_tool_calls": [],
                 "context_data": {"error": str(invoke_err)}
             }

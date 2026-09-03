@@ -78,6 +78,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
   const [integrationsError, setIntegrationsError] = useState<string | null>(null);
   const [integrationsSuccess, setIntegrationsSuccess] = useState<string | null>(null);
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+  const [apiKeyFormProvider, setApiKeyFormProvider] = useState<{ slug: string; name: string; config_fields: Array<{ name: string; label: string; secret?: boolean; default?: string }> } | null>(null);
+  const [apiKeyFormValues, setApiKeyFormValues] = useState<Record<string, string>>({});
 
   const fetchIntegrationsData = async () => {
     setIntegrationsLoading(true);
@@ -162,11 +164,63 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                 setTimeout(() => setIntegrationsSuccess(null), 4000);
               }
             }
-          } catch {}
+          } catch { }
         }, 2000);
       }
     } catch (e: any) {
       setIntegrationsError(e.message || "Failed to connect");
+      setConnectingProvider(null);
+    }
+  };
+
+  const handleConnectClick = async (p: { slug: string; name: string; connection_type?: string }) => {
+    if (p.connection_type !== "api_key") {
+      await handleConnectOAuth(p.slug);
+      return;
+    }
+    // Cloud inference providers without an OAuth flow (AWS Bedrock, Alibaba ECS) use a config form instead.
+    setIntegrationsError(null);
+    try {
+      const token = getValidToken();
+      const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/integrations/providers/${p.slug}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to load connection form");
+      const detail = await res.json();
+      const defaults: Record<string, string> = {};
+      for (const field of detail.config_fields || []) defaults[field.name] = field.default || "";
+      setApiKeyFormValues(defaults);
+      setApiKeyFormProvider({ slug: p.slug, name: detail.name, config_fields: detail.config_fields || [] });
+    } catch (e: any) {
+      setIntegrationsError(e.message || "Failed to load connection form");
+    }
+  };
+
+  const handleSaveApiKeyConnection = async () => {
+    if (!apiKeyFormProvider) return;
+    setConnectingProvider(apiKeyFormProvider.slug);
+    setIntegrationsError(null);
+    try {
+      const token = getValidToken();
+      const res = await fetch(`${config.API_BASE_URL}${config.API_V1_STR}/integrations/connect/api-key/${apiKeyFormProvider.slug}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ config: apiKeyFormValues }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Failed to connect" }));
+        throw new Error(err.detail || "Failed to connect");
+      }
+      setIntegrationsSuccess(`Connected to ${apiKeyFormProvider.name} successfully!`);
+      setApiKeyFormProvider(null);
+      fetchIntegrationsData();
+      setTimeout(() => setIntegrationsSuccess(null), 4000);
+    } catch (e: any) {
+      setIntegrationsError(e.message || "Failed to connect");
+    } finally {
       setConnectingProvider(null);
     }
   };
@@ -736,11 +790,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                       role="tab"
                       aria-selected={activeSettingsTab === "providers"}
                       onClick={() => setActiveSettingsTab("providers")}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                        activeSettingsTab === "providers"
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeSettingsTab === "providers"
                           ? "bg-[#fd3b12] text-white shadow-md shadow-[#fd3b12]/30"
                           : "bg-[#D8DCE4] text-[#4A4D5E] hover:bg-[#D0D4DC] hover:text-[#1A1D2E]"
-                      }`}
+                        }`}
                     >
                       <Cog6ToothIcon className="w-3.5 h-3.5" />
                       <span>Providers</span>
@@ -749,11 +802,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                       role="tab"
                       aria-selected={activeSettingsTab === "integrations"}
                       onClick={() => setActiveSettingsTab("integrations")}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                        activeSettingsTab === "integrations"
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${activeSettingsTab === "integrations"
                           ? "bg-[#fd3b12] text-white shadow-md shadow-[#fd3b12]/30"
                           : "bg-[#D8DCE4] text-[#4A4D5E] hover:bg-[#D0D4DC] hover:text-[#1A1D2E]"
-                      }`}
+                        }`}
                     >
                       <ServerIcon className="w-3.5 h-3.5" />
                       <span>Integrations</span>
@@ -775,877 +827,900 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                       to the inference engine.
                     </p>
 
-                {/* Provider Radio Group */}
-                <div className="mb-6">
-                  <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-3">
-                    Default Provider
-                  </label>
-                  <div className="grid grid-cols-5 gap-2">
-                    {PROVIDERS.map((provider) => {
-                      const isActive = activeProvider === provider.id;
-                      const isLiteRt = provider.id === "litert";
-                      return (
-                        <button
-                          key={provider.id}
-                          onClick={() => setActiveProvider(provider.id)}
-                          className={`relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${isActive
-                              ? isLiteRt
-                                ? "bg-white/60 backdrop-blur-md border-[#3B82F6]/60 shadow-lg shadow-[#3B82F6]/20"
-                                : "bg-[#fd3b12]/10 border-[#fd3b12] shadow-md shadow-[#fd3b12]/10"
-                              : isLiteRt
-                                ? "bg-white/35 backdrop-blur-md border-[#3B82F6]/20 hover:bg-white/55 hover:border-[#3B82F6]/40"
-                                : "bg-[#D8DCE4] border-transparent hover:bg-[#D0D4DC] hover:border-black/[0.08]"
-                            }`}
-                        >
-                          {isActive && (
-                            <div
-                              className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${isLiteRt
-                                  ? "bg-[#3B82F6] shadow-[0_0_8px_rgba(59,130,246,0.75)]"
-                                  : "bg-[#fd3b12] shadow-[0_0_6px_rgba(255,102,0,0.7)]"
-                                }`}
-                            />
-                          )}
-                          <ProviderIcon provider={provider} size={28} />
-                          <span
-                            className={`text-[11px] font-semibold ${isActive
-                                ? isLiteRt
-                                  ? "text-[#1D4ED8]"
-                                  : "text-[#fd3b12]"
-                                : "text-[#4A4D5E]"
-                              }`}
-                          >
-                            {provider.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={() => setMoreProvidersOpen(true)}
-                      className="relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-dashed border-black/[0.12] bg-[#D8DCE4] text-[#4A4D5E] hover:bg-[#D0D4DC] hover:border-black/[0.2] transition-all duration-200"
-                    >
-                      <span className="w-7 h-7 rounded-full bg-[#fd3b12]/10 text-[#fd3b12] flex items-center justify-center text-lg font-bold leading-none">
-                        +
-                      </span>
-                      <span className="text-[11px] font-semibold">More</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Conditional API Key Inputs */}
-                <div className="space-y-4">
-                  {activeProvider === "local" && (
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                      <p className="text-xs text-green-700 font-medium flex items-center gap-2">
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                        Using local Ollama GPU — no API key needed
-                      </p>
-                      <p className="text-[10px] text-green-600/70 mt-1.5">
-                        Ensure Ollama is running on localhost:11434
-                      </p>
-                    </div>
-                  )}
-
-                  {activeProvider === "litert" && (
-                    <div className="relative overflow-hidden space-y-3 rounded-2xl border border-[#3B82F6]/25 bg-white/45 backdrop-blur-md shadow-[0_12px_28px_-18px_rgba(59,130,246,0.85)] p-4">
-                      <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-white/65 via-[#DBEAFE]/30 to-[#93C5FD]/20" />
-                      <p className="relative text-xs text-[#1E40AF] font-medium leading-relaxed">
-                        LiteRT runs in the dedicated Chat portal where you can use local on-device inference controls.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProvider("litert");
-                          setIsOpen(false);
-                          navigate("/chat");
-                        }}
-                        className="relative w-full flex items-center justify-center gap-2 rounded-xl border border-[#3B82F6]/40 bg-white/80 text-[#1D4ED8] px-4 py-3 text-sm font-semibold hover:bg-[#DBEAFE]/70 hover:border-[#3B82F6]/60 transition-all shadow-sm"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                          aria-hidden="true"
-                        >
-                          <path
-                            d="M7.5 7.5V4.5L3 9L7.5 13.5V10.5H10.5C13.2614 10.5 15.5 12.7386 15.5 15.5V17"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <rect
-                            x="13"
-                            y="4"
-                            width="8"
-                            height="8"
-                            rx="2"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                          />
-                          <path
-                            d="M15.5 18H20"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                        Open LiteRT Chat Portal
-                      </button>
-                    </div>
-                  )}
-
-                  {activeProvider === "ollama_cloud" && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          Remote Ollama URL
-                        </label>
-                        <input
-                          type="text"
-                          value={ollamaCloudUrl}
-                          onChange={(e) => setOllamaCloudUrl(e.target.value)}
-                          placeholder="https://ollama.your-domain.com"
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          Authorization Token (Optional)
-                        </label>
-                        <input
-                          type="password"
-                          value={ollamaCloudKey}
-                          onChange={(e) => setOllamaCloudKey(e.target.value)}
-                          placeholder="Bearer token or API key"
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <button
-                          onClick={testOllamaCloud}
-                          disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
-                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
-                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                            }`}
-                        >
-                          {isTesting ? (
-                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <ArrowPathIcon className="w-4 h-4" />
-                          )}
-                          Test Connection
-                        </button>
-
-                        {testResult && (
-                          <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"
-                              }`}
-                          >
-                            {testResult.success ? (
-                              <CheckCircleIcon className="w-4 h-4" />
-                            ) : (
-                              <ExclamationCircleIcon className="w-4 h-4" />
-                            )}
-                            {testResult.message}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {activeProvider === "colab_bridge" && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          Colab Bridge Base URL
-                        </label>
-                        <input
-                          type="text"
-                          value={colabBridgeUrl}
-                          onChange={(e) => setColabBridgeUrl(e.target.value)}
-                          placeholder="https://xxxx.ngrok-free.app"
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          Handshake Secret (Optional)
-                        </label>
-                        <input
-                          type="password"
-                          value={colabBridgeKey}
-                          onChange={(e) => setColabBridgeKey(e.target.value)}
-                          placeholder="Authentication token or API key"
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <button
-                          onClick={testColabBridge}
-                          disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
-                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
-                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                            }`}
-                        >
-                          {isTesting ? (
-                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <ArrowPathIcon className="w-4 h-4" />
-                          )}
-                          Test Connection
-                        </button>
-
-                        {testResult && (
-                          <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"
-                              }`}
-                          >
-                            {testResult.success ? (
-                              <CheckCircleIcon className="w-4 h-4" />
-                            ) : (
-                              <ExclamationCircleIcon className="w-4 h-4" />
-                            )}
-                            {testResult.message}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {activeProvider === "openai" && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          OpenAI Base URL (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={openAiBaseUrl}
-                          onChange={(e) => setOpenAiBaseUrl(e.target.value)}
-                          placeholder="https://api.openai.com/v1"
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          OpenAI API Key
-                        </label>
-                        <input
-                          type="password"
-                          value={openAiKey}
-                          onChange={(e) => setOpenAiKey(e.target.value)}
-                          placeholder="sk-..."
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <button
-                          onClick={testOpenAI}
-                          disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
-                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
-                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                            }`}
-                        >
-                          {isTesting ? (
-                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <ArrowPathIcon className="w-4 h-4" />
-                          )}
-                          Test Connection
-                        </button>
-
-                        {testResult && (
-                          <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"
-                              }`}
-                          >
-                            {testResult.success ? (
-                              <CheckCircleIcon className="w-4 h-4" />
-                            ) : (
-                              <ExclamationCircleIcon className="w-4 h-4" />
-                            )}
-                            {testResult.message}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {activeProvider === "openrouter" && (
-                    <div>
-                      <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                        OpenRouter API Key
+                    {/* Provider Radio Group */}
+                    <div className="mb-6">
+                      <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-3">
+                        Default Provider
                       </label>
-                      <input
-                        type="password"
-                        value={openRouterKey}
-                        onChange={(e) => setOpenRouterKey(e.target.value)}
-                        placeholder="sk-or-v1-..."
-                        className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
-                      />
+                      <div className="grid grid-cols-5 gap-2">
+                        {PROVIDERS.map((provider) => {
+                          const isActive = activeProvider === provider.id;
+                          const isLiteRt = provider.id === "litert";
+                          return (
+                            <button
+                              key={provider.id}
+                              onClick={() => setActiveProvider(provider.id)}
+                              className={`relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${isActive
+                                ? isLiteRt
+                                  ? "bg-white/60 backdrop-blur-md border-[#3B82F6]/60 shadow-lg shadow-[#3B82F6]/20"
+                                  : "bg-[#fd3b12]/10 border-[#fd3b12] shadow-md shadow-[#fd3b12]/10"
+                                : isLiteRt
+                                  ? "bg-white/35 backdrop-blur-md border-[#3B82F6]/20 hover:bg-white/55 hover:border-[#3B82F6]/40"
+                                  : "bg-[#D8DCE4] border-transparent hover:bg-[#D0D4DC] hover:border-black/[0.08]"
+                                }`}
+                            >
+                              {isActive && (
+                                <div
+                                  className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${isLiteRt
+                                    ? "bg-[#3B82F6] shadow-[0_0_8px_rgba(59,130,246,0.75)]"
+                                    : "bg-[#fd3b12] shadow-[0_0_6px_rgba(255,102,0,0.7)]"
+                                    }`}
+                                />
+                              )}
+                              <ProviderIcon provider={provider} size={28} />
+                              <span
+                                className={`text-[11px] font-semibold ${isActive
+                                  ? isLiteRt
+                                    ? "text-[#1D4ED8]"
+                                    : "text-[#fd3b12]"
+                                  : "text-[#4A4D5E]"
+                                  }`}
+                              >
+                                {provider.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => setMoreProvidersOpen(true)}
+                          className="relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 border-dashed border-black/[0.12] bg-[#D8DCE4] text-[#4A4D5E] hover:bg-[#D0D4DC] hover:border-black/[0.2] transition-all duration-200"
+                        >
+                          <span className="w-7 h-7 rounded-full bg-[#fd3b12]/10 text-[#fd3b12] flex items-center justify-center text-lg font-bold leading-none">
+                            +
+                          </span>
+                          <span className="text-[11px] font-semibold">More</span>
+                        </button>
+                      </div>
                     </div>
-                  )}
 
-                  {activeProvider === "gemini" && (
+                    {/* Conditional API Key Inputs */}
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-2">
-                          Authentication Method
-                        </label>
-                        <div className="grid grid-cols-2 gap-2 bg-[#D8DCE4] p-1 rounded-xl border border-black/[0.04]">
+                      {activeProvider === "local" && (
+                        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                          <p className="text-xs text-green-700 font-medium flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            Using local Ollama GPU — no API key needed
+                          </p>
+                          <p className="text-[10px] text-green-600/70 mt-1.5">
+                            Ensure Ollama is running on localhost:11434
+                          </p>
+                        </div>
+                      )}
+
+                      {activeProvider === "litert" && (
+                        <div className="relative overflow-hidden space-y-3 rounded-2xl border border-[#3B82F6]/25 bg-white/45 backdrop-blur-md shadow-[0_12px_28px_-18px_rgba(59,130,246,0.85)] p-4">
+                          <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-white/65 via-[#DBEAFE]/30 to-[#93C5FD]/20" />
+                          <p className="relative text-xs text-[#1E40AF] font-medium leading-relaxed">
+                            LiteRT runs in the dedicated Chat portal where you can use local on-device inference controls.
+                          </p>
                           <button
                             type="button"
-                            onClick={() => setGeminiAuthMethod("api_key")}
-                            className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${geminiAuthMethod === "api_key"
-                                ? "bg-[#1A1D2E] text-white shadow-sm"
-                                : "text-[#4A4D5E] hover:text-[#1A1D2E]"
-                              }`}
+                            onClick={() => {
+                              setProvider("litert");
+                              setIsOpen(false);
+                              navigate("/chat");
+                            }}
+                            className="relative w-full flex items-center justify-center gap-2 rounded-xl border border-[#3B82F6]/40 bg-white/80 text-[#1D4ED8] px-4 py-3 text-sm font-semibold hover:bg-[#DBEAFE]/70 hover:border-[#3B82F6]/60 transition-all shadow-sm"
                           >
-                            Google AI Studio
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setGeminiAuthMethod("vertex")}
-                            className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${geminiAuthMethod === "vertex"
-                                ? "bg-[#1A1D2E] text-white shadow-sm"
-                                : "text-[#4A4D5E] hover:text-[#1A1D2E]"
-                              }`}
-                          >
-                            Vertex AI (ADC)
+                            <svg
+                              className="w-5 h-5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                              aria-hidden="true"
+                            >
+                              <path
+                                d="M7.5 7.5V4.5L3 9L7.5 13.5V10.5H10.5C13.2614 10.5 15.5 12.7386 15.5 15.5V17"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <rect
+                                x="13"
+                                y="4"
+                                width="8"
+                                height="8"
+                                rx="2"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                              />
+                              <path
+                                d="M15.5 18H20"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            Open LiteRT Chat Portal
                           </button>
                         </div>
-                      </div>
+                      )}
 
-                      {geminiAuthMethod === "api_key" ? (
+                      {activeProvider === "ollama_cloud" && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              Remote Ollama URL
+                            </label>
+                            <input
+                              type="text"
+                              value={ollamaCloudUrl}
+                              onChange={(e) => setOllamaCloudUrl(e.target.value)}
+                              placeholder="https://ollama.your-domain.com"
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              Authorization Token (Optional)
+                            </label>
+                            <input
+                              type="password"
+                              value={ollamaCloudKey}
+                              onChange={(e) => setOllamaCloudKey(e.target.value)}
+                              placeholder="Bearer token or API key"
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={testOllamaCloud}
+                              disabled={isTesting}
+                              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
+                                ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                                : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                                }`}
+                            >
+                              {isTesting ? (
+                                <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <ArrowPathIcon className="w-4 h-4" />
+                              )}
+                              Test Connection
+                            </button>
+
+                            {testResult && (
+                              <div
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                                  }`}
+                              >
+                                {testResult.success ? (
+                                  <CheckCircleIcon className="w-4 h-4" />
+                                ) : (
+                                  <ExclamationCircleIcon className="w-4 h-4" />
+                                )}
+                                {testResult.message}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeProvider === "colab_bridge" && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              Colab Bridge Base URL
+                            </label>
+                            <input
+                              type="text"
+                              value={colabBridgeUrl}
+                              onChange={(e) => setColabBridgeUrl(e.target.value)}
+                              placeholder="https://xxxx.ngrok-free.app"
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              Handshake Secret (Optional)
+                            </label>
+                            <input
+                              type="password"
+                              value={colabBridgeKey}
+                              onChange={(e) => setColabBridgeKey(e.target.value)}
+                              placeholder="Authentication token or API key"
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={testColabBridge}
+                              disabled={isTesting}
+                              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
+                                ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                                : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                                }`}
+                            >
+                              {isTesting ? (
+                                <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <ArrowPathIcon className="w-4 h-4" />
+                              )}
+                              Test Connection
+                            </button>
+
+                            {testResult && (
+                              <div
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                                  }`}
+                              >
+                                {testResult.success ? (
+                                  <CheckCircleIcon className="w-4 h-4" />
+                                ) : (
+                                  <ExclamationCircleIcon className="w-4 h-4" />
+                                )}
+                                {testResult.message}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeProvider === "openai" && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              OpenAI Base URL (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              value={openAiBaseUrl}
+                              onChange={(e) => setOpenAiBaseUrl(e.target.value)}
+                              placeholder="https://api.openai.com/v1"
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              OpenAI API Key
+                            </label>
+                            <input
+                              type="password"
+                              value={openAiKey}
+                              onChange={(e) => setOpenAiKey(e.target.value)}
+                              placeholder="sk-..."
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={testOpenAI}
+                              disabled={isTesting}
+                              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
+                                ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                                : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                                }`}
+                            >
+                              {isTesting ? (
+                                <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <ArrowPathIcon className="w-4 h-4" />
+                              )}
+                              Test Connection
+                            </button>
+
+                            {testResult && (
+                              <div
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                                  }`}
+                              >
+                                {testResult.success ? (
+                                  <CheckCircleIcon className="w-4 h-4" />
+                                ) : (
+                                  <ExclamationCircleIcon className="w-4 h-4" />
+                                )}
+                                {testResult.message}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeProvider === "openrouter" && (
                         <div>
                           <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                            Google Gemini API Key
+                            OpenRouter API Key
                           </label>
                           <input
                             type="password"
-                            value={geminiKey}
-                            onChange={(e) => setGeminiKey(e.target.value)}
-                            placeholder="AIza..."
+                            value={openRouterKey}
+                            onChange={(e) => setOpenRouterKey(e.target.value)}
+                            placeholder="sk-or-v1-..."
                             className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
                           />
                         </div>
-                      ) : (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <div className="bg-[#1A1D2E]/[0.03] border border-[#1A1D2E]/[0.08] rounded-xl p-3.5 text-xs text-[#4A4D5E] leading-relaxed">
-                            💡{" "}
-                            <strong>
-                              Application Default Credentials (ADC)
-                            </strong>
-                            <p className="mt-1">
-                              Uses the backend environment's credentials. Ensure
-                              you have run{" "}
-                              <code>gcloud auth application-default login</code>{" "}
-                              on your host.
-                            </p>
+                      )}
+
+                      {activeProvider === "gemini" && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-2">
+                              Authentication Method
+                            </label>
+                            <div className="grid grid-cols-2 gap-2 bg-[#D8DCE4] p-1 rounded-xl border border-black/[0.04]">
+                              <button
+                                type="button"
+                                onClick={() => setGeminiAuthMethod("api_key")}
+                                className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${geminiAuthMethod === "api_key"
+                                  ? "bg-[#1A1D2E] text-white shadow-sm"
+                                  : "text-[#4A4D5E] hover:text-[#1A1D2E]"
+                                  }`}
+                              >
+                                Google AI Studio
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setGeminiAuthMethod("vertex")}
+                                className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${geminiAuthMethod === "vertex"
+                                  ? "bg-[#1A1D2E] text-white shadow-sm"
+                                  : "text-[#4A4D5E] hover:text-[#1A1D2E]"
+                                  }`}
+                              >
+                                Vertex AI (ADC)
+                              </button>
+                            </div>
                           </div>
 
+                          {geminiAuthMethod === "api_key" ? (
+                            <div>
+                              <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                                Google Gemini API Key
+                              </label>
+                              <input
+                                type="password"
+                                value={geminiKey}
+                                onChange={(e) => setGeminiKey(e.target.value)}
+                                placeholder="AIza..."
+                                className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                              />
+                            </div>
+                          ) : (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                              <div className="bg-[#1A1D2E]/[0.03] border border-[#1A1D2E]/[0.08] rounded-xl p-3.5 text-xs text-[#4A4D5E] leading-relaxed">
+                                💡{" "}
+                                <strong>
+                                  Application Default Credentials (ADC)
+                                </strong>
+                                <p className="mt-1">
+                                  Uses the backend environment's credentials. Ensure
+                                  you have run{" "}
+                                  <code>gcloud auth application-default login</code>{" "}
+                                  on your host.
+                                </p>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
+                                    GCP Project ID
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={geminiProjectId}
+                                    onChange={(e) =>
+                                      setGeminiProjectId(e.target.value)
+                                    }
+                                    placeholder="aicodex-lab (optional)"
+                                    className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
+                                    GCP Region
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={geminiRegion}
+                                    onChange={(e) =>
+                                      setGeminiRegion(e.target.value)
+                                    }
+                                    placeholder="us-west1 (optional)"
+                                    className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {activeProvider === "cloudflare_ai_gateway" && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              Cloudflare AI Gateway Base URL
+                            </label>
+                            <input
+                              type="text"
+                              value={cfGatewayUrl}
+                              onChange={(e) => setCfGatewayUrl(e.target.value)}
+                              placeholder="https://gateway.ai.cloudflare.com"
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
-                                GCP Project ID
+                                Account ID
                               </label>
                               <input
                                 type="text"
-                                value={geminiProjectId}
+                                value={cfGatewayAccountId}
                                 onChange={(e) =>
-                                  setGeminiProjectId(e.target.value)
+                                  setCfGatewayAccountId(e.target.value)
                                 }
-                                placeholder="aicodex-lab (optional)"
+                                placeholder="your-account-id"
                                 className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
                               />
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
-                                GCP Region
+                                Gateway ID
                               </label>
                               <input
                                 type="text"
-                                value={geminiRegion}
+                                value={cfGatewayGatewayId}
                                 onChange={(e) =>
-                                  setGeminiRegion(e.target.value)
+                                  setCfGatewayGatewayId(e.target.value)
                                 }
-                                placeholder="us-west1 (optional)"
+                                placeholder="your-gateway-id"
                                 className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
                               />
                             </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              Authorization Token (Optional)
+                            </label>
+                            <input
+                              type="password"
+                              value={cfGatewayKey}
+                              onChange={(e) => setCfGatewayKey(e.target.value)}
+                              placeholder="Bearer token or API key"
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={testCloudflareAIGateway}
+                              disabled={isTesting}
+                              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
+                                ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                                : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                                }`}
+                            >
+                              {isTesting ? (
+                                <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <ArrowPathIcon className="w-4 h-4" />
+                              )}
+                              Test Connection
+                            </button>
+
+                            {testResult && (
+                              <div
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                                  }`}
+                              >
+                                {testResult.success ? (
+                                  <CheckCircleIcon className="w-4 h-4" />
+                                ) : (
+                                  <ExclamationCircleIcon className="w-4 h-4" />
+                                )}
+                                {testResult.message}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeProvider === "workers_ai" && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
+                              Account ID
+                            </label>
+                            <input
+                              type="text"
+                              value={workersAiAccountId}
+                              onChange={(e) =>
+                                setWorkersAiAccountId(e.target.value)
+                              }
+                              placeholder="your-account-id"
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              API Token (Optional)
+                            </label>
+                            <input
+                              type="password"
+                              value={workersAiKey}
+                              onChange={(e) => setWorkersAiKey(e.target.value)}
+                              placeholder="Bearer token or API key"
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={testWorkersAI}
+                              disabled={isTesting}
+                              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
+                                ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                                : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                                }`}
+                            >
+                              {isTesting ? (
+                                <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <ArrowPathIcon className="w-4 h-4" />
+                              )}
+                              Test Connection
+                            </button>
+
+                            {testResult && (
+                              <div
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                                  }`}
+                              >
+                                {testResult.success ? (
+                                  <CheckCircleIcon className="w-4 h-4" />
+                                ) : (
+                                  <ExclamationCircleIcon className="w-4 h-4" />
+                                )}
+                                {testResult.message}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeProvider === "anthropic" && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              Anthropic Base URL (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              value={anthropicBaseUrl}
+                              onChange={(e) => setAnthropicBaseUrl(e.target.value)}
+                              placeholder="https://api.anthropic.com"
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              Anthropic API Key
+                            </label>
+                            <input
+                              type="password"
+                              value={anthropicKey}
+                              onChange={(e) => setAnthropicKey(e.target.value)}
+                              placeholder="sk-ant-..."
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={testAnthropic}
+                              disabled={isTesting}
+                              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
+                                ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                                : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                                }`}
+                            >
+                              {isTesting ? (
+                                <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <ArrowPathIcon className="w-4 h-4" />
+                              )}
+                              Test Connection
+                            </button>
+
+                            {testResult && (
+                              <div
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                                  }`}
+                              >
+                                {testResult.success ? (
+                                  <CheckCircleIcon className="w-4 h-4" />
+                                ) : (
+                                  <ExclamationCircleIcon className="w-4 h-4" />
+                                )}
+                                {testResult.message}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeProvider === "huggingface" && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              Hugging Face Base URL (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              value={huggingfaceBaseUrl}
+                              onChange={(e) => setHuggingfaceBaseUrl(e.target.value)}
+                              placeholder="https://api-inference.huggingface.co"
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                              Hugging Face API Key
+                            </label>
+                            <input
+                              type="password"
+                              value={huggingfaceKey}
+                              onChange={(e) => setHuggingfaceKey(e.target.value)}
+                              placeholder="hf_..."
+                              className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={testHuggingFace}
+                              disabled={isTesting}
+                              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
+                                ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
+                                : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
+                                }`}
+                            >
+                              {isTesting ? (
+                                <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <ArrowPathIcon className="w-4 h-4" />
+                              )}
+                              Test Connection
+                            </button>
+
+                            {testResult && (
+                              <div
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-red-100 text-red-700"
+                                  }`}
+                              >
+                                {testResult.success ? (
+                                  <CheckCircleIcon className="w-4 h-4" />
+                                ) : (
+                                  <ExclamationCircleIcon className="w-4 h-4" />
+                                )}
+                                {testResult.message}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
                     </div>
-                  )}
 
-                  {activeProvider === "cloudflare_ai_gateway" && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          Cloudflare AI Gateway Base URL
-                        </label>
-                        <input
-                          type="text"
-                          value={cfGatewayUrl}
-                          onChange={(e) => setCfGatewayUrl(e.target.value)}
-                          placeholder="https://gateway.ai.cloudflare.com"
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
-                            Account ID
-                          </label>
-                          <input
-                            type="text"
-                            value={cfGatewayAccountId}
-                            onChange={(e) =>
-                              setCfGatewayAccountId(e.target.value)
-                            }
-                            placeholder="your-account-id"
-                            className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
-                            Gateway ID
-                          </label>
-                          <input
-                            type="text"
-                            value={cfGatewayGatewayId}
-                            onChange={(e) =>
-                              setCfGatewayGatewayId(e.target.value)
-                            }
-                            placeholder="your-gateway-id"
-                            className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          Authorization Token (Optional)
-                        </label>
-                        <input
-                          type="password"
-                          value={cfGatewayKey}
-                          onChange={(e) => setCfGatewayKey(e.target.value)}
-                          placeholder="Bearer token or API key"
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <button
-                          onClick={testCloudflareAIGateway}
-                          disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
-                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
-                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                            }`}
-                        >
-                          {isTesting ? (
-                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <ArrowPathIcon className="w-4 h-4" />
-                          )}
-                          Test Connection
-                        </button>
-
-                        {testResult && (
-                          <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"
-                              }`}
-                          >
-                            {testResult.success ? (
-                              <CheckCircleIcon className="w-4 h-4" />
-                            ) : (
-                              <ExclamationCircleIcon className="w-4 h-4" />
-                            )}
-                            {testResult.message}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {activeProvider === "workers_ai" && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-medium text-[#1A1D2E] mb-1">
-                          Account ID
-                        </label>
-                        <input
-                          type="text"
-                          value={workersAiAccountId}
-                          onChange={(e) =>
-                            setWorkersAiAccountId(e.target.value)
-                          }
-                          placeholder="your-account-id"
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-3.5 py-2 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-xs placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          API Token (Optional)
-                        </label>
-                        <input
-                          type="password"
-                          value={workersAiKey}
-                          onChange={(e) => setWorkersAiKey(e.target.value)}
-                          placeholder="Bearer token or API key"
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <button
-                          onClick={testWorkersAI}
-                          disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
-                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
-                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                            }`}
-                        >
-                          {isTesting ? (
-                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <ArrowPathIcon className="w-4 h-4" />
-                          )}
-                          Test Connection
-                        </button>
-
-                        {testResult && (
-                          <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"
-                              }`}
-                          >
-                            {testResult.success ? (
-                              <CheckCircleIcon className="w-4 h-4" />
-                            ) : (
-                              <ExclamationCircleIcon className="w-4 h-4" />
-                            )}
-                            {testResult.message}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {activeProvider === "anthropic" && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          Anthropic Base URL (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={anthropicBaseUrl}
-                          onChange={(e) => setAnthropicBaseUrl(e.target.value)}
-                          placeholder="https://api.anthropic.com"
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          Anthropic API Key
-                        </label>
-                        <input
-                          type="password"
-                          value={anthropicKey}
-                          onChange={(e) => setAnthropicKey(e.target.value)}
-                          placeholder="sk-ant-..."
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <button
-                          onClick={testAnthropic}
-                          disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
-                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
-                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                            }`}
-                        >
-                          {isTesting ? (
-                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <ArrowPathIcon className="w-4 h-4" />
-                          )}
-                          Test Connection
-                        </button>
-
-                        {testResult && (
-                          <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"
-                              }`}
-                          >
-                            {testResult.success ? (
-                              <CheckCircleIcon className="w-4 h-4" />
-                            ) : (
-                              <ExclamationCircleIcon className="w-4 h-4" />
-                            )}
-                            {testResult.message}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {activeProvider === "huggingface" && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          Hugging Face Base URL (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={huggingfaceBaseUrl}
-                          onChange={(e) => setHuggingfaceBaseUrl(e.target.value)}
-                          placeholder="https://api-inference.huggingface.co"
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                          Hugging Face API Key
-                        </label>
-                        <input
-                          type="password"
-                          value={huggingfaceKey}
-                          onChange={(e) => setHuggingfaceKey(e.target.value)}
-                          placeholder="hf_..."
-                          className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <button
-                          onClick={testHuggingFace}
-                          disabled={isTesting}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isTesting
-                              ? "bg-[#D8DCE4] text-[#7A7D8E] cursor-not-allowed"
-                              : "bg-white text-[#1A1D2E] border border-black/[0.06] hover:bg-[#D8DCE4]"
-                            }`}
-                        >
-                          {isTesting ? (
-                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <ArrowPathIcon className="w-4 h-4" />
-                          )}
-                          Test Connection
-                        </button>
-
-                        {testResult && (
-                          <div
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${testResult.success
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"
-                              }`}
-                          >
-                            {testResult.success ? (
-                              <CheckCircleIcon className="w-4 h-4" />
-                            ) : (
-                              <ExclamationCircleIcon className="w-4 h-4" />
-                            )}
-                            {testResult.message}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* LangSmith Telemetry Settings */}
-                <div className="mt-6 pt-6 border-t border-black/[0.06]">
-                  <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-4">
-                    LangSmith Telemetry
-                  </label>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between group">
-                      <span className="text-sm text-[#1A1D2E] font-medium group-hover:text-[#fd3b12] transition-colors">
-                        Enable LangSmith Tracing
-                      </span>
-                      <button
-                        onClick={() => setEnableLangsmith(!enableLangsmith)}
-                        className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${enableLangsmith ? "bg-[#fd3b12]" : "bg-[#D8DCE4]"
-                          }`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${enableLangsmith ? "translate-x-5" : "translate-x-0"
-                            }`}
-                        />
-                      </button>
-                    </div>
-
-                    {enableLangsmith && (
-                      <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div>
-                          <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                            LangSmith API Key
-                          </label>
-                          <input
-                            type="password"
-                            value={langsmithApiKey}
-                            onChange={(e) => setLangsmithApiKey(e.target.value)}
-                            placeholder="ls__..."
-                            className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
-                            LangSmith Project
-                          </label>
-                          <input
-                            type="text"
-                            value={langsmithProject}
-                            onChange={(e) =>
-                              setLangsmithProject(e.target.value)
-                            }
-                            placeholder="aicodex-agent-react-benchmarks"
-                            className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
-                          />
-                        </div>
+                    {/* LangSmith Telemetry Settings */}
+                    <div className="mt-6 pt-6 border-t border-black/[0.06]">
+                      <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-4">
+                        LangSmith Telemetry
+                      </label>
+                      <div className="space-y-4">
                         <div className="flex items-center justify-between group">
-                          <div className="flex flex-col">
-                            <span className="text-sm text-[#1A1D2E] font-medium group-hover:text-[#fd3b12] transition-colors">
-                              Private Workspace
-                            </span>
-                            <span className="text-[10px] text-[#7A7D8E]">
-                              Enforces data egress restriction (gating
-                              telemetry)
-                            </span>
-                          </div>
+                          <span className="text-sm text-[#1A1D2E] font-medium group-hover:text-[#fd3b12] transition-colors">
+                            Enable LangSmith Tracing
+                          </span>
                           <button
-                            onClick={() =>
-                              setPrivateWorkspace(!privateWorkspace)
-                            }
-                            className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${privateWorkspace ? "bg-[#fd3b12]" : "bg-[#D8DCE4]"
+                            onClick={() => setEnableLangsmith(!enableLangsmith)}
+                            className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${enableLangsmith ? "bg-[#fd3b12]" : "bg-[#D8DCE4]"
                               }`}
                           >
                             <span
-                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${privateWorkspace
-                                  ? "translate-x-5"
-                                  : "translate-x-0"
+                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${enableLangsmith ? "translate-x-5" : "translate-x-0"
                                 }`}
                             />
                           </button>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
 
-                {/* Visual Identity Toggles */}
-                <div className="mt-8 pt-6 border-t border-black/[0.06]">
-                  <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-4">
-                    Neural Identity & Effects
-                  </label>
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                    {[
-                      { key: "isDynamic", label: "Motion & Animations" },
-                      { key: "showTraces", label: "Neural Energy Traces" },
-                      {
-                        key: "showNeuralStrings",
-                        label: "Neural Drifting Strings",
-                      },
-                      { key: "showScanlines", label: "CRT Scanlines" },
-                      {
-                        key: "showMonochrome",
-                        label: "Monochrome Neural Phosphor",
-                      },
-                      { key: "showWaves", label: "Great Neural Waves" },
-                      { key: "showGrain", label: "Cinematic Film Grain" },
-                      {
-                        key: "showGlitches",
-                        label: "Digital Glitch Artifacts",
-                      },
-                      { key: "showVideo", label: "High-Fi Video Layer" },
-                      {
-                        key: "showStillBackground",
-                        label: "Static Vector Wallpaper",
-                      },
-                    ].map((item) => (
-                      <div
-                        key={item.key}
-                        className="flex items-center justify-between group"
-                      >
-                        <span className="text-sm text-[#1A1D2E] font-medium group-hover:text-[#fd3b12] transition-colors">
-                          {item.label}
-                        </span>
+                        {enableLangsmith && (
+                          <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div>
+                              <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                                LangSmith API Key
+                              </label>
+                              <input
+                                type="password"
+                                value={langsmithApiKey}
+                                onChange={(e) => setLangsmithApiKey(e.target.value)}
+                                placeholder="ls__..."
+                                className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 font-mono text-sm placeholder:text-[#7A7D8E] transition-all"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#1A1D2E] mb-1.5">
+                                LangSmith Project
+                              </label>
+                              <input
+                                type="text"
+                                value={langsmithProject}
+                                onChange={(e) =>
+                                  setLangsmithProject(e.target.value)
+                                }
+                                placeholder="aicodex-agent-react-benchmarks"
+                                className="w-full bg-[#D8DCE4] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[#1A1D2E] focus:outline-none focus:ring-2 focus:ring-[#fd3b12]/40 focus:border-[#fd3b12]/30 text-sm placeholder:text-[#7A7D8E] transition-all"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between group">
+                              <div className="flex flex-col">
+                                <span className="text-sm text-[#1A1D2E] font-medium group-hover:text-[#fd3b12] transition-colors">
+                                  Private Workspace
+                                </span>
+                                <span className="text-[10px] text-[#7A7D8E]">
+                                  Enforces data egress restriction (gating
+                                  telemetry)
+                                </span>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  setPrivateWorkspace(!privateWorkspace)
+                                }
+                                className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${privateWorkspace ? "bg-[#fd3b12]" : "bg-[#D8DCE4]"
+                                  }`}
+                              >
+                                <span
+                                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${privateWorkspace
+                                    ? "translate-x-5"
+                                    : "translate-x-0"
+                                    }`}
+                                />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Visual Identity Toggles */}
+                    <div className="mt-8 pt-6 border-t border-black/[0.06]">
+                      <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-4">
+                        Neural Identity & Effects
+                      </label>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                        {[
+                          { key: "isDynamic", label: "Motion & Animations" },
+                          { key: "showTraces", label: "Neural Energy Traces" },
+                          {
+                            key: "showNeuralStrings",
+                            label: "Neural Drifting Strings",
+                          },
+                          { key: "showScanlines", label: "CRT Scanlines" },
+                          {
+                            key: "showMonochrome",
+                            label: "Monochrome Neural Phosphor",
+                          },
+                          { key: "showWaves", label: "Great Neural Waves" },
+                          { key: "showGrain", label: "Cinematic Film Grain" },
+                          {
+                            key: "showGlitches",
+                            label: "Digital Glitch Artifacts",
+                          },
+                          { key: "showVideo", label: "High-Fi Video Layer" },
+                          {
+                            key: "showStillBackground",
+                            label: "Static Vector Wallpaper",
+                          },
+                        ].map((item) => (
+                          <div
+                            key={item.key}
+                            className="flex items-center justify-between group"
+                          >
+                            <span className="text-sm text-[#1A1D2E] font-medium group-hover:text-[#fd3b12] transition-colors">
+                              {item.label}
+                            </span>
+                            <button
+                              onClick={() =>
+                                updateVisualSetting(
+                                  item.key as keyof VisualSettings,
+                                  !visualSettings[item.key as keyof VisualSettings],
+                                )
+                              }
+                              className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${visualSettings[item.key as keyof VisualSettings]
+                                ? "bg-[#fd3b12]"
+                                : "bg-[#D8DCE4]"
+                                }`}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${visualSettings[item.key as keyof VisualSettings]
+                                  ? "translate-x-5"
+                                  : "translate-x-0"
+                                  }`}
+                              />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Super Admin Section */}
+                      <div className="mt-6 pt-6 border-t border-black/[0.06]">
+                        <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-4">
+                          Super Admin Controls
+                        </label>
                         <button
-                          onClick={() =>
-                            updateVisualSetting(
-                              item.key as keyof VisualSettings,
-                              !visualSettings[item.key as keyof VisualSettings],
-                            )
-                          }
-                          className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${visualSettings[item.key as keyof VisualSettings]
-                              ? "bg-[#fd3b12]"
-                              : "bg-[#D8DCE4]"
-                            }`}
+                          onClick={() => {
+                            setIsOpen(false);
+                            navigate("/admin/overview");
+                          }}
+                          className="w-full flex items-center justify-between p-3 rounded-xl bg-black/5 hover:bg-black/10 border border-black/[0.05] transition-all group"
                         >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${visualSettings[item.key as keyof VisualSettings]
-                                ? "translate-x-5"
-                                : "translate-x-0"
-                              }`}
-                          />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Super Admin Section */}
-                  <div className="mt-6 pt-6 border-t border-black/[0.06]">
-                    <label className="block text-xs font-semibold text-[#4A4D5E] uppercase tracking-wider mb-4">
-                      Super Admin Controls
-                    </label>
-                    <button
-                      onClick={() => {
-                        setIsOpen(false);
-                        navigate("/admin/overview");
-                      }}
-                      className="w-full flex items-center justify-between p-3 rounded-xl bg-black/5 hover:bg-black/10 border border-black/[0.05] transition-all group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[#fd3b12]/10 flex items-center justify-center">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-[#fd3b12]/10 flex items-center justify-center">
+                              <svg
+                                className="w-5 h-5 text-[#fd3b12]"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M9 20l-5.447-2.724A2 2 0 013 15.485V6.415a2 2 0 011.118-1.789L9 2l5.447 2.724A2 2 0 0115 6.415v9.07a2 2 0 01-1.118 1.789L9 20zm0-18v18m0-18l-5.447 2.724m10.894 0L9 2m5.447 13.485L9 20m-5.447-2.724L9 20"
+                                />
+                              </svg>
+                            </div>
+                            <div className="text-left">
+                              <div className="text-[11px] font-bold text-[#1A1D2E] uppercase tracking-wider">
+                                Super Admin Overview
+                              </div>
+                              <div className="text-[9px] text-[#7A7D8E]">
+                                Access cross-workspace knowledge clusters
+                              </div>
+                            </div>
+                          </div>
                           <svg
-                            className="w-5 h-5 text-[#fd3b12]"
+                            className="w-4 h-4 text-[#7A7D8E] group-hover:translate-x-1 transition-transform"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -1654,35 +1729,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               strokeWidth="2"
-                              d="M9 20l-5.447-2.724A2 2 0 013 15.485V6.415a2 2 0 011.118-1.789L9 2l5.447 2.724A2 2 0 0115 6.415v9.07a2 2 0 01-1.118 1.789L9 20zm0-18v18m0-18l-5.447 2.724m10.894 0L9 2m5.447 13.485L9 20m-5.447-2.724L9 20"
+                              d="M9 5l7 7-7 7"
                             />
                           </svg>
-                        </div>
-                        <div className="text-left">
-                          <div className="text-[11px] font-bold text-[#1A1D2E] uppercase tracking-wider">
-                            Super Admin Overview
-                          </div>
-                          <div className="text-[9px] text-[#7A7D8E]">
-                            Access cross-workspace knowledge clusters
-                          </div>
-                        </div>
+                        </button>
                       </div>
-                      <svg
-                        className="w-4 h-4 text-[#7A7D8E] group-hover:translate-x-1 transition-transform"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
+                    </div>
 
                   </>
                 )}
@@ -1698,22 +1750,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                       <button
                         type="button"
                         onClick={() => setIntegrationsSubTab("connex")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                          integrationsSubTab === "connex"
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${integrationsSubTab === "connex"
                             ? "bg-black/10 text-[#1A1D2E] font-bold"
                             : "text-[#7A7D8E] hover:text-[#1A1D2E]"
-                        }`}
+                          }`}
                       >
                         OAuth Connections (Connex)
                       </button>
                       <button
                         type="button"
                         onClick={() => setIntegrationsSubTab("mcp")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                          integrationsSubTab === "mcp"
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${integrationsSubTab === "mcp"
                             ? "bg-black/10 text-[#1A1D2E] font-bold"
                             : "text-[#7A7D8E] hover:text-[#1A1D2E]"
-                        }`}
+                          }`}
                       >
                         MCP Servers ({mcpServers.length})
                       </button>
@@ -1741,11 +1791,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                         {(integrationProviders.length > 0
                           ? integrationProviders
                           : [
-                              { id: "google", name: "Google Workspace", slug: "google", scopes: ["Gmail", "Drive"] },
-                              { id: "github", name: "GitHub", slug: "github", scopes: ["Repos", "Issues", "PRs"] },
-                              { id: "slack", name: "Slack", slug: "slack", scopes: ["Channels", "Messages"] },
-                              { id: "notion", name: "Notion", slug: "notion", scopes: ["Pages", "Databases"] },
-                            ]
+                            { id: "google", name: "Google Workspace", slug: "google", scopes: ["Gmail", "Drive"] },
+                            { id: "github", name: "GitHub", slug: "github", scopes: ["Repos", "Issues", "PRs"] },
+                            { id: "slack", name: "Slack", slug: "slack", scopes: ["Channels", "Messages"] },
+                            { id: "notion", name: "Notion", slug: "notion", scopes: ["Pages", "Databases"] },
+                          ]
                         ).map((p: any) => {
                           const conn = userConnections.find((c: any) => c.provider === p.slug);
                           const isConnected = conn && conn.status === "active";
@@ -1785,7 +1835,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                                 {isConnected ? (
                                   <button
                                     type="button"
-                                    onClick={() => handleConnectOAuth(p.slug)}
+                                    onClick={() => handleConnectClick(p)}
                                     className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-black/5 text-[#4A4D5E] hover:bg-black/10 transition-all"
                                   >
                                     Reconnect
@@ -1794,7 +1844,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                                   <button
                                     type="button"
                                     disabled={isConnecting}
-                                    onClick={() => handleConnectOAuth(p.slug)}
+                                    onClick={() => handleConnectClick(p)}
                                     className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#fd3b12] text-white hover:bg-[#E65C00] shadow-sm transition-all flex items-center gap-1.5"
                                   >
                                     {isConnecting ? (
@@ -1814,6 +1864,41 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                             </div>
                           );
                         })}
+                        {apiKeyFormProvider && (
+                          <div className="p-3.5 bg-white/80 border border-[#fd3b12]/30 rounded-xl space-y-2.5">
+                            <div className="text-xs font-bold text-[#1A1D2E]">Connect {apiKeyFormProvider.name}</div>
+                            {apiKeyFormProvider.config_fields.map((field) => (
+                              <div key={field.name}>
+                                <label className="text-[11px] text-[#7A7D8E] block mb-1">{field.label}</label>
+                                <input
+                                  type={field.secret ? "password" : "text"}
+                                  value={apiKeyFormValues[field.name] ?? ""}
+                                  onChange={(e) =>
+                                    setApiKeyFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))
+                                  }
+                                  className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-white border border-black/10 focus:border-[#fd3b12]/50 outline-none"
+                                />
+                              </div>
+                            ))}
+                            <div className="flex justify-end gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setApiKeyFormProvider(null)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-black/5 text-[#4A4D5E] hover:bg-black/10 transition-all"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                disabled={connectingProvider === apiKeyFormProvider.slug}
+                                onClick={handleSaveApiKeyConnection}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#fd3b12] text-white hover:bg-[#E65C00] shadow-sm transition-all"
+                              >
+                                {connectingProvider === apiKeyFormProvider.slug ? "Connecting..." : "Save & Connect"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
@@ -1929,11 +2014,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                                     {server.transport_type}
                                   </span>
                                   <span
-                                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${
-                                      server.status === "connected"
+                                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${server.status === "connected"
                                         ? "bg-green-100 text-green-700"
                                         : "bg-gray-100 text-gray-600"
-                                    }`}
+                                      }`}
                                   >
                                     {server.status || "disconnected"}
                                   </span>
@@ -1947,11 +2031,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, setIsOpen }) => {
                                 <button
                                   type="button"
                                   onClick={() => handleToggleMcpServer(server.name, server.status === "connected")}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                                    server.status === "connected"
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${server.status === "connected"
                                       ? "bg-black/5 text-[#4A4D5E] hover:bg-black/10"
                                       : "bg-[#fd3b12] text-white hover:bg-[#E65C00]"
-                                  }`}
+                                    }`}
                                 >
                                   {server.status === "connected" ? "Disconnect" : "Connect"}
                                 </button>

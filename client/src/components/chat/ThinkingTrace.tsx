@@ -12,6 +12,25 @@ interface ThinkingTraceProps {
   currentContext: any[];
 }
 
+// Short animated labels shown in place of "Thinking Process" while a graph node is active.
+const NODE_LABELS: Record<string, string> = {
+  init: "Setting Up",
+  planner: "Planning",
+  guard: "Checking",
+  reason: "Reasoning",
+  thinking: "Reasoning",
+  execute_tool: "Executing",
+  validate: "Validating",
+  verification: "Verifying",
+  evaluate_turn: "Evaluating Turn",
+  trading_debate: "Evaluating Trade",
+  mql5_enforcer: "Enforcing MQL",
+  prepare_next_turn: "Preparing Turn",
+  final_report: "Finalizing",
+  handle_blocker: "Resolving",
+  starting: "Starting Execution",
+};
+
 const ThinkingTrace: React.FC<ThinkingTraceProps> = ({
   loading,
   thoughtLog,
@@ -30,6 +49,8 @@ const ThinkingTrace: React.FC<ThinkingTraceProps> = ({
 
   const hiddenTraceCount = Math.max(0, traceStartIndex);
   const visibleTrace = thoughtLog.slice(traceStartIndex);
+  const activeNodeType = thoughtLog.length > 0 ? thoughtLog[thoughtLog.length - 1].type : undefined;
+  const activeLabel = (activeNodeType && NODE_LABELS[activeNodeType]) || "Thinking Process";
 
   if (
     !loading &&
@@ -43,18 +64,19 @@ const ThinkingTrace: React.FC<ThinkingTraceProps> = ({
   return (
     <div className="flex justify-start pl-4 animate-in fade-in zoom-in-95 duration-300 mb-4">
       <div className="bg-[#D8DCE4]/40 backdrop-blur-sm border border-[#fd3b12]/40 p-4 rounded-xl max-w-2xl w-full shadow-sm shadow-[#fd3b12]/5">
-        <details open={loading} className="group">
+        <details className="group">
           <summary className="flex items-center justify-between cursor-pointer list-none select-none">
             <div className="flex items-center gap-3">
-              <span
-                className={`text-[10px] font-bold uppercase tracking-[0.15em] ${loading ? "text-[#fd3b12]" : "text-[#7A7D8E]"}`}
-              >
-                {loading ? "Thinking Process" : "Neural Trace"}
-              </span>
               <AgentPulse
                 mode={loading ? "thinking" : "idle"}
                 showText={false}
               />
+              <span
+                key={loading ? activeLabel : "neural-trace"}
+                className={`inline-block animate-in slide-in-from-top-1 fade-in duration-300 text-[10px] font-bold uppercase tracking-[0.15em] ${loading ? "text-[#fd3b12]" : "text-[#7A7D8E]"}`}
+              >
+                {loading ? activeLabel : "Neural Trace"}
+              </span>
               {!loading && thoughtStartTime && thoughtLog.length > 0 && (
                 <span className="text-[#7A7D8E] lowercase font-mono">
                   (
