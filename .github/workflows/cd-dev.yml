@@ -18,13 +18,38 @@ jobs:
       ALIBABA_REGISTRY: registry.${{ secrets.ALIBABA_REGION_ID }}.aliyuncs.com
       IMAGE_NAME: aicodex/backend
       IMAGE_TAG: ${{ github.sha }}
+      TF_VAR_region: ${{ secrets.ALIBABA_REGION_ID }}
+      TF_VAR_project_name: aicodex
+      TF_VAR_vpc_name: aicodex-vpc
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Checkout CodexSpaces source
+        uses: actions/checkout@v4
+        with:
+          repository: iarxii/CodexSpaces
+          token: ${{ secrets.CODEXSPACES_READ_TOKEN }}
+          path: codex_spaces
+          fetch-depth: 0
+          submodules: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Validate Terraform dev stack
+        working-directory: infra/environments/dev
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
 
       - name: Log in to Alibaba Container Registry
         run: |
@@ -56,4 +81,4 @@ jobs:
       - name: Smoke check guidance
         run: |
           echo "Image published to $ALIBABA_REGISTRY/$IMAGE_NAME:dev"
-          echo "Next step: deploy this image to the dev ECS GPU instance or Terraform-managed ECS target."
+          echo "Terraform dev stack validated. Next step: apply the dev stack and deploy the image to the GPU ECS target."

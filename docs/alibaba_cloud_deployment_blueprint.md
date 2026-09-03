@@ -2,9 +2,25 @@
 
 This document provides a high-level roadmap and reference guide for configuring your **Alibaba Cloud** account, hosting the **Premium GPU/Inference Backend** (AI Codex / Ollama), and standardizing deployment patterns across your future projects.
 
+> Updated baseline status (2026-09-02): this repository is currently Cloud Run-first and should not be treated as an existing Alibaba deployment. The Alibaba path below is an additive future target for the premium inference backend only, while the active production deployment remains the current Google Cloud Run workflow.
+
 ---
 
-## 1. Executive Summary & Recommended Compute Mapping
+## 1. Current Repo Reality vs. Future Alibaba Target
+
+### Current repo baseline
+- The active deployment path is the Google Cloud Run pipeline documented in [deploy_production.bat](../deploy_production.bat).
+- The backend container is Cloud Run-oriented and exposes the service port expected by the current deployment flow.
+- The repo does not yet contain a Terraform root, Alibaba VPC topology, or an actual production Alibaba deployment definition.
+
+### Future Alibaba target
+- Add Alibaba Cloud as a separate deployment target for the premium inference backend.
+- Keep the existing Cloud Run deployment path stable while implementing the Alibaba path in parallel.
+- Start with a dev-only ACR + GPU ECS deployment, then expand to staging and production after smoke checks and approval.
+
+---
+
+## 2. Executive Summary & Recommended Compute Mapping
 
 Alibaba Cloud offers multiple compute layers depending on resource intensity, statefulness, and scale:
 
@@ -46,12 +62,17 @@ Setting up a secure foundation prevents unauthorized access and avoids unexpecte
 2. Attach least-privilege system policies (e.g., `AliyunECSFullAccess`, `AliyunSAEFullAccess`, or `AliyunContainerRegistryFullAccess`).
 3. Generate **RAM AccessKey ID & Secret** and store them securely in your GitHub Secrets or `.env` manager.
 
-### Step 3: Network & VPC Topology
+### Step 3: Networcdk & VPC Topology
 1. Create a primary **Virtual Private Cloud (VPC)** in your target region (e.g., `ap-southeast-1` Singapore or `eu-central-1` Frankfurt).
-2. Provision **VSwitches** across at least 2 Availability Zones for high availability.
+2. Provision **VSwitches** across at least 2 Availability Zones for high availability. Recommended names and ranges for the first implementation:
+   - `aicodex-vpc` = `10.10.0.0/16`
+   - `aicodex-vsw-az1` = `10.10.1.0/24`
+   - `aicodex-vsw-az2` = `10.10.2.0/24`
 3. Configure a baseline **Security Group**:
    - Inbound: `22` (SSH - restricted to your IP), `80/443` (HTTP/HTTPS), `8000` (FastAPI / Codex Backend).
    - Inbound: `11434` (Ollama - keep private or protect with security key/proxy).
+
+These names and CIDRs are the current implementation baseline for the first Alibaba dev deployment and should be kept consistent in any Terraform or CLI automation.
 
 ---
 

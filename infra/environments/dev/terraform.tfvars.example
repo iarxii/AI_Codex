@@ -1,0 +1,10 @@
+region = "ap-southeast-1"
+project_name = "aicodex"
+vpc_name = "aicodex-vpc"
+vpc_cidr = "10.10.0.0/16"
+zone_ids = ["ap-southeast-1a", "ap-southeast-1b"]
+vswitch_names = ["aicodex-vsw-az1", "aicodex-vsw-az2"]
+vswitch_cidrs = ["10.10.1.0/24", "10.10.2.0/24"]
+admin_cidr_blocks = ["203.0.113.10/32"]
+backend_port = 8000
+ollama_port = 11434

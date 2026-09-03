@@ -41,6 +41,19 @@ Thumbs.db
 temp_*_build/
 backend/OllamaOpt_local/
 
+# Terraform local state and generated files
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
 # MCP Server Build files
 mcp/build/
 
