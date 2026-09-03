@@ -46,8 +46,7 @@ import json
 import os
 import sys
 import time
-import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -58,6 +57,31 @@ from dotenv import load_dotenv
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env.debug")
+
+
+def _default_provider(target: str) -> str:
+    configured = os.environ.get("AICODEX_DEBUG_PROVIDER")
+    if configured:
+        return configured
+    return "local" if target == "local" else "ollama_cloud"
+
+
+def _default_api_key(provider: str) -> Optional[str]:
+    if provider == "ollama_cloud":
+        return os.environ.get("OLLAMA_CLOUD_API_KEY") or os.environ.get("OLLAMA_CLOUD_APIK")
+    return None
+
+
+def _default_base_url(provider: str) -> Optional[str]:
+    if provider == "ollama_cloud":
+        return os.environ.get("OLLAMA_CLOUD_BASE_URL") or "https://ollama.com"
+    return None
+
+
+def _select_production_model(models: list[dict]) -> Optional[str]:
+    available = [str(model.get("id")) for model in models if model.get("id")]
+    preferred = ["gpt-oss:20b", "gemma4:31b", "nemotron-3-nano:30b"]
+    return next((model for model in preferred if model in available), available[0] if available else None)
 
 
 def _to_ws_url(http_url: str) -> str:
@@ -94,14 +118,34 @@ async def login(backend_url: str, username: str, password: str) -> str:
         return resp.json()["access_token"]
 
 
-async def list_models(backend_url: str, token: str, provider: str, base_url: Optional[str]) -> list[dict]:
+async def list_models(
+    backend_url: str,
+    token: str,
+    provider: str,
+    base_url: Optional[str],
+    api_key: Optional[str] = None,
+) -> list[dict]:
     headers = {"Authorization": f"Bearer {token}"}
     if base_url:
         headers["X-Base-Url"] = base_url
+    if api_key:
+        headers["X-API-Key"] = api_key
     async with httpx.AsyncClient(timeout=15.0) as client:
         resp = await client.get(f"{backend_url}/api/models", params={"provider": provider}, headers=headers)
         resp.raise_for_status()
         return resp.json()
+
+
+async def create_conversation(backend_url: str, token: str) -> int:
+    headers = {"Authorization": f"Bearer {token}"}
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(
+            f"{backend_url}/api/conversations/",
+            json={"title": "Debug CLI Conversation"},
+            headers=headers,
+        )
+        resp.raise_for_status()
+        return int(resp.json()["id"])
 
 
 @dataclass
@@ -116,6 +160,8 @@ class SessionState:
     last_send_time: Optional[float] = None
     last_user_message: str = ""
     seen_first_token: bool = False
+    connection_closed: asyncio.Event = field(default_factory=asyncio.Event)
+    close_requested: bool = False
 
     def log_failure(self, reason: str) -> None:
         entry = {
@@ -139,7 +185,8 @@ def _print_event(data: dict[str, Any], session: SessionState) -> None:
             print(f"\n[ttft] {ttft:.2f}s")
             session.seen_first_token = True
         # Streamed text — print inline without a newline so replies read naturally.
-        print(data.get("content", ""), end="", flush=True)
+        content = data.get("delta") if etype == "token_delta" else data.get("content")
+        print(content or "", end="", flush=True)
     elif etype == "status":
         print(f"\n[status] node={data.get('node')} — {data.get('status')}")
     elif etype == "tool_call":
@@ -156,7 +203,7 @@ def _print_event(data: dict[str, Any], session: SessionState) -> None:
         session.log_failure(str(data.get("message")))
     elif etype == "done":
         rtt = f"{time.monotonic() - session.last_send_time:.2f}s" if session.last_send_time else "?"
-        print(f"\n[done] provider={data.get('provider')} model={data.get('model')} backend_duration={data.get('duration')} client_rtt={rtt} tokens={data.get('tokens')}")
+        print(f"\n[done] final_length={data.get('final_length')} final_seq={data.get('final_seq')} client_rtt={rtt}")
         session.seen_first_token = False
     elif etype == "telemetry":
         print(f"\n[telemetry] {data}")
@@ -175,7 +222,9 @@ async def receiver(ws, session: SessionState) -> None:
             _print_event(data, session)
     except websockets.ConnectionClosed as e:
         print("\n[connection closed by server]")
-        session.log_failure(f"WebSocket connection closed unexpectedly: {e}")
+        session.connection_closed.set()
+        if not session.close_requested:
+            session.log_failure(f"WebSocket connection closed unexpectedly: {e}")
 
 
 async def main() -> None:
@@ -186,8 +235,8 @@ async def main() -> None:
     parser.add_argument("--username", default=os.environ.get("AICODEX_DEBUG_USERNAME"))
     parser.add_argument("--password", default=os.environ.get("AICODEX_DEBUG_PASSWORD"))
     parser.add_argument("--token", default=None, help="Skip login and use an existing JWT access token directly")
-    parser.add_argument("--provider", default="local")
-    parser.add_argument("--model", default="default")
+    parser.add_argument("--provider", default=None, help="Provider; defaults to local for --target local and ollama_cloud for production targets")
+    parser.add_argument("--model", default=None, help="Model ID; production auto-selects a preferred available model when omitted")
     parser.add_argument("--api-key", default=None)
     parser.add_argument("--base-url", default=None, help="X-Base-Url header, required by ollama_cloud/azure_foundry/alibaba_ecs")
     parser.add_argument("--conversation-id", type=int, default=None)
@@ -197,6 +246,9 @@ async def main() -> None:
     args = parser.parse_args()
 
     backend_url = _resolve_backend_url(args.target, args.backend_url, Path(args.route_map))
+    args.provider = args.provider or _default_provider(args.target)
+    args.api_key = args.api_key or _default_api_key(args.provider)
+    args.base_url = args.base_url or _default_base_url(args.provider)
     if args.target != "local":
         print(f"[WARNING] Connecting to the '{args.target}' PRODUCTION deployment: {backend_url}")
 
@@ -209,6 +261,28 @@ async def main() -> None:
         print(f"Logging in as {args.username} against {backend_url}...")
         token = await login(backend_url, args.username, args.password)
         print("Login OK.")
+
+    if args.conversation_id is None:
+        args.conversation_id = await create_conversation(backend_url, token)
+        print(f"Created conversation {args.conversation_id}.")
+
+    if args.model is None:
+        if args.target == "local":
+            args.model = "default"
+        else:
+            models = await list_models(backend_url, token, args.provider, args.base_url, args.api_key)
+            if not models:
+                raise SystemExit(
+                    f"No models available for provider '{args.provider}'. "
+                    "Pass --model explicitly or configure the provider first."
+                )
+            args.model = _select_production_model(models)
+            if not args.model:
+                raise SystemExit(
+                    f"No usable model IDs returned for provider '{args.provider}'. "
+                    "Pass --model explicitly or configure the provider first."
+                )
+            print(f"Selected production model {args.model}.")
 
     ws_base = _to_ws_url(backend_url)
     handshake_qs = f"&handshake={args.handshake}" if args.handshake else ""
@@ -238,18 +312,29 @@ async def main() -> None:
                     cmd = parts[0].lower()
                     arg = parts[1] if len(parts) > 1 else ""
                     if cmd == "/quit":
+                        session.close_requested = True
                         break
                     elif cmd == "/provider":
-                        session.provider = arg.strip()
+                        value = arg.strip()
+                        if not value:
+                            print("Usage: /provider <name>")
+                            continue
+                        session.provider = value
                         print(f"(provider set to {session.provider})")
                         continue
                     elif cmd == "/model":
-                        session.model = arg.strip()
+                        value = arg.strip()
+                        if not value:
+                            print("Usage: /model <name>")
+                            continue
+                        session.model = value
                         print(f"(model set to {session.model})")
                         continue
                     elif cmd == "/models":
                         try:
-                            models = await list_models(backend_url, token, session.provider, session.base_url)
+                            models = await list_models(
+                                backend_url, token, session.provider, session.base_url, session.api_key
+                            )
                             print(f"\nAvailable models for '{session.provider}':")
                             for m in models:
                                 print(f"  - {m.get('id')}  ({m.get('name', '')})")
@@ -257,25 +342,56 @@ async def main() -> None:
                             print(f"\nFailed to list models: {e}")
                         continue
                     elif cmd == "/apikey":
-                        session.api_key = arg.strip()
+                        value = arg.strip()
+                        if not value:
+                            print("Usage: /apikey <key>")
+                            continue
+                        session.api_key = value
                         print("(api key set)")
                         continue
                     elif cmd == "/baseurl":
-                        session.base_url = arg.strip()
+                        value = arg.strip()
+                        if not value:
+                            print("Usage: /baseurl <url>")
+                            continue
+                        session.base_url = value
                         print(f"(base_url set to {session.base_url})")
                         continue
                     elif cmd == "/conv":
-                        session.conversation_id = int(arg.strip())
+                        value = arg.strip()
+                        try:
+                            conversation_id = int(value)
+                        except ValueError:
+                            print("Usage: /conv <integer conversation id>")
+                            continue
+                        session.conversation_id = conversation_id
                         print(f"(conversation_id set to {session.conversation_id})")
                         continue
                     elif cmd == "/raw":
-                        await ws.send(arg)
+                        raw_payload = arg.strip()
+                        if not raw_payload:
+                            print("Usage: /raw <json>")
+                            continue
+                        try:
+                            json.loads(raw_payload)
+                        except json.JSONDecodeError as e:
+                            print(f"Invalid JSON for /raw: {e.msg}")
+                            continue
+                        try:
+                            await ws.send(raw_payload)
+                        except websockets.ConnectionClosed as e:
+                            session.connection_closed.set()
+                            session.log_failure(f"Failed to send raw payload: {e}")
+                            break
                         continue
                     else:
                         print(f"Unknown command: {cmd}")
                         continue
 
-                session.conversation_id = session.conversation_id or int(uuid.uuid4().int % 1_000_000_000)
+                if session.connection_closed.is_set():
+                    print("WebSocket is closed; exiting.")
+                    break
+
                 session.last_user_message = line
                 session.seen_first_token = False
                 payload = {
@@ -293,9 +409,9 @@ async def main() -> None:
                 session.last_send_time = time.monotonic()
                 try:
                     await ws.send(json.dumps(payload))
-                except Exception as e:
+                except websockets.ConnectionClosed as e:
                     session.log_failure(f"Failed to send message: {e}")
-                    raise
+                    break
                 print()  # spacer before streamed tokens
         except (KeyboardInterrupt, EOFError):
             pass
