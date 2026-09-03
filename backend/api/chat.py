@@ -17,6 +17,7 @@ from backend.agent.graph import create_agent_graph
 from codex_spaces.backend.agent.space_config import get_space_config
 from sqlalchemy import select, update
 from backend.agent.provider_auth import build_provider_api_key_map, resolve_provider_api_key
+from backend.integrations.cloud_inference import resolve_cloud_inference_credentials, CLOUD_INFERENCE_PROVIDERS
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -176,6 +177,35 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         base_url = payload_data.get("base_url")
         account_id = payload_data.get("account_id")
         gateway_id = payload_data.get("gateway_id")
+        region = payload_data.get("region")
+        aws_secret_access_key = payload_data.get("aws_secret_access_key")
+
+        # Tier 2 "Client-Managed Cloud Connections": on the premium instance (COLAB_SECRET
+        # configured), resolve per-user Connex credentials for cloud inference providers
+        # instead of trusting client-supplied secrets for these providers.
+        from backend.config import settings as _cloud_inference_settings
+        if _cloud_inference_settings.COLAB_SECRET and provider in CLOUD_INFERENCE_PROVIDERS:
+            async with AsyncSessionLocal() as cred_db:
+                resolved_creds = await resolve_cloud_inference_credentials(cred_db, user.id, provider)
+            if not resolved_creds:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": f"Connect {provider.replace('_', ' ').title()} in the CONNEX tab to use this provider.",
+                })
+                return
+            if provider == "azure_foundry":
+                api_key = resolved_creds.get("api_key") or api_key
+                base_url = resolved_creds.get("base_url") or base_url
+                model = resolved_creds.get("deployment_name") or model
+            elif provider == "aws_bedrock":
+                api_key = resolved_creds.get("access_key_id") or api_key
+                aws_secret_access_key = resolved_creds.get("secret_access_key") or aws_secret_access_key
+                region = resolved_creds.get("region") or region
+                model = resolved_creds.get("model_id") or model
+            elif provider == "alibaba_ecs":
+                base_url = resolved_creds.get("base_url") or base_url
+                api_key = resolved_creds.get("api_key") or api_key
+
         model_config = payload_data.get("config", {})
         agent_mode = payload_data.get("agent_mode", True)
         local_backend_mode = payload_data.get("local_backend_mode", "ollama")
@@ -459,6 +489,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                         "base_url": base_url,
                         "account_id": account_id,
                         "gateway_id": gateway_id,
+                        "region": region,
+                        "aws_secret_access_key": aws_secret_access_key,
                         "model_config": model_config,
                         "conversation_id": str(conversation_id),
                         "agent_mode": agent_mode,

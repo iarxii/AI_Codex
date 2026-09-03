@@ -4,5 +4,6 @@
   "backend_url": "https://aicodex-be-1096425756328.us-central1.run.app",
   "frontend_url": "https://aicodex-lab-1096425756328.us-central1.run.app",
   "premium_url": "https://aicodex-premium-1096425756328.us-central1.run.app",
-  "last_deployed": "2026/09/01 19:05:47,48"
+  "alibaba_ecs_url": "",
+  "last_deployed": "2026/09/03 19:43:06,79"
 }

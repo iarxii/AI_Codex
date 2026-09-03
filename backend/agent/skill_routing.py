@@ -178,18 +178,6 @@ class SkillDiagnostic:
     message: str
 
 
-def resolve_client_capabilities(
-    client_type: Optional[str],
-    additional_capabilities: Optional[Iterable[str]] = None,
-) -> frozenset[str]:
-    """Resolve an untrusted client identifier to an unprivileged baseline."""
-    normalized_client = (client_type or "web").lower()
-    capabilities = set(CLIENT_CAPABILITIES.get(normalized_client, CLIENT_CAPABILITIES["web"]))
-    if additional_capabilities:
-        capabilities.update(additional_capabilities)
-    return frozenset(capabilities)
-
-
 def _as_string_tuple(value: object, field_name: str) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
         raise ValueError(f"'{field_name}' must be a list of non-empty strings")

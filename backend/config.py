@@ -26,7 +26,11 @@ class Settings(BaseSettings):
     LLAMACPP_BASE_URL: str = "http://localhost:8080"
     LOCAL_BACKEND_MODE: str = "llamacpp"  # "ollama" | "llamacpp"
     DEFAULT_MODEL: str = "llama3.2:3b"
-    ALIBABA_ECS_OLLAMA_URL: str = ""  # Premium router target: Ollama on Alibaba ECS GPU host
+    # Tier 1 "Platform-Managed Inference" — instance-wide cloud inference config, disabled until
+    # paid subscriptions ship (see docs/plans/#76_platform_managed_inference_subscriptions_TODO.md).
+    # Tier 2 "Client-Managed Cloud Connections" (Connex, per-user) is the active path regardless of this flag.
+    PLATFORM_MANAGED_INFERENCE_ENABLED: bool = False
+    ALIBABA_ECS_OLLAMA_URL: str = ""  # Tier 1 fallback: Ollama on Alibaba ECS GPU host
     
     # Database
     DB_TYPE: str = "sqlite" # "sqlite" or "postgres"

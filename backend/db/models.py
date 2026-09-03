@@ -213,6 +213,7 @@ class IntegrationProvider(Base):
     id: Mapped[str] = mapped_column(String(50), primary_key=True) # e.g., "google", "github", "slack"
     name: Mapped[str] = mapped_column(String(100))
     slug: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    connection_type: Mapped[str] = mapped_column(String(20), default="oauth") # "oauth" | "api_key" (cloud inference providers without a usable OAuth consent flow)
     oauth_authorize_url_template: Mapped[Optional[str]] = mapped_column(Text) # {state_param} gets replaced
     oauth_token_url: Mapped[str] = mapped_column(String(200))
     scopes_json: Mapped[str] = mapped_column(Text) # JSON array of scopes
@@ -230,6 +231,7 @@ class UserConnection(Base):
     access_token_enc: Mapped[str] = mapped_column(Text)
     refresh_token_enc: Mapped[Optional[str]] = mapped_column(Text)
     scopes: Mapped[Optional[str]] = mapped_column(Text)
+    config_json: Mapped[Optional[str]] = mapped_column(Text) # non-secret provider config, e.g. Azure Foundry endpoint/deployment_name
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     status: Mapped[str] = mapped_column(String(20), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

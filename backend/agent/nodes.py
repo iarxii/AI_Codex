@@ -230,6 +230,20 @@ async def get_dynamic_llm(config: RunnableConfig, bind_tools: bool = True, tier:
                 "LiteRT is a client-side provider and cannot be used over the agent "
                 "WebSocket. Use the Lite Chat portal instead."
             )
+        elif provider in ("azure_foundry", "aws_bedrock", "alibaba_ecs"):
+            # Connex-managed cloud inference providers (Tier 2) — reuse the shared factory
+            # instead of duplicating Azure/Bedrock/Alibaba wiring here.
+            from backend.agent.models import get_llm as _get_shared_llm
+            target_model = model or settings.DEFAULT_MODEL
+            llm = _get_shared_llm(
+                provider=provider,
+                model=target_model,
+                temperature=temp,
+                api_key=api_key,
+                base_url=config.get("configurable", {}).get("base_url"),
+                region=config.get("configurable", {}).get("region"),
+                aws_secret_access_key=config.get("configurable", {}).get("aws_secret_access_key"),
+            )
         else:
             # ─── Local Provider: Ollama App or raw llama-server ───
             local_backend_mode = config.get("configurable", {}).get(

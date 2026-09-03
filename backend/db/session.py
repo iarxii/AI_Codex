@@ -160,8 +160,8 @@ async def init_db():
 
             # Seed Integration Providers
             import json
-            from backend.integrations.oauth import PROVIDERS
-            for slug, cfg in PROVIDERS.items():
+            from backend.integrations.oauth import PROVIDERS, API_KEY_PROVIDERS
+            for slug, cfg in {**PROVIDERS, **API_KEY_PROVIDERS}.items():
                 result = await session.execute(select(IntegrationProvider).filter_by(id=slug))
                 existing = result.scalar_one_or_none()
                 if not existing:
@@ -169,15 +169,18 @@ async def init_db():
                         id=slug,
                         name=cfg.name,
                         slug=cfg.slug,
+                        connection_type=cfg.connection_type,
                         oauth_authorize_url_template=cfg.oauth_authorize_url,
                         oauth_token_url=cfg.oauth_token_url,
                         scopes_json=json.dumps(cfg.scopes),
                         icon_url=cfg.icon,
-                        config_schema_json=json.dumps(cfg.client_kwargs) if cfg.client_kwargs else None,
+                        config_schema_json=json.dumps(cfg.config_fields or cfg.client_kwargs) if (cfg.config_fields or cfg.client_kwargs) else None,
                         is_active=True,
                     )
                     session.add(new_provider)
                     print(f"Seeded integration provider: {slug}")
+                elif existing.connection_type != cfg.connection_type:
+                    existing.connection_type = cfg.connection_type
             await session.commit()
     except Exception as e:
         print(f"Warning: Database seeding failed. Server starting without full seed data. Error: {e}")

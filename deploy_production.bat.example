@@ -8,12 +8,14 @@ SET REGION=us-central1
 SET BACKEND_IMAGE=us-central1-docker.pkg.dev/%PROJECT_ID%/aicodex-repo/backend
 SET FRONTEND_IMAGE=us-central1-docker.pkg.dev/%PROJECT_ID%/aicodex-repo/frontend
 
-:: Default to deploying both
+:: Default to deploying all three
 SET DEPLOY_BE=true
 SET DEPLOY_FE=true
-SET DEPLOY_PREMIUM=false
+SET DEPLOY_PREMIUM=true
 SET COLAB_URL=
 SET COLAB_SECRET=
+SET ALIBABA_ENDPOINT=
+SET PREFLIGHT=false
 
 :: Parse arguments
 :parse_args
@@ -23,7 +25,9 @@ if "%~1"=="--be" (
     SET DEPLOY_FE=false
 ) else if "%~1"=="--fe" (
     echo Deployment Mode: Frontend Only
+    SET DEPLOY_FE=true
     SET DEPLOY_BE=false
+    SET DEPLOY_PREMIUM=false
 ) else if "%~1"=="--premium" (
     echo Deployment Mode: Premium Backend
     SET DEPLOY_PREMIUM=true
@@ -35,12 +39,126 @@ if "%~1"=="--be" (
 ) else if "%~1"=="--colab-secret" (
     SET COLAB_SECRET=%~2
     shift
+) else if "%~1"=="--alibaba-endpoint" (
+    SET ALIBABA_ENDPOINT=%~2
+    shift
+) else if "%~1"=="--preflight" (
+    SET PREFLIGHT=true
 ) else (
     echo Deployment Mode: Full Stack
+    SET DEPLOY_BE=true
+    SET DEPLOY_FE=true
+    SET DEPLOY_PREMIUM=true
 )
 shift
 goto parse_args
 :end_parse
+
+:: ============================================================
+:: PREFLIGHT CHECK
+:: Run with --preflight to validate all prerequisites without
+:: building or deploying anything.
+:: ============================================================
+if "!PREFLIGHT!"=="true" goto :do_preflight
+goto :after_preflight
+
+:do_preflight
+echo.
+echo ========================================
+echo   PREFLIGHT CHECK - No deployment will
+echo   occur. Validating prerequisites only.
+echo ========================================
+echo.
+SET PREFLIGHT_OK=true
+
+echo [CHECK 1/7] gcloud CLI available...
+where gcloud >nul 2>&1
+if !ERRORLEVEL! NEQ 0 (
+    echo   [FAIL] gcloud not found in PATH.
+    SET PREFLIGHT_OK=false
+) else (
+    for /f "tokens=*" %%v in ('gcloud version 2^>nul ^| findstr "Google Cloud SDK"') do echo   [PASS] %%v
+)
+
+echo [CHECK 2/7] Active gcloud account...
+SET ACTIVE_ACCOUNT=
+for /f "tokens=*" %%a in ('gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2^>nul') do set ACTIVE_ACCOUNT=%%a
+if "!ACTIVE_ACCOUNT!"=="" (
+    echo   [FAIL] No active gcloud account. Run: gcloud auth login
+    SET PREFLIGHT_OK=false
+) else (
+    echo   [PASS] Authenticated as: !ACTIVE_ACCOUNT!
+)
+
+echo [CHECK 3/7] Project access for %PROJECT_ID%...
+gcloud projects describe %PROJECT_ID% >nul 2>&1
+if !ERRORLEVEL! NEQ 0 (
+    echo   [FAIL] Cannot access project %PROJECT_ID%. Check permissions or run: gcloud config set project %PROJECT_ID%
+    SET PREFLIGHT_OK=false
+) else (
+    echo   [PASS] Project %PROJECT_ID% is accessible.
+)
+
+echo [CHECK 4/7] Artifact Registry repo accessible...
+gcloud artifacts repositories describe aicodex-repo --project=%PROJECT_ID% --location=us-central1 >nul 2>&1
+if !ERRORLEVEL! NEQ 0 (
+    echo   [WARN] Artifact Registry aicodex-repo not found or not accessible. Builds may fail.
+) else (
+    echo   [PASS] Artifact Registry aicodex-repo is accessible.
+)
+
+echo [CHECK 5/7] Required source directories...
+for %%d in (backend client codex_spaces skills) do (
+    if not exist %%d (
+        echo   [FAIL] Missing directory: %%d
+        SET PREFLIGHT_OK=false
+    ) else (
+        echo   [PASS] Found: %%d\
+    )
+)
+
+echo [CHECK 6/7] Dockerfiles...
+if not exist backend\Dockerfile (
+    echo   [FAIL] Missing: backend\Dockerfile
+    SET PREFLIGHT_OK=false
+) else (
+    echo   [PASS] backend\Dockerfile found.
+)
+if not exist client\Dockerfile (
+    echo   [FAIL] Missing: client\Dockerfile
+    SET PREFLIGHT_OK=false
+) else (
+    echo   [PASS] client\Dockerfile found.
+)
+
+echo [CHECK 7/7] Existing Cloud Run service status...
+for %%s in (aicodex-be aicodex-lab aicodex-premium) do (
+    gcloud run services describe %%s --platform managed --region %REGION% --project %PROJECT_ID% --format="value(status.url)" >nul 2>&1
+    if !ERRORLEVEL! NEQ 0 (
+        echo   [WARN] Service %%s not found or not yet deployed ^(will be created on first deploy^).
+    ) else (
+        for /f "tokens=*" %%u in ('gcloud run services describe %%s --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)" 2^>nul') do (
+            echo   [PASS] %%s -^> %%u
+        )
+    )
+)
+
+echo.
+if "!PREFLIGHT_OK!"=="true" (
+    echo ========================================
+    echo   PREFLIGHT PASSED. Ready to deploy.
+    echo   Run without --preflight to proceed.
+    echo ========================================
+    exit /b 0
+) else (
+    echo ========================================
+    echo   PREFLIGHT FAILED. Fix errors above
+    echo   before running a full deployment.
+    echo ========================================
+    exit /b 1
+)
+
+:after_preflight
 
 if "!COLAB_URL!" NEQ "" echo [DUAL BACKEND] Detected Colab URL: !COLAB_URL!
 if "!COLAB_SECRET!" NEQ "" echo [DUAL BACKEND] Detected Colab Handshake Secret.
@@ -77,7 +195,7 @@ if "%DEPLOY_BE%"=="true" (
         --region %REGION% ^
         --project %PROJECT_ID% ^
         --allow-unauthenticated ^
-        --memory 1Gi ^
+        --memory 2Gi ^
         --timeout 600 ^
         --set-env-vars "SECRET_KEY=YOUR_SECRET_KEY_HERE,DB_TYPE=sqlite,CORS_ORIGINS=*,GCS_BUCKET_NAME=your-bucket-name,SEED_ADMIN=False"
     if %ERRORLEVEL% NEQ 0 (
@@ -90,6 +208,10 @@ if "%DEPLOY_BE%"=="true" (
 
 if "%DEPLOY_PREMIUM%"=="true" (
     echo [2.5/4] Deploying Premium Backend to Cloud Run as 'aicodex-premium'...
+    SET PREMIUM_ENV_VARS=SECRET_KEY=YOUR_SECRET_KEY_HERE,DB_TYPE=sqlite,CORS_ORIGINS=*,GCS_BUCKET_NAME=your-bucket-name,SEED_ADMIN=False,COLAB_SECRET=!COLAB_SECRET!
+    if not "!ALIBABA_ENDPOINT!"=="" (
+        SET PREMIUM_ENV_VARS=!PREMIUM_ENV_VARS!,ALIBABA_ECS_OLLAMA_URL=!ALIBABA_ENDPOINT!
+    )
     call %GCLOUD% run deploy aicodex-premium ^
         --image %BACKEND_IMAGE% ^
         --platform managed ^
@@ -98,7 +220,7 @@ if "%DEPLOY_PREMIUM%"=="true" (
         --allow-unauthenticated ^
         --memory 2Gi ^
         --timeout 3600 ^
-        --set-env-vars "SECRET_KEY=YOUR_SECRET_KEY_HERE,DB_TYPE=sqlite,CORS_ORIGINS=*,GCS_BUCKET_NAME=your-bucket-name,SEED_ADMIN=False,COLAB_SECRET=!COLAB_SECRET!"
+        --set-env-vars "!PREMIUM_ENV_VARS!"
     if %ERRORLEVEL% NEQ 0 (
         echo Premium Backend deployment failed. Exiting.
         exit /b %ERRORLEVEL%
@@ -107,7 +229,7 @@ if "%DEPLOY_PREMIUM%"=="true" (
 
 if "%DEPLOY_FE%"=="true" (
     echo Retrieving Backend URL for Frontend build...
-    for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-be --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set BACKEND_URL=%%i
+    for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-be --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set BACKEND_URL=%%i
     
     if "!BACKEND_URL!"=="" (
         echo ERROR: Could not retrieve Backend URL. Is 'aicodex-be' deployed?
@@ -117,7 +239,7 @@ if "%DEPLOY_FE%"=="true" (
     echo Backend URL detected: !BACKEND_URL!
     
     echo Retrieving Premium URL for Frontend build...
-    for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-premium --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set PREMIUM_URL=%%i
+    for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-premium --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set PREMIUM_URL=%%i
     echo Premium URL detected: !PREMIUM_URL!
 
     echo [3/4] Submitting Frontend Build to Google Cloud...
@@ -165,11 +287,13 @@ if "%DEPLOY_FE%"=="true" (
 )
 
 echo [5/6] Generating/Updating Route Map JSON...
-for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-be --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set BACKEND_URL=%%i
-for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-lab --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set FRONTEND_URL=%%i
-for /f "usebackq tokens=*" %%i in (`powershell -Command "gcloud run services describe aicodex-premium --platform managed --region %REGION% --project %PROJECT_ID% --format='value(status.url)'"`) do set PREMIUM_URL=%%i
+for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-be --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set BACKEND_URL=%%i
+for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-lab --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set FRONTEND_URL=%%i
+for /f "usebackq tokens=*" %%i in (`%GCLOUD% run services describe aicodex-premium --platform managed --region %REGION% --project %PROJECT_ID% --format^="value(status.url)"`) do set PREMIUM_URL=%%i
 
-SET ROUTE_MAP_PATH=..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-react\src\data\route_map.json
+:: Route map is written to the repo root by default. Add extra destinations
+:: below if you keep companion repos (e.g. a separate frontend client) that
+:: need the same discovery file mirrored to their local source tree.
 (
     echo {
     echo   "project": "%PROJECT_ID%",
@@ -177,19 +301,21 @@ SET ROUTE_MAP_PATH=..\..\adaptivconcept-npc\Adaptivconcept-FL\adaptivconcept-rea
     echo   "backend_url": "!BACKEND_URL!",
     echo   "frontend_url": "!FRONTEND_URL!",
     echo   "premium_url": "!PREMIUM_URL!",
-    echo   "last_deployed": "%DATE% %TIME%"
-    echo }
-) > !ROUTE_MAP_PATH!
-(
-    echo {
-    echo   "project": "%PROJECT_ID%",
-    echo   "region": "%REGION%",
-    echo   "backend_url": "!BACKEND_URL!",
-    echo   "frontend_url": "!FRONTEND_URL!",
-    echo   "premium_url": "!PREMIUM_URL!",
+    echo   "alibaba_ecs_url": "!ALIBABA_ENDPOINT!",
     echo   "last_deployed": "%DATE% %TIME%"
     echo }
 ) > route_map.json
+(
+    echo {
+    echo   "project": "%PROJECT_ID%",
+    echo   "region": "%REGION%",
+    echo   "backend_url": "!BACKEND_URL!",
+    echo   "frontend_url": "!FRONTEND_URL!",
+    echo   "premium_url": "!PREMIUM_URL!",
+    echo   "alibaba_ecs_url": "!ALIBABA_ENDPOINT!",
+    echo   "last_deployed": "%DATE% %TIME%"
+    echo }
+) > vscode-extension\route_map.json
 echo Route map updated.
 
 echo [6/6] Cleaning up old revisions...
@@ -202,3 +328,39 @@ for %%s in (aicodex-be aicodex-lab aicodex-premium) do (
 )
 
 echo Deployment task complete!
+
+echo.
+echo ========================================
+echo   DEPLOYMENT SUMMARY
+echo ========================================
+echo   Project:          %PROJECT_ID%
+echo   Region:           %REGION%
+if "%DEPLOY_BE%"=="true" (
+    echo   Backend:          deployed -^> !BACKEND_URL!
+) else (
+    echo   Backend:          skipped ^(current: !BACKEND_URL!^)
+)
+if "%DEPLOY_PREMIUM%"=="true" (
+    echo   Premium Backend:  deployed -^> !PREMIUM_URL!
+) else (
+    echo   Premium Backend:  skipped ^(current: !PREMIUM_URL!^)
+)
+if "%DEPLOY_FE%"=="true" (
+    echo   Frontend:         deployed -^> !FRONTEND_URL!
+) else (
+    echo   Frontend:         skipped ^(current: !FRONTEND_URL!^)
+)
+if not "!ALIBABA_ENDPOINT!"=="" (
+    echo   Alibaba ECS URL:  !ALIBABA_ENDPOINT! ^(Tier 1, inert unless PLATFORM_MANAGED_INFERENCE_ENABLED^)
+) else (
+    echo   Alibaba ECS URL:  not set
+)
+if "!COLAB_URL!" NEQ "" (
+    echo   Colab Bridge:     !COLAB_URL!
+) else (
+    echo   Colab Bridge:     not set
+)
+echo   Route maps:       route_map.json ^(+1 mirrored copy^) updated
+echo   Completed at:     %DATE% %TIME%
+echo ========================================
+

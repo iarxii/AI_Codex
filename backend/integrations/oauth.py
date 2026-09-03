@@ -107,8 +107,8 @@ class AuthURLParams(BaseModel):
     code_challenge_method: str = "S256"  # S256 or PLAIN
 
 
-def build_authorization_url(params: AuthURLParams) -> str:
-    """Build the OAuth 2.0 authorization URL with PKCE."""
+def build_authorization_url(params: AuthURLParams, authorize_url: str) -> str:
+    """Build the OAuth 2.0 authorization URL with PKCE for the given provider's authorize endpoint."""
     params_dict = {
         "client_id": params.client_id,
         "redirect_uri": params.redirect_uri,
@@ -119,8 +119,7 @@ def build_authorization_url(params: AuthURLParams) -> str:
         "code_challenge_method": params.code_challenge_method,
     }
     query_string = urllib.parse.urlencode(params_dict)
-    # Google uses its own endpoint path; keep generic for now
-    return f"https://accounts.google.com/o/oauth2/auth?{query_string}"
+    return f"{authorize_url}?{query_string}"
 
 
 # ---------------------------------------------------------------------------
@@ -230,11 +229,13 @@ class IntegrationProviderConfig(BaseModel):
     """Configuration for a single OAuth provider."""
     name: str
     slug: str
-    oauth_authorize_url: str
-    oauth_token_url: str
-    scopes: list[str]
+    connection_type: str = "oauth"  # "oauth" | "api_key" — api_key providers skip the OAuth redirect and use a config form instead
+    oauth_authorize_url: str = ""
+    oauth_token_url: str = ""
+    scopes: list[str] = Field(default_factory=list)
     icon: str | None = None
     client_kwargs: dict[str, Any] = Field(default_factory=dict)
+    config_fields: list[dict[str, Any]] = Field(default_factory=list)  # api_key type: [{"name","label","secret","default"}]
 
 
 # Pre-seeded providers — extend via DB integration_providers table later
@@ -280,22 +281,69 @@ PROVIDERS: dict[str, IntegrationProviderConfig] = {
         ],
         icon="https://platform.slack-edge.com/img/default_application_icon.png",
     ),
+    "azure_foundry": IntegrationProviderConfig(
+        name="Azure AI Foundry",
+        slug="azure_foundry",
+        connection_type="oauth",
+        oauth_authorize_url="https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+        oauth_token_url="https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        scopes=[
+            "https://cognitiveservices.azure.com/.default",
+            "offline_access",
+        ],
+        icon="https://learn.microsoft.com/en-us/azure/ai-foundry/media/icons/ai-foundry-icon.svg",
+        # Azure AD grants identity only — the resource location still needs a follow-up config step
+        config_fields=[
+            {"name": "endpoint", "label": "Foundry resource endpoint (https://<resource>.openai.azure.com/)", "secret": False},
+            {"name": "deployment_name", "label": "Deployment name", "secret": False},
+            {"name": "api_version", "label": "API version", "secret": False, "default": "2024-10-21"},
+        ],
+    ),
+}
+
+
+# API-key/config-form providers — cloud inference targets that don't support a usable OAuth
+# consent flow for this purpose (AWS has no generic per-app OAuth; Alibaba ECS is a self-hosted
+# Ollama endpoint with no identity provider at all).
+API_KEY_PROVIDERS: dict[str, IntegrationProviderConfig] = {
+    "aws_bedrock": IntegrationProviderConfig(
+        name="AWS Bedrock",
+        slug="aws_bedrock",
+        connection_type="api_key",
+        config_fields=[
+            {"name": "access_key_id", "label": "AWS Access Key ID", "secret": True},
+            {"name": "secret_access_key", "label": "AWS Secret Access Key", "secret": True},
+            {"name": "region", "label": "AWS Region", "secret": False, "default": "us-east-1"},
+            {"name": "model_id", "label": "Bedrock Model ID", "secret": False},
+        ],
+    ),
+    "alibaba_ecs": IntegrationProviderConfig(
+        name="Alibaba ECS (Ollama)",
+        slug="alibaba_ecs",
+        connection_type="api_key",
+        config_fields=[
+            {"name": "base_url", "label": "Ollama base URL (http://<ecs-ip>:11434)", "secret": False},
+            {"name": "api_key", "label": "Optional bearer token", "secret": True, "default": ""},
+        ],
+    ),
 }
 
 
 def get_provider_config(slug: str) -> IntegrationProviderConfig:
-    """Look up a provider configuration by slug."""
-    if slug not in PROVIDERS:
-        msg = f"Unknown provider slug: {slug}"
-        raise ValueError(msg)
-    return PROVIDERS[slug]
+    """Look up a provider configuration by slug (OAuth or API-key type)."""
+    if slug in PROVIDERS:
+        return PROVIDERS[slug]
+    if slug in API_KEY_PROVIDERS:
+        return API_KEY_PROVIDERS[slug]
+    msg = f"Unknown provider slug: {slug}"
+    raise ValueError(msg)
 
 
 # ---------------------------------------------------------------------------
 # Token storage CRUD (sync over DB session — caller provides session)
 # ---------------------------------------------------------------------------
 
-def store_user_connection(
+async def store_user_connection(
     *,
     db_session,
     user_id: int,
@@ -305,14 +353,16 @@ def store_user_connection(
     scopes: list[str] | None,
 ) -> None:
     """Encrypt and store a user's OAuth connection row."""
+    from sqlalchemy import select
     from backend.db.models import UserConnection, IntegrationProvider
 
     # Ensure provider exists
-    provider = db_session.query(IntegrationProvider).filter_by(id=provider_slug).first()
+    result = await db_session.execute(select(IntegrationProvider).filter_by(id=provider_slug))
+    provider = result.scalar_one_or_none()
     if not provider:
-        provider = IntegrationProvider(id=provider_slug, name=provider_slug.title())
+        provider = IntegrationProvider(id=provider_slug, name=provider_slug.title(), oauth_token_url="")
         db_session.add(provider)
-        db_session.flush()
+        await db_session.flush()
 
     enc_access = encrypt_token(access_token)
     enc_refresh = encrypt_token(refresh_token) if refresh_token else None
@@ -328,32 +378,93 @@ def store_user_connection(
         status="active",
     )
     db_session.add(conn)
+    await db_session.flush()
 
 
-def get_user_connection(
+async def store_api_key_connection(
+    *,
+    db_session,
+    user_id: int,
+    provider_slug: str,
+    config: dict[str, Any],
+) -> None:
+    """Encrypt and store a user's API-key/config-form connection row (no OAuth tokens involved)."""
+    import json
+    from sqlalchemy import select
+    from backend.db.models import UserConnection, IntegrationProvider
+
+    result = await db_session.execute(select(IntegrationProvider).filter_by(id=provider_slug))
+    provider = result.scalar_one_or_none()
+    if not provider:
+        provider_config = get_provider_config(provider_slug)
+        provider = IntegrationProvider(
+            id=provider_slug,
+            name=provider_config.name,
+            slug=provider_config.slug,
+            connection_type="api_key",
+            oauth_token_url="",
+            scopes_json="[]",
+        )
+        db_session.add(provider)
+        await db_session.flush()
+
+    enc_config = encrypt_token(json.dumps(config))
+
+    conn = UserConnection(
+        user_id=user_id,
+        provider_id=provider_slug,
+        access_token_enc=enc_config,
+        refresh_token_enc=None,
+        scopes=None,
+        expires_at=None,
+        status="active",
+    )
+    db_session.add(conn)
+    await db_session.flush()
+
+
+async def update_connection_config(
+    *,
+    db_session,
+    user_id: int,
+    provider_slug: str,
+    config: dict[str, Any],
+) -> None:
+    """Save non-secret follow-up config (e.g. Azure Foundry endpoint/deployment_name) on an existing connection."""
+    import json
+
+    conn = await get_user_connection(db_session=db_session, user_id=user_id, provider_slug=provider_slug)
+    if not conn:
+        raise ValueError(f"No connection found for provider '{provider_slug}' — connect it first")
+    conn.config_json = json.dumps(config)
+    conn.updated_at = datetime.utcnow()
+    await db_session.flush()
+
+
+async def get_user_connection(
     *,
     db_session,
     user_id: int,
     provider_slug: str,
 ) -> Optional[UserConnection]:
-    """Retrieve a user's encrypted OAuth connection row."""
+    """Retrieve a user's encrypted connection row (OAuth or API-key type)."""
+    from sqlalchemy import select
     from backend.db.models import UserConnection
 
-    return (
-        db_session.query(UserConnection)
-        .filter_by(user_id=user_id, provider_id=provider_slug)
-        .first()
+    result = await db_session.execute(
+        select(UserConnection).filter_by(user_id=user_id, provider_id=provider_slug)
     )
+    return result.scalar_one_or_none()
 
 
-def retrieve_decrypted_tokens(
+async def retrieve_decrypted_tokens(
     *,
     db_connection,
     user_id: int,
     provider_slug: str,
 ) -> Optional[OAuthTokens]:
     """Fetch and decrypt tokens, returning an OAuthTokens model (or None)."""
-    conn = get_user_connection(db_session=db_connection, user_id=user_id, provider_slug=provider_slug)
+    conn = await get_user_connection(db_session=db_connection, user_id=user_id, provider_slug=provider_slug)
     if not conn:
         return None
 
@@ -377,7 +488,7 @@ def retrieve_decrypted_tokens(
     )
 
 
-def update_connection_status(
+async def update_connection_status(
     *,
     db_session,
     connection_id: int,
@@ -386,7 +497,8 @@ def update_connection_status(
     """Update a connection status (e.g., 'revoked', 'expired')."""
     from backend.db.models import UserConnection
 
-    conn = db_session.get(UserConnection, connection_id)
+    conn = await db_session.get(UserConnection, connection_id)
     if conn:
         conn.status = status
         conn.updated_at = datetime.utcnow()
+        await db_session.flush()

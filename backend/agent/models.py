@@ -7,7 +7,7 @@ from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
-def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Optional[str] = None, base_url: Optional[str] = None, account_id: Optional[str] = None, gateway_id: Optional[str] = None):
+def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Optional[str] = None, base_url: Optional[str] = None, account_id: Optional[str] = None, gateway_id: Optional[str] = None, region: Optional[str] = None, aws_secret_access_key: Optional[str] = None):
     """
     Unified LLM factory for AICodex Agent.
     """
@@ -137,13 +137,45 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
         )
 
     elif provider == "alibaba_ecs":
-        # Premium router target: direct Ollama host on Alibaba ECS, not OpenAI-compatible
-        resolved_base_url = base_url or settings.ALIBABA_ECS_OLLAMA_URL or "http://localhost:11434"
+        # Tier 2 (Connex, per-user) supplies base_url directly; Tier 1 static fallback only
+        # applies when platform-managed inference is enabled (see backend/config.py).
+        resolved_base_url = base_url
+        if not resolved_base_url and settings.PLATFORM_MANAGED_INFERENCE_ENABLED:
+            resolved_base_url = settings.ALIBABA_ECS_OLLAMA_URL
+        if not resolved_base_url:
+            raise ValueError(
+                "Alibaba ECS requires a connected Ollama endpoint. Connect Alibaba ECS in the "
+                "CONNEX tab, or enable platform-managed inference."
+            )
         logger.info(f"Alibaba ECS resolved base_url: {resolved_base_url}")
         return ChatOllama(
             model=model_name,
             base_url=resolved_base_url,
             temperature=temperature
+        )
+
+    elif provider == "aws_bedrock":
+        # Connex-managed only (Tier 2) — AWS has no static platform-managed fallback.
+        try:
+            from langchain_aws import ChatBedrock
+        except ImportError as exc:
+            raise ValueError(
+                "AWS Bedrock support requires the 'langchain-aws' package. Install it with "
+                "'pip install langchain-aws'."
+            ) from exc
+
+        if not api_key or not aws_secret_access_key or not region:
+            raise ValueError(
+                "AWS Bedrock requires an access key, secret key, and region. Connect AWS Bedrock "
+                "in the CONNEX tab."
+            )
+        logger.info(f"Initializing AWS Bedrock: model={model_name}, region={region}")
+        return ChatBedrock(
+            model_id=model_name,
+            region_name=region,
+            aws_access_key_id=api_key,
+            aws_secret_access_key=aws_secret_access_key,
+            model_kwargs={"temperature": temperature},
         )
 
     elif provider == "colab_bridge":
@@ -243,10 +275,10 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
             temperature=temperature
         )
 
-    elif provider == "azure":
-        # Azure OpenAI needs the resource endpoint + API version. The base_url
+    elif provider in ("azure", "azure_foundry"):
+        # Azure OpenAI / Azure AI Foundry need the resource endpoint + API version. The base_url
         # passed in must be the full "https://<resource>.openai.azure.com/"
-        # deployment endpoint (the frontend stores it via MoreProvidersModal).
+        # deployment endpoint (frontend MoreProvidersModal for azure, Connex config for azure_foundry).
         resolved_base_url = base_url or ""
         if not resolved_base_url:
             logger.error("Azure provider selected without an azure_endpoint base_url.")

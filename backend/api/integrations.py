@@ -52,10 +52,13 @@ from backend.integrations.oauth import (
     exchange_code_for_tokens,
     TokenExchangeError,
     store_user_connection,
+    store_api_key_connection,
+    update_connection_config,
     get_user_connection,
     retrieve_decrypted_tokens,
     update_connection_status,
     PROVIDERS,
+    API_KEY_PROVIDERS,
     get_provider_config,
 )
 from backend.api.deps import get_current_active_user
@@ -97,12 +100,73 @@ async def get_provider_detail(slug: str) -> dict:
     return {
         "name": config.name,
         "slug": config.slug,
+        "connection_type": config.connection_type,
         "oauth_authorize_url": config.oauth_authorize_url,
         "oauth_token_url": config.oauth_token_url,
         "scopes": config.scopes,
         "icon": config.icon,
         "client_kwargs": config.client_kwargs,
+        "config_fields": config.config_fields,
     }
+
+
+class ApiKeyConnectionIn(BaseModel):
+    config: Dict[str, Any]
+
+
+@router.post("/connect/api-key/{slug}")
+async def connect_api_key_provider(
+    *,
+    slug: str,
+    body: ApiKeyConnectionIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> JSONResponse:
+    """Connect a cloud-inference provider that uses a config form instead of OAuth (AWS Bedrock, Alibaba ECS)."""
+    if slug not in API_KEY_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Provider '{slug}' does not use api-key connections")
+
+    config = get_provider_config(slug)
+    missing = [f["name"] for f in config.config_fields if f["name"] not in body.config and not f.get("default")]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing required fields: {', '.join(missing)}")
+
+    await store_api_key_connection(
+        db_session=db,
+        user_id=current_user.id,
+        provider_slug=slug,
+        config=body.config,
+    )
+    await db.commit()
+
+    return JSONResponse(content={"success": True, "message": f"Connected {config.name} successfully", "provider": slug})
+
+
+class ConnectionConfigIn(BaseModel):
+    config: Dict[str, Any]
+
+
+@router.post("/connections/{slug}/config")
+async def save_connection_config(
+    *,
+    slug: str,
+    body: ConnectionConfigIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> JSONResponse:
+    """Save non-secret follow-up config for an existing connection (e.g. Azure Foundry endpoint/deployment_name after OAuth)."""
+    try:
+        await update_connection_config(
+            db_session=db,
+            user_id=current_user.id,
+            provider_slug=slug,
+            config=body.config,
+        )
+        await db.commit()
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return JSONResponse(content={"success": True, "provider": slug})
 
 
 # ---------------------------------------------------------------
@@ -124,7 +188,7 @@ async def list_my_connections(
     for c in connections:
         # Decrypt just enough to show masked info
         try:
-            access = retrieve_decrypted_tokens(db_connection=db, user_id=current_user.id, provider_slug=c.provider_id)
+            access = await retrieve_decrypted_tokens(db_connection=db, user_id=current_user.id, provider_slug=c.provider_id)
             out.append(
                 {
                     "provider": c.provider_id,
@@ -305,11 +369,15 @@ from typing import Optional
 from backend.integrations.mcp_client import MCPServerConfig, load_default_mcp_servers, get_mcp_structured_tools
 
 
+class OAuthConnectIn(BaseModel):
+    redirect_uri: str
+
+
 @router.post("/connect/{slug}")
 async def initiate_oauth_connect(
     *,
     slug: str,
-    redirect_uri: str = Query(...),
+    body: OAuthConnectIn,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
@@ -318,6 +386,7 @@ async def initiate_oauth_connect(
     Returns a JSON with `authorization_url` and `state` that the frontend
     uses to redirect the user to the provider's consent screen.
     """
+    redirect_uri = body.redirect_uri
     config = get_provider_config(slug)
     code_verifier = generate_code_verifier()
     code_challenger = generate_code_challenger(code_verifier)
@@ -331,7 +400,8 @@ async def initiate_oauth_connect(
             state=state,
             code_challenge=code_challenger,
             code_challenge_method="S256",
-        )
+        ),
+        authorize_url=config.oauth_authorize_url,
     )
 
     # Store PKCE state for callback verification

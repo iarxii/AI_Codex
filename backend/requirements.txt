@@ -15,6 +15,7 @@ langchain-groq
 langchain-openai
 langchain-google-genai
 langchain-google-vertexai
+langchain-aws
 mcp
 httpx
 qdrant-client
