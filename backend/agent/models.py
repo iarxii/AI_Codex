@@ -20,6 +20,8 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
             model_name = "gemma-4-E4B_q4_0-it"
         elif provider == "ollama_cloud":
             model_name = settings.DEFAULT_MODEL  # e.g. llama3.2:3b from config
+        elif provider == "alibaba_ecs":
+            model_name = settings.DEFAULT_MODEL
         elif provider == "openrouter":
             model_name = "meta-llama/llama-3-8b-instruct"
         elif provider == "openai":
@@ -133,7 +135,17 @@ def get_llm(provider: str, model: str, temperature: float = 0.7, api_key: Option
             openai_api_base=resolved_base_url,
             temperature=temperature
         )
-        
+
+    elif provider == "alibaba_ecs":
+        # Premium router target: direct Ollama host on Alibaba ECS, not OpenAI-compatible
+        resolved_base_url = base_url or settings.ALIBABA_ECS_OLLAMA_URL or "http://localhost:11434"
+        logger.info(f"Alibaba ECS resolved base_url: {resolved_base_url}")
+        return ChatOllama(
+            model=model_name,
+            base_url=resolved_base_url,
+            temperature=temperature
+        )
+
     elif provider == "colab_bridge":
         return ChatOpenAI(
             model=model_name,

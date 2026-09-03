@@ -244,6 +244,25 @@ async def _list_models_raw(
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Ollama Cloud error: {str(e)}")
 
+        elif provider == "alibaba_ecs":
+            resolved_base = x_base_url or settings.ALIBABA_ECS_OLLAMA_URL
+            if not resolved_base:
+                return []
+            try:
+                normalized_base = _normalize_base_url(resolved_base, "alibaba_ecs")
+                response = await client.get(f"{normalized_base.rstrip('/')}/api/tags")
+                if response.status_code == 200:
+                    data = response.json()
+                    return [{"id": m["name"], "name": m["name"]} for m in data.get("models", [])]
+                return []
+            except HTTPException:
+                raise
+            except httpx.RequestError as e:
+                target = str(getattr(e, "request", None).url) if getattr(e, "request", None) else normalized_base
+                raise HTTPException(status_code=502, detail=f"Alibaba ECS network error ({target}): {str(e)}")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Alibaba ECS error: {str(e)}")
+
         elif provider == "openrouter":
             if not actual_key:
                 return []

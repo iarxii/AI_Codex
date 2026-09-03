@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     LLAMACPP_BASE_URL: str = "http://localhost:8080"
     LOCAL_BACKEND_MODE: str = "llamacpp"  # "ollama" | "llamacpp"
     DEFAULT_MODEL: str = "llama3.2:3b"
+    ALIBABA_ECS_OLLAMA_URL: str = ""  # Premium router target: Ollama on Alibaba ECS GPU host
     
     # Database
     DB_TYPE: str = "sqlite" # "sqlite" or "postgres"

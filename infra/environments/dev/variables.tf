@@ -57,3 +57,15 @@ variable "ollama_port" {
   type        = number
   default     = 11434
 }
+
+variable "ecs_instance_type" {
+  description = "Instance type for the ECS GPU host running Ollama."
+  type        = string
+  default     = "ecs.gn7i-c8g1.2xlarge"
+}
+
+variable "ecs_image_id" {
+  description = "OS image ID for the ECS GPU host."
+  type        = string
+  default     = "ubuntu_22_04_x64_20G_alibase_20191224.vhd"
+}

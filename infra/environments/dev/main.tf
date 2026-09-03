@@ -34,3 +34,21 @@ module "security_group" {
   backend_port      = var.backend_port
   ollama_port       = var.ollama_port
 }
+
+module "acr" {
+  source = "../../modules/acr"
+
+  region       = var.region
+  project_name = var.project_name
+}
+
+module "ecs_gpu" {
+  source = "../../modules/ecs-gpu"
+
+  project_name      = var.project_name
+  region            = var.region
+  instance_type     = var.ecs_instance_type
+  image_id          = var.ecs_image_id
+  vswitch_id        = module.network.vswitch_ids[0]
+  security_group_id = module.security_group.security_group_id
+}

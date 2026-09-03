@@ -41,7 +41,13 @@ resource "alicloud_instance" "gpu_backend" {
     apt-get install -y docker.io
     systemctl enable docker
     systemctl start docker
-    echo "GPU backend placeholder. Replace with Docker Compose deployment and Ollama runtime config."
+    mkdir -p /mnt/models
+    # Ollama bound to all interfaces so the premium backend can reach it via ALIBABA_ECS_OLLAMA_URL
+    docker run -d --name ollama --restart unless-stopped \
+      --gpus all \
+      -p 11434:11434 \
+      -v /mnt/models:/root/.ollama \
+      ollama/ollama:latest
   EOF
 }
 

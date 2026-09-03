@@ -3,6 +3,8 @@
 This document provides a high-level roadmap and reference guide for configuring your **Alibaba Cloud** account, hosting the **Premium GPU/Inference Backend** (AI Codex / Ollama), and standardizing deployment patterns across your future projects.
 
 > Updated baseline status (2026-09-02): this repository is currently Cloud Run-first and should not be treated as an existing Alibaba deployment. The Alibaba path below is an additive future target for the premium inference backend only, while the active production deployment remains the current Google Cloud Run workflow.
+>
+> Updated baseline status (2026-09-03): the design is now router-vs-host, not a wholesale migration. `aicodex-premium` stays on Cloud Run as the auth/routing entrypoint; Alibaba ECS hosts only the Ollama runtime, reached via the `alibaba_ecs` provider and `ALIBABA_ECS_OLLAMA_URL`. `infra/environments/dev` now wires the `vpc`, `security-group`, `acr`, and `ecs-gpu` Terraform modules together (not yet applied against a real account).
 
 ---
 
@@ -159,7 +161,7 @@ Store your infrastructure definitions in git alongside your applications:
 
 - [ ] **Step 1:** Complete Identity & Billing verification on Alibaba Cloud Console.
 - [ ] **Step 2:** Create a RAM User with Access Keys & restricted permissions.
-- [ ] **Step 3:** Provision a VPC & Security Group in your chosen region.
-- [ ] **Step 4:** Set up Alibaba Cloud Container Registry (ACR) namespace for your projects.
-- [ ] **Step 5:** Deploy initial Premium Backend instance (ECS or SAE) and configure the `X-Codex-Premium-Key` handshake.
-- [ ] **Step 6:** Point frontend API URL / domain via Alibaba Cloud DNS (Alidns) or Cloudflare.
+- [x] **Step 3:** Terraform for VPC & Security Group defined in `infra/environments/dev` (apply pending real account credentials).
+- [x] **Step 4:** Terraform for ACR namespace defined in `infra/environments/dev` (apply pending real account credentials).
+- [ ] **Step 5:** Apply Terraform, deploy Ollama on the ECS GPU host (`infra/modules/ecs-gpu` user_data), and point `deploy_production.bat --alibaba-endpoint` at it.
+- [ ] **Step 6:** Point frontend API URL / domain via Alibaba Cloud DNS (Alidns) or Cloudflare, if the router pattern is later replaced by a direct endpoint.
