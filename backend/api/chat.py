@@ -2,6 +2,7 @@ import json
 import time
 import logging
 import asyncio
+import re
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, HTTPException
 from typing import List, Annotated, Set
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -76,6 +77,36 @@ async def generate_cloud_chat_title(conversation_id: int, first_message: str, pr
 # user_id -> last_request_timestamp
 user_cooldowns: dict[int, float] = {}
 RATE_LIMIT_SECONDS = 1.5
+
+
+def build_rate_limit_error(retry_after: float) -> dict:
+    return {
+        "type": "error",
+        "category": "rate_limit",
+        "status_code": 429,
+        "retry_after": round(max(0.0, retry_after), 3),
+        "message": f"Neural Link Throttled: Please wait {RATE_LIMIT_SECONDS}s between thoughts.",
+    }
+
+
+def classify_execution_error(error: Exception) -> tuple[str, int | None, str]:
+    """Return a stable category/status/message without losing provider provenance."""
+    error_str = str(error)
+    status_match = re.search(r"\b(401|402|403|404|408|409|429|500|502|503|504)\b", error_str)
+    status_code = int(status_match.group(1)) if status_match else None
+    lowered = error_str.lower()
+
+    if status_code in (401, 403) or "unauthorized" in lowered or "invalid api key" in lowered:
+        return "provider_auth", status_code or 401, "Authentication failed. Please check your API key in Settings."
+    if status_code == 429 or "rate limit" in lowered or "throttl" in lowered:
+        return "provider_rate_limit", 429, "Rate limited by provider. Please wait a moment and try again, or switch to a different model."
+    if status_code == 404:
+        return "model_not_found", 404, "Model not found on the provider. Please select a different model."
+    if "cannot reach" in lowered or "connecterror" in lowered or isinstance(error, ConnectionError):
+        return "provider_unavailable", None, f"Cannot connect to LLM server. {error_str}"
+    if "timed out" in lowered or "timeout" in lowered:
+        return "timeout", 408, "Request timed out. The model server may be overloaded or offline."
+    return "execution", None, error_str[:250] + "..." if len(error_str) > 300 else error_str
 
 # Simple connection manager for WebSockets
 class ConnectionManager:
@@ -272,6 +303,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         node_has_streamed = False
         history_len = 0
         final_messages = None
+        execution_failed = False
 
         thought_log = []
         tool_runs = []
@@ -768,26 +800,20 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             await websocket.send_json({"type": "status", "status": "Cancelled", "node": "idle"})
             return  # Exit early — cancel handler already sends "done"
         except Exception as e:
+            execution_failed = True
             await flush_token_delta(node=current_node_name)
             error_str = str(e)
             log_error(f"PIPELINE EXCEPTION for conv {conversation_id}", e)
             
-            # Parse common error patterns into user-friendly messages
-            friendly_msg = error_str
-            if "429" in error_str or "rate" in error_str.lower():
-                friendly_msg = "Rate limited by provider. Please wait a moment and try again, or switch to a different model."
-            elif "401" in error_str or "unauthorized" in error_str.lower() or "invalid api key" in error_str.lower():
-                friendly_msg = "Authentication failed. Please check your API key in Settings."
-            elif "Cannot reach" in error_str or "ConnectError" in error_str or isinstance(e, ConnectionError):
-                friendly_msg = f"Cannot connect to LLM server. {error_str}"
-            elif "timed out" in error_str.lower() or "timeout" in error_str.lower():
-                friendly_msg = "Request timed out. The model server may be overloaded or offline."
-            elif "404" in error_str:
-                friendly_msg = "Model not found on the provider. Please select a different model."
-            elif len(error_str) > 300:
-                friendly_msg = error_str[:250] + "..."
-            
-            await websocket.send_json({"type": "error", "message": f"Execution Error: {friendly_msg}"})
+            category, status_code, friendly_msg = classify_execution_error(e)
+            error_payload = {
+                "type": "error",
+                "category": category,
+                "message": f"Execution Error: {friendly_msg}",
+            }
+            if status_code is not None:
+                error_payload["status_code"] = status_code
+            await websocket.send_json(error_payload)
         finally:
             if checker_task:
                 checker_task.cancel()
@@ -853,7 +879,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
                 "node": "idle"
             })
             
-            await websocket.send_json({"type": "done", "final_length": len(full_ai_response), "final_seq": token_seq})
+            if not execution_failed:
+                await websocket.send_json({"type": "done", "final_length": len(full_ai_response), "final_seq": token_seq})
 
     try:
         while True:
@@ -903,10 +930,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             now = time.time()
             last_req = user_cooldowns.get(user.id, 0)
             if now - last_req < RATE_LIMIT_SECONDS:
-                await websocket.send_json({
-                    "type": "error", 
-                    "message": f"Neural Link Throttled: Please wait {RATE_LIMIT_SECONDS}s between thoughts."
-                })
+                await websocket.send_json(build_rate_limit_error(RATE_LIMIT_SECONDS - (now - last_req)))
                 continue
             
             user_cooldowns[user.id] = now
