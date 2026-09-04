@@ -10,6 +10,8 @@ from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node
 import logging
 logger = logging.getLogger(__name__)   # automatically uses the configured root logger
 
+NO_TOOL_STALL_LIMIT = 3
+
 
 def should_continue(state: AgentState):
     last_message = state["messages"][-1] if state.get("messages") else None
@@ -56,6 +58,17 @@ def should_continue(state: AgentState):
         if not has_tool_evidence and not state.get("execution_artifacts"):
             logger.info("ROUTER: Clean non-tool response detected. Skipping quality nodes.")
             return END
+
+    if (
+        not has_calls
+        and not state.get("is_short_process")
+        and (state.get("no_tool_stall_count") or 0) >= NO_TOOL_STALL_LIMIT
+    ):
+        logger.warning(
+            "ROUTER: No-tool stall detected after %s reasoning turns. Routing to handle_blocker.",
+            state.get("no_tool_stall_count"),
+        )
+        return "handle_blocker"
         
     return "validate"
 
@@ -182,6 +195,7 @@ def create_agent_graph():
             "mql5_enforcer": "mql5_enforcer",
             "execute_tool": "execute_tool",
             "validate": "validate",
+            "handle_blocker": "handle_blocker",
             "final_report": "final_report",
             END: END
         }

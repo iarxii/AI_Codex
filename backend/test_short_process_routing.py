@@ -10,6 +10,7 @@ from backend.agent.state import AgentState
 from backend.agent.nodes import init_node
 from backend.agent.graph import route_after_init, should_continue, END
 from backend.agent.routing import classify_prompt
+from backend.agent.profile import build_system_prompt
 
 class MockConfig:
     def __init__(self, client_type="web"):
@@ -132,6 +133,32 @@ def test_routing_logic():
         "space_config": {}
     }
     assert should_continue(action_state) == "validate"
+
+    stalled_action_state = {
+        "messages": [mock_msg_no_tools],
+        "is_short_process": False,
+        "routing_metadata": {"process_mode": "long", "action_indicators": ["action:create"]},
+        "no_tool_stall_count": 3,
+        "space_config": {},
+    }
+    assert should_continue(stalled_action_state) == "handle_blocker"
+
+    clean_stalled_state = {
+        "messages": [mock_msg_no_tools],
+        "is_short_process": False,
+        "routing_metadata": {"process_mode": "long", "action_indicators": []},
+        "no_tool_stall_count": 3,
+        "space_config": {},
+    }
+    assert should_continue(clean_stalled_state) == END
+
+    prompt = build_system_prompt(
+        tool_binding_status="Tools bound successfully",
+        workspace_context="[Workspace Context]\n- Path: C:/projects/actual-app",
+    )
+    assert "[CLIENT WORKSPACE CONTEXT]" in prompt
+    assert "C:/projects/actual-app" in prompt
+    assert "Do not substitute or invent a different project path." in prompt
 
     print("Routing tests passed successfully!")
 

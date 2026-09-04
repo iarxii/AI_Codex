@@ -678,6 +678,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         tool_manifest=tool_manifest,
         client_type=client_type,
         client_capabilities=client_capabilities,
+        workspace_context=str((state.get("context") or {}).get("workspace") or ""),
     )
     
     consideration = state.get("consideration_vector")
@@ -822,12 +823,19 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         fingerprints.append(f"{tc.get('name')}:{args_str}")
     fingerprints = fingerprints[-10:]
 
+    no_tool_stall_count = state.get("no_tool_stall_count") or 0
+    if tool_calls:
+        no_tool_stall_count = 0
+    elif not state.get("is_short_process"):
+        no_tool_stall_count += 1
+
     result = {
         "messages": [response],
         "current_tool_calls": tool_calls,
         "context_data": {"history_len": len(messages), "summarized": bool(summary)},
         "telemetry": telemetry,
-        "recent_actions_fingerprint": fingerprints
+        "recent_actions_fingerprint": fingerprints,
+        "no_tool_stall_count": no_tool_stall_count,
     }
     if tool_calls and state.get("is_short_process"):
         routing_metadata = dict(state.get("routing_metadata") or {})
@@ -1763,6 +1771,11 @@ async def handle_blocker_node(state: AgentState, config: RunnableConfig) -> Dict
     logger.warning("Agent loop halted due to quality degradation or stagnation.")
     report = state.get("evaluation_report") or {}
     critique = report.get("critique", "No critique provided.")
+    if state.get("no_tool_stall_count", 0) >= 3:
+        critique = (
+            "The agent produced repeated action-oriented responses without emitting a tool call. "
+            "The loop was stopped before the graph recursion limit was reached."
+        )
     msg = AIMessage(
         content=(
             "🛑 **Execution Paused (Degradation Guard)**\n\n"

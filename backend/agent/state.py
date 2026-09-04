@@ -44,6 +44,7 @@ class AgentState(TypedDict):
     execution_artifacts: Optional[dict]              # Records of changes (e.g. modified files)
     evaluation_report: Optional[dict]                # Results from evaluate_turn node
     recent_actions_fingerprint: Optional[List[str]]  # History of tool calls for stagnation detection
+    no_tool_stall_count: Optional[int]                # Consecutive long-process turns without tool calls
     
     # --- Token Allocation Metrics ---
     token_metrics: Optional[dict]                    # {system, summary, tail, total, max}

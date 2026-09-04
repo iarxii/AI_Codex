@@ -86,6 +86,7 @@ def build_system_prompt(
     client_type: str = "web",
     client_capabilities: Optional[Iterable[str]] = None,
     tool_manifest: str = "",
+    workspace_context: str = "",
 ) -> str:
     """
     Assembles the System Prompt from modular markdown files (SOUL, USER, MEMORY, AGENTS).
@@ -94,6 +95,7 @@ def build_system_prompt(
     Injects mandatory and situational skills from the skills/ directory.
     Optionally injects tool-binding telemetry so the model knows which tools are available.
     Optionally injects the exact bound-tool manifest so the model never invents tool names.
+    Optionally injects client-provided workspace context for durable project grounding.
     """
     soul = compress_markdown(load_profile_file("SOUL.md", "You are AICodex, an elite agentic assistant."))
     user = compress_markdown(load_profile_file("USER.md", "The user is a software developer."))
@@ -128,6 +130,15 @@ def build_system_prompt(
             "have, report ONLY the exact names above. Never invent tool names; if a tool is "
             "not listed above, it is not available to you."
         )
+
+    workspace_context_block = ""
+    if workspace_context.strip():
+        workspace_context_block = (
+            "\n\n[CLIENT WORKSPACE CONTEXT]\n"
+            f"{workspace_context.strip()}\n"
+            "Treat this as the authoritative workspace for this request. "
+            "Do not substitute or invent a different project path."
+        )
     
     prompt = f"""[SOUL]
 {soul}
@@ -160,6 +171,7 @@ INSTRUCTIONS:
 10. CRITICAL: Writing code inside a [CANVAS:...] block does NOT save it to disk. To physically create or modify files, you MUST call the appropriate tool. Use 'workspace_patcher' to modify existing files by replacing a specific block of text. Use 'workspace_writer' ONLY for creating brand new files. NEVER output raw markdown code blocks to write to a file without calling a tool. Call the tool FIRST, then optionally show a Canvas block afterward.
 {tool_status_line}
 {tool_manifest_block}
+{workspace_context_block}
 """
     return prompt
 
