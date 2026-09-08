@@ -106,7 +106,7 @@ def build_system_prompt(
     # Workspace Sentinel: inject live session context
     from backend.agent.workspace_sentinel import read_workspace_status
     workspace_status = read_workspace_status(conversation_id)
-    status_block = f"\n[STATUS]\n{workspace_status}" if workspace_status else ""
+    status_block = f"\n\n[STATUS]\n{workspace_status}" if workspace_status else ""
     
     # Load prompt-based skills
     mandatory_skills = compress_markdown(load_mandatory_skills(client_type, client_capabilities))
@@ -154,7 +154,7 @@ def build_system_prompt(
 [USER]
 {user}
 
-[MEMORY]
+[PLATFORM MEMORY — about the AICodex platform itself, NOT the user's current client workspace]
 {memory}
 {status_block}
 
@@ -169,7 +169,7 @@ def build_system_prompt(
 INSTRUCTIONS:
 1. Use [SOUL] for identity.
 2. Use [USER] context.
-3. Use [MEMORY] for grounding.
+3. Use [PLATFORM MEMORY] only for facts about the AICodex platform's own codebase/history — NEVER as a substitute for the user's actual client IDE workspace (see [AUTHORITATIVE CLIENT IDE WORKSPACE] below, if present).
 4. Use [SPIRIT_BIRD] for educational context and tutoring.
 5. Use [STATUS] for current session awareness (if present).
 6. Use [PROCEDURES] for execution. Follow the Workspace Interaction precedence rule strictly.
