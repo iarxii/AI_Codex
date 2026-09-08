@@ -45,6 +45,7 @@ class AgentState(TypedDict):
     evaluation_report: Optional[dict]                # Results from evaluate_turn node
     recent_actions_fingerprint: Optional[List[str]]  # History of tool calls for stagnation detection
     no_tool_stall_count: Optional[int]                # Consecutive long-process turns without tool calls
+    guard_blocked: Optional[bool]                     # Guard detected a hard stop condition
     
     # --- Token Allocation Metrics ---
     token_metrics: Optional[dict]                    # {system, summary, tail, total, max}

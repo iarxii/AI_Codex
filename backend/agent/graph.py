@@ -178,8 +178,16 @@ def create_agent_graph():
         }
     )
     
-    # Guard → Reason (guard validates context before LLM invocation)
-    workflow.add_edge("guard", "reason")
+    # Guard normally precedes reasoning, but hard guard failures must terminate
+    # instead of feeding the warning back into the model.
+    workflow.add_conditional_edges(
+        "guard",
+        lambda state: "handle_blocker" if state.get("guard_blocked") else "reason",
+        {
+            "handle_blocker": "handle_blocker",
+            "reason": "reason",
+        },
+    )
     
     # After debate, go to planner (then guard)
     workflow.add_edge("trading_debate", "planner")

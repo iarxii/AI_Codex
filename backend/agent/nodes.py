@@ -473,7 +473,8 @@ async def guard_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any
                              "Could you rephrase what you need, or should I try a different approach?"
                 )],
                 "current_tool_calls": [],
-                "is_complete": True
+                "is_complete": True,
+                "guard_blocked": True,
             }
     
     # 2. Context Budget Pre-check (warn, don't block — reason_node handles summarization)
@@ -1218,6 +1219,13 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                 # Wait for tool response from client (no hard timeout - tool runs until complete or cancelled)
                 # Use a long timeout (1 hour) as safety net; actual cancellation handled via cancel signal
                 response_payload = await asyncio.wait_for(tool_response_queue.get(), timeout=3600.0)
+                while (
+                    isinstance(response_payload, dict)
+                    and response_payload.get("status") == "started"
+                ):
+                    response_payload = await asyncio.wait_for(
+                        tool_response_queue.get(), timeout=3600.0
+                    )
                 tool_result = response_payload.get("output", "")
                 
                 # Notify UI that tool execution completed
