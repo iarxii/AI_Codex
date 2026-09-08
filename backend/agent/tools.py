@@ -56,8 +56,8 @@ def make_wrapped_workspace_patcher(skill: BaseSkill, conversation_id: str):
     return wrapped_workspace_patcher
 
 def make_wrapped_shell_exec(skill: BaseSkill, conversation_id: str):
-    async def wrapped_shell_exec(command: str, cwd: str = "."):
-        return await skill.execute(command=command, cwd=cwd, conversation_id=conversation_id)
+    async def wrapped_shell_exec(command: str, cwd: str = ".", shell: str = "default"):
+        return await skill.execute(command=command, cwd=cwd, shell=shell, conversation_id=conversation_id)
     return wrapped_shell_exec
 
 def make_wrapped_harness_dispatch(skill: BaseSkill, conversation_id: str):

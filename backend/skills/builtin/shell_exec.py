@@ -23,12 +23,17 @@ class ShellExecSkill(BaseSkill):
                 "type": "string",
                 "description": "The working directory relative to the project root.",
                 "default": "."
+            },
+            "shell": {
+                "type": "string",
+                "enum": ["default", "cmd", "powershell", "bash"],
+                "description": "Shell syntax to use. Select the shell available on the client; default uses the client's preferred shell."
             }
         },
         "required": ["command"]
     }
 
-    async def execute(self, command: str, cwd: str = ".", conversation_id: str = None) -> SkillResult:
+    async def execute(self, command: str, cwd: str = ".", shell: str = "default", conversation_id: str = None) -> SkillResult:
         try:
             from backend.config import PROJECT_ROOT, WORKSPACES_DIR
             
@@ -51,9 +56,9 @@ class ShellExecSkill(BaseSkill):
             if settings.SANDBOX_MODE == "cloudrun":
                 from ..cloudrun_sandbox import CloudRunSandboxExecutor
                 executor = CloudRunSandboxExecutor()
-                result = await executor.execute(command, cwd=str(abs_cwd), conversation_id=conversation_id)
+                result = await executor.execute(command, cwd=str(abs_cwd), conversation_id=conversation_id, shell=shell)
             else:
-                result = await execute_sandboxed(command, cwd=str(abs_cwd), conversation_id=conversation_id)
+                result = await execute_sandboxed(command, cwd=str(abs_cwd), conversation_id=conversation_id, shell=shell)
             return result
             
         except Exception as e:

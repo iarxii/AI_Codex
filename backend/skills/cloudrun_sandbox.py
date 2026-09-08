@@ -24,7 +24,7 @@ class CloudRunSandboxExecutor:
         self.region = region or settings.GCP_REGION
         self.service_name = settings.CLOUDRUN_SERVICE_NAME
 
-    async def execute(self, command: str, cwd: str = ".", conversation_id: Optional[str] = None) -> SandboxResult:
+    async def execute(self, command: str, cwd: str = ".", conversation_id: Optional[str] = None, shell: str = "default") -> SandboxResult:
         """
         Executes command via Cloud Run Job / Container API or gcloud CLI wrapper.
         """
@@ -51,7 +51,7 @@ class CloudRunSandboxExecutor:
         
         # If SANDBOX_MODE is local or GCP project not configured, fallback to local execution
         if settings.SANDBOX_MODE != "cloudrun":
-            return await execute_sandboxed(command, cwd=cwd, conversation_id=conversation_id)
+            return await execute_sandboxed(command, cwd=cwd, conversation_id=conversation_id, shell=shell)
 
         try:
             # Build gcloud run / curl request or gcloud exec command string

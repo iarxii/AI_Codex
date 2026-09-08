@@ -106,7 +106,11 @@ User: "Create a hello_world.py that prints Hello World"
 ### Rules
 - The `workspace_writer` tool automatically creates parent directories. No `mkdir` needed.
 - The host OS is Windows. Avoid Unix-specific flags in `shell_exec` (e.g., no `mkdir -p`).
+- For `client_type` in (`vscode`, `aidock`), `shell_exec` runs in the client shell selected by the
+  `shell` argument (`cmd`, `powershell`, or `bash`). Select the shell before writing the
+  command and use its syntax exactly. Use `default` only when the client's preferred shell
+  is sufficient. On Windows `cmd.exe`, use `dir`, `type`, `where`, and `cd`; in PowerShell
+  use `Get-ChildItem`, `Get-Content`, and `Get-Location`; in bash use `ls`, `cat`, and `pwd`.
 - Always include a brief chat summary of what you did after the tool executes.
-- **Autonomous Error Recovery**: If a tool call (such as `shell_exec` or `workspace_writer`) fails or returns an error (e.g., non-zero exit code or stderr), DO NOT stop to ask the user. Instead, analyze the error output, formulate a fix (e.g., adjust command flags, correct file paths, or fix code syntax), and call the tool again with the corrected arguments.
-- **Autonomous Verification**: After writing a file or executing a command, autonomously verify the state (e.g., read the file back or run a test script via `shell_exec`) before declaring the step or task complete.
-
+- **Controlled Error Recovery**: If a tool call fails or returns an error, you may analyze the error output and attempt at most ONE targeted fix with corrected arguments. If it fails a second time, stop and report the error to the user. NEVER re-run read or list commands (`workspace_reader`, `dir`, `ls`, `Get-ChildItem`) that already returned valid output.
+- **Targeted Verification**: Verification is only needed after writing code files or performing build operations. Read-only inspection commands (listing directories or reading files) are already verified by their output—do NOT perform follow-up verification on read-only actions.

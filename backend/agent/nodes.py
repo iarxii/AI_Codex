@@ -1192,7 +1192,7 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                 tool_result = f"Error updating planning board: {str(e)}"
                 
         elif is_client_tool and websocket:
-            logger.info(f"Delegating tool execution to VS Code client: {tool_name} with args: {tool_args}")
+            logger.info(f"Delegating tool execution to client ({client_type}): {tool_name} with args: {tool_args}")
             
             # Create a dedicated response queue for this tool call
             tool_response_queue = asyncio.Queue()
@@ -1501,18 +1501,25 @@ async def verification_node(state: AgentState, config: RunnableConfig) -> Dict[s
     # Check if any workspace files were written in the recent turn
     # Scan backwards from the end until we hit a HumanMessage
     files_modified = []
+    already_verified = False
     for m in reversed(messages):
         if isinstance(m, HumanMessage):
             break
-        # If it's an AIMessage with tool_calls for writing files
+        # Check if we already executed verification in this turn
         if isinstance(m, AIMessage) and hasattr(m, "tool_calls") and m.tool_calls:
             for tc in m.tool_calls:
+                if str(tc.get("id", "")).startswith("verify_"):
+                    already_verified = True
+                    break
                 if tc.get("name") == "workspace_writer":
                     args = tc.get("args") or {}
                     filename = args.get("filename")
                     if filename:
                         files_modified.append(filename)
-                        
+
+    if already_verified:
+        return {}
+
     if files_modified:
         # Determine the appropriate verification command
         command = ""
@@ -1521,7 +1528,13 @@ async def verification_node(state: AgentState, config: RunnableConfig) -> Dict[s
         # Check if any modified file is in the vscode-extension
         if any("vscode-extension" in f for f in files_modified):
             command = "npm run compile"
-            cwd = "projects/iarxii/AI_Codex/vscode-extension"
+            for f in files_modified:
+                if "vscode-extension" in f:
+                    idx = f.find("vscode-extension")
+                    cwd = f[:idx + len("vscode-extension")]
+                    break
+            if not cwd:
+                cwd = "vscode-extension"
         elif any(f.endswith(".py") for f in files_modified):
             # Check syntax for Python files
             py_files = [f for f in files_modified if f.endswith(".py")]
@@ -1536,7 +1549,7 @@ async def verification_node(state: AgentState, config: RunnableConfig) -> Dict[s
                 content="[VERIFICATION] Verifying recent changes...",
                 tool_calls=[{
                     "name": "shell_exec",
-                    "args": {"command": command, "cwd": cwd},
+                    "args": {"command": command, "cwd": cwd, "shell": "default"},
                     "id": tool_call_id
                 }]
             )

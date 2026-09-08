@@ -9,7 +9,7 @@ from typing import Iterable, Optional
 import yaml
 
 
-SUPPORTED_PLATFORMS = frozenset({"all", "vscode", "web", "aidock", "android"})
+SUPPORTED_PLATFORMS = frozenset({"all", "vscode", "web", "aidock", "android", "cli"})
 VALID_KINDS = frozenset({"mandatory", "situational"})
 MANIFEST_FIELDS = frozenset({
     "name",
@@ -33,6 +33,12 @@ CLIENT_CAPABILITIES = {
         "vscode.webview",
     }),
     "aidock": frozenset({
+        "workspace.read",
+        "workspace.write",
+        "shell.execute",
+        "codebase.search",
+    }),
+    "cli": frozenset({
         "workspace.read",
         "workspace.write",
         "shell.execute",

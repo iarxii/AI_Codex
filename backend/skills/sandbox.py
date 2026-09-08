@@ -25,7 +25,10 @@ async def kill_active_process(conversation_id: str) -> bool:
             pass
     return False
 
-async def execute_sandboxed(command: str, cwd: str = ".", conversation_id: Optional[str] = None) -> SandboxResult:
+import sys
+import os
+
+async def execute_sandboxed(command: str, cwd: str = ".", conversation_id: Optional[str] = None, shell: str = "default") -> SandboxResult:
     """
     Executes a shell command in a sandboxed subprocess.
     Enforces allowlist, timeout, and captures output.
@@ -50,13 +53,41 @@ async def execute_sandboxed(command: str, cwd: str = ".", conversation_id: Optio
         return SandboxResult(success=False, error=f"Command '{base_cmd}' not in allowlist")
 
     try:
-        # Note: on Windows, shell=True is needed for built-ins like 'dir' or 'type'
-        proc = await asyncio.create_subprocess_shell(
-            command,
-            cwd=cwd,
-            stdout=PIPE,
-            stderr=PIPE
-        )
+        normalized_shell = (shell or "default").strip().lower()
+        is_win = sys.platform == "win32"
+
+        if normalized_shell == "powershell":
+            ps_exe = "powershell.exe" if is_win else "pwsh"
+            proc = await asyncio.create_subprocess_exec(
+                ps_exe, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command,
+                cwd=cwd,
+                stdout=PIPE,
+                stderr=PIPE
+            )
+        elif normalized_shell == "cmd" and is_win:
+            comspec = os.environ.get("ComSpec", "cmd.exe")
+            proc = await asyncio.create_subprocess_exec(
+                comspec, "/D", "/C", command,
+                cwd=cwd,
+                stdout=PIPE,
+                stderr=PIPE
+            )
+        elif normalized_shell == "bash":
+            bash_exe = "bash.exe" if is_win else "/bin/bash"
+            proc = await asyncio.create_subprocess_exec(
+                bash_exe, "-c", command,
+                cwd=cwd,
+                stdout=PIPE,
+                stderr=PIPE
+            )
+        else:
+            # default / fallback shell execution
+            proc = await asyncio.create_subprocess_shell(
+                command,
+                cwd=cwd,
+                stdout=PIPE,
+                stderr=PIPE
+            )
         
         if conversation_id:
             ACTIVE_PROCESSES[conversation_id] = proc
