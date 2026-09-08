@@ -1013,6 +1013,7 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
 
     websocket = config.get("configurable", {}).get("websocket")
     client_tool_response_queues = config.get("configurable", {}).get("client_tool_response_queues", {})
+    pending_client_tools = config.get("configurable", {}).get("pending_client_tools", {})
 
     state_updates = {}
 
@@ -1026,8 +1027,6 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
     if parallel_execution:
         # Execute all tools in parallel using asyncio.gather
         tool_tasks = []
-        websocket = config.get("configurable", {}).get("websocket")
-        client_tool_response_queues = config.get("configurable", {}).get("client_tool_response_queues", {})
         
         for tool_call in last_message.tool_calls:
             tool_name = tool_call["name"]
@@ -1041,7 +1040,6 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
             # Create response queue for this tool (if using client delegation)
             if websocket and client_tool_response_queues:
                 tool_response_queue = asyncio.Queue()
-                pending_client_tools = config.get("configurable", {}).get("pending_client_tools", {})
                 pending_client_tools[tool_id] = tool_response_queue
             
             async def _execute_and_collect(tool, args, tid, wss, queues, pctools):
@@ -1054,12 +1052,12 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                         output = str(result)
                     
                     # Send end notification via queue
-                    if queues and tool_id in queues:
+                    if queues and tid in queues:
                         try:
-                            await queues[tool_id].put({
+                            await queues[tid].put({
                                 "output": output,
-                                "tool_id": tool_id,
-                                "tool_name": tool_name,
+                                "tool_id": tid,
+                                "tool_name": tool.name,
                                 "status": "completed"
                             })
                         except Exception:
@@ -1070,37 +1068,39 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                         try:
                             await wss.send_json({
                                 "type": "tool_execution_end",
-                                "tool_id": tool_id,
-                                "tool_name": tool_name,
+                                "tool_id": tid,
+                                "tool_name": tool.name,
                                 "status": "completed"
                             })
                         except Exception:
                             pass
                     
-                    return {"tool_name": tool_name, "tool_id": tool_id, "output": output, "success": True}
+                    return {"tool_name": tool.name, "tool_id": tid, "output": output, "success": True}
                 except Exception as e:
                     # Send error notification
-                    if websocket and client_tool_response_queues:
+                    if queues:
                         try:
-                            await client_tool_response_queues.get(tool_id, asyncio.Queue()).put({
+                            queue = queues.get(tid)
+                            if queue:
+                                await queue.put({
                                 "output": str(e),
-                                "tool_id": tool_id,
-                                "tool_name": tool_name,
+                                "tool_id": tid,
+                                "tool_name": tool.name,
                                 "status": "error"
-                            })
+                                })
                         except Exception:
                             pass
                     if wss:
                         try:
                             await wss.send_json({
                                 "type": "tool_execution_end",
-                                "tool_id": tool_id,
-                                "tool_name": tool_name,
+                                "tool_id": tid,
+                                "tool_name": tool.name,
                                 "status": "error"
                             })
                         except Exception:
                             pass
-                    return {"tool_name": tool_name, "tool_id": tool_id, "output": str(e), "success": False}
+                    return {"tool_name": tool.name, "tool_id": tid, "output": str(e), "success": False}
             
             tool_tasks.append(_execute_and_collect(tool, tool_args, tool_id, websocket, client_tool_response_queues, pending_client_tools))
         
