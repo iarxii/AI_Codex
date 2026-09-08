@@ -1017,11 +1017,20 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
 
     state_updates = {}
 
+    client_delegated_tools = {
+        "vscode": {"workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"},
+        "aidock": {"workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"},
+    }
+    delegated_for_client = set(client_delegated_tools.get(client_type, set()))
+    for advertised in mcp_tools_list:
+        if advertised.get("name"):
+            delegated_for_client.add(advertised["name"])
+
     # Check if any tool has execution_mode="parallel"
     parallel_execution = any(
         TOOL_EXECUTION_MODES.get(tc["name"]) == "parallel"
         for tc in last_message.tool_calls
-        if tool_map.get(tc["name"])
+        if tool_map.get(tc["name"]) and tc["name"] not in delegated_for_client
     )
 
     if parallel_execution:
@@ -1038,8 +1047,9 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                 continue
             
             # Create response queue for this tool (if using client delegation)
-            if websocket and client_tool_response_queues:
+            if websocket and tool_name in delegated_for_client:
                 tool_response_queue = asyncio.Queue()
+                client_tool_response_queues[tool_id] = tool_response_queue
                 pending_client_tools[tool_id] = tool_response_queue
             
             async def _execute_and_collect(tool, args, tid, wss, queues, pctools):
@@ -1124,19 +1134,7 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
             tool_args = tool_call["args"]
             tool_id = tool_call["id"]
             
-            CLIENT_DELEGATED_TOOLS = {
-            "vscode": {"workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"},
-            "aidock": {"workspace_writer", "workspace_reader", "shell_exec", "workspace_patcher"}
-        }
-        
-        delegated_for_client = set(CLIENT_DELEGATED_TOOLS.get(client_type, set()))
-        # Any tool the client itself advertises (scratchpad.mcp_tools) is delegated
-        # back to that client for execution. This lets new client capabilities
-        # (browser, PiCodex CLI, etc.) work without per-tool server changes.
-        for advertised in mcp_tools_list:
-            if advertised.get("name"):
-                delegated_for_client.add(advertised.get("name"))
-        is_client_tool = tool_name in delegated_for_client
+            is_client_tool = tool_name in delegated_for_client
         
         if tool_name == "compact_context":
             from langchain_core.messages import RemoveMessage
@@ -1192,11 +1190,12 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
             except Exception as e:
                 tool_result = f"Error updating planning board: {str(e)}"
                 
-        elif is_client_tool and websocket and client_tool_response_queues:
+        elif is_client_tool and websocket:
             logger.info(f"Delegating tool execution to VS Code client: {tool_name} with args: {tool_args}")
             
             # Create a dedicated response queue for this tool call
             tool_response_queue = asyncio.Queue()
+            client_tool_response_queues[tool_id] = tool_response_queue
             pending_client_tools = config.get("configurable", {}).get("pending_client_tools", {})
             pending_client_tools[tool_id] = tool_response_queue
             
@@ -1256,8 +1255,14 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                 })
             finally:
                 # Clean up pending tool tracking
+                client_tool_response_queues.pop(tool_id, None)
                 if tool_id in pending_client_tools:
                     del pending_client_tools[tool_id]
+        elif client_type in client_delegated_tools and tool_name in client_delegated_tools[client_type]:
+            tool_result = (
+                f"Error: `{tool_name}` is a client workspace tool, but no client WebSocket "
+                "is available. The backend must not execute it against its own workspace."
+            )
         else:
             logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
             start_time = time.perf_counter()

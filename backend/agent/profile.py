@@ -134,10 +134,16 @@ def build_system_prompt(
     workspace_context_block = ""
     if workspace_context.strip():
         workspace_context_block = (
-            "\n\n[CLIENT WORKSPACE CONTEXT]\n"
+            "\n\n[AUTHORITATIVE CLIENT IDE WORKSPACE]\n"
             f"{workspace_context.strip()}\n"
-            "Treat this as the authoritative workspace for this request. "
-            "Do not substitute or invent a different project path."
+            "This is the authoritative IDE workspace for this request. "
+            "The backend service filesystem, backend PROJECT_ROOT, conversation scratch "
+            "directory, retrieval index, and any other repository are separate and must "
+            "never be substituted for this workspace. For client_type=vscode, use the "
+            "client workspace tools (workspace_reader, workspace_writer, "
+            "workspace_patcher, or shell_exec) to inspect or change IDE files. "
+            "Do not claim to have inspected a file or directory until the corresponding "
+            "client tool returns its output."
         )
     
     prompt = f"""[SOUL]
@@ -174,4 +180,3 @@ INSTRUCTIONS:
 {workspace_context_block}
 """
     return prompt
-
