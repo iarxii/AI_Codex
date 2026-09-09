@@ -108,6 +108,25 @@ async def migrate_db(conn):
         except Exception as e:
             print(f"[MIGRATION] Warning: invoicing migration for {inv_table}: {e}")
 
+    # -- Cloud inference connection support (mirrors alembic revision
+    # add_cloud_inference_connections for SQLite dev databases) --
+    for cloud_table, cloud_cols in {
+        "integration_providers": {"connection_type": "VARCHAR(20) DEFAULT 'oauth'"},
+        "user_connections": {"config_json": "TEXT"},
+    }.items():
+        try:
+            result = await conn.execute(text(f"PRAGMA table_info({cloud_table})"))
+            rows = result.fetchall()
+            if not rows:
+                continue
+            existing_cloud_cols = {row[1] for row in rows}
+            for col, col_def in cloud_cols.items():
+                if col not in existing_cloud_cols:
+                    print(f"[MIGRATION] Adding column {col} to {cloud_table}...")
+                    await conn.execute(text(f"ALTER TABLE {cloud_table} ADD COLUMN {col} {col_def}"))
+        except Exception as e:
+            print(f"[MIGRATION] Warning: cloud inference migration for {cloud_table}: {e}")
+
 async def init_db():
     # Step 1: Ensure all tables exist. This is the critical step and must not be
     # swallowed by migration errors. Run it in its own isolated try/except.

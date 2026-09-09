@@ -149,7 +149,8 @@ async def _run_initialization():
 
         # Initialize MCP Client Manager
         print("[INIT] Starting MCP Client Manager...")
-        from backend.integrations.mcp_client import MCPClientManager, load_default_mcp_servers, get_mcp_client_manager
+        from backend.integrations.mcp_client import load_default_mcp_servers
+        from backend.agent.tools import get_mcp_client_manager
         mcp_manager = get_mcp_client_manager()
         for server_config in load_default_mcp_servers():
             mcp_manager.add_server(server_config)
@@ -182,7 +183,7 @@ async def lifespan(app: FastAPI):
     
     # Shutdown MCP Client Manager
     print("[LIFESPAN] Stopping MCP Client Manager...")
-    from backend.integrations.mcp_client import get_mcp_client_manager
+    from backend.agent.tools import get_mcp_client_manager
     mcp_manager = get_mcp_client_manager()
     await mcp_manager.disconnect_all()
     print("[LIFESPAN] MCP Client Manager stopped.")

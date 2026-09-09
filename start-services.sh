@@ -14,7 +14,11 @@ export PATH="$GCLOUD_PATH:$GO_PATH:$PATH"
 # Start backend service
 echo "Starting FastAPI Backend on port 9000..."
 export PYTHONPATH=.
-source backend/.venv/bin/activate || source backend/.venv/Scripts/activate
+if [ -f backend/.venv/bin/activate ]; then
+    source backend/.venv/bin/activate
+else
+    source backend/.venv/Scripts/activate
+fi
 uvicorn backend.main:app --reload --reload-dir backend --host 0.0.0.0 --port 9000 &
 
 BACKEND_PID=$!
