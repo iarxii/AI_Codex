@@ -149,6 +149,30 @@ async def delete_workspace_item(conversation_id: str, req: PathRequest, current_
             target_path.unlink()
             
         return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class RenameRequest(BaseModel):
+    old_path: str
+    new_path: str
+
+@router.post("/{conversation_id}/rename")
+async def rename_workspace_item(conversation_id: str, req: RenameRequest, current_user: dict = Depends(get_current_user)):
+    try:
+        base_dir = _get_workspace_root(conversation_id)
+        src = _safe_resolve(base_dir, req.old_path)
+        dst = _safe_resolve(base_dir, req.new_path)
+
+        if not src.exists():
+            raise HTTPException(status_code=404, detail="Source path not found")
+
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src.rename(dst)
+        return {"status": "success", "old_path": req.old_path, "new_path": req.new_path}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

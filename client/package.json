@@ -18,6 +18,7 @@
     "@litertjs/core": "^2.5.3",
     "@lobehub/icons": "^5.6.0",
     "@lobehub/ui": "^5.20.3",
+    "@monaco-editor/react": "^4.7.0",
     "@tailwindcss/typography": "^0.5.19",
     "framer-motion": "^12.38.0",
     "jszip": "^3.10.1",
