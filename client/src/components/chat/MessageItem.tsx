@@ -573,7 +573,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
       ) : isUser ? (
         <div className="flex justify-end animate-in fade-in slide-in-from-right-4">
           <div className="flex flex-col items-end gap-1.5 max-w-[80%]">
-            <div className="flex items-center gap-2 mr-0.5">
+            <div className="flex items-center gap-2 mr-0.5 bg-white rounded-md">
               <button
                 onClick={handleCopyMessage}
                 className="p-1 rounded-md bg-white/5 hover:bg-white/10 text-[#fd3b12]/70 hover:text-[#fd3b12] transition-colors border border-transparent hover:border-[#fd3b12]/20"
@@ -687,7 +687,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
           )}
           <div className="flex justify-start animate-in fade-in slide-in-from-left-4">
             <div className="flex flex-col items-start gap-1.5 max-w-[85%]">
-              <span className="text-[9px] font-bold text-[#fd3b12] uppercase tracking-widest bg-[#fd3b12]/10 px-2 py-0.5 rounded-md border border-[#fd3b12]/20 backdrop-blur-sm ml-0.5">
+              <span className="text-[9px] font-bold text-[#fd3b12] uppercase tracking-widest bg-[#fff] [#fd3b12]/10 px-2 py-0.5 rounded-md border border-[#fd3b12]/20 backdrop-blur-sm ml-0.5">
                 Agent
               </span>
               <div className="bg-white border border-black/[0.04] p-5 rounded-2xl rounded-tl-none rounded-br-none shadow-sm relative group bot-corner-glow w-full">

@@ -24,7 +24,7 @@ const MetricsStrip: React.FC<MetricsStripProps> = ({
   setIsChartExpanded,
 }) => {
   return (
-    <div className="mt-4 flex flex-col items-center">
+    <div className="mt-4 flex flex-col items-center w-100">
       <div className="flex items-center gap-4 bg-white/80 backdrop-blur-md border border-black/[0.04] rounded-full px-5 py-1.5 shadow-sm transition-all hover:shadow-md hover:bg-white/95">
         <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-[#4A4D5E] font-bold">
           <div className="flex items-center gap-1.5">

@@ -183,19 +183,22 @@ const ChatInput: React.FC<ChatInputProps> = ({
   }, [input]);
   return (
     <footer
-      className="px-3 sm:px-6 pb-5 pt-3 bg-transparent border-t border-black/[0.04] z-20 safe-area-bottom"
+      className="px-3 sm:px-6 pb-5 pt-3 bg-transparent border-t border-black/[0.04] z-20 safe-area-bottom min-w-[400px]"
       style={{ overflow: "visible", paddingBottom: "max(1.25rem, env(safe-area-inset-bottom, 0px))" }}
     >
-      <div className={`max-w-4xl mx-auto mb-3 transition-all duration-300 ${isProviderBarExpanded ? 'block' : 'hidden'}`}>
-        <ProviderSelector
-          showTelemetry={showTelemetry}
-          setShowTelemetry={setShowTelemetry}
-        />
-      </div>
+
       <form onSubmit={handleSendWithAttachments} className="max-w-4xl mx-auto">
         <Brain className="hidden" aria-hidden="true" />
         {/* Main Input Container */}
         <div className="workspace-composer relative border border-black/[0.08] rounded-2xl shadow-md transition-all focus-within:border-[#fd3b12]/40 focus-within:shadow-lg focus-within:shadow-[#fd3b12]/5">
+          {/* provider selector */}
+          <div className={`max-w-4xl mx-auto mb-3 transition-all duration-300 ${isProviderBarExpanded ? 'block' : 'hidden'}`}>
+            <ProviderSelector
+              showTelemetry={showTelemetry}
+              setShowTelemetry={setShowTelemetry}
+            />
+          </div>
+
           {/* Function Buttons Row */}
           <div className="flex items-center gap-1 px-3 pt-2.5 pb-0">
             {/* Provider Selector Toggle */}
@@ -242,6 +245,25 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
               {isSpecializationOpen && (
                 <div className="absolute bottom-full left-0 mb-2 w-48 bg-white border border-black/[0.08] rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <div className="mt-1 pt-1 border-t border-black/[0.04]">
+                    <div className="flex items-center justify-between px-3 py-2">
+                      <span className="text-[10px] font-black tracking-widest text-[#7A7D8E]">
+                        AGENT MODE
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAgentMode(!agentMode)}
+                        className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus:outline-none ${agentMode ? "bg-[#10B981]" : "bg-[#EF4444]"
+                          }`}
+                      >
+                        <span
+                          className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${agentMode ? "translate-x-[17px]" : "translate-x-1"
+                            }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="px-3 py-1.5 border-b border-black/[0.04] mb-1">
                     <span className="text-[9px] font-black uppercase tracking-widest text-[#7A7D8E]">
                       Specialization
@@ -262,24 +284,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
                       {spec.name}
                     </button>
                   ))}
-                  <div className="mt-1 pt-1 border-t border-black/[0.04]">
-                    <div className="flex items-center justify-between px-3 py-2">
-                      <span className="text-[10px] font-black tracking-widest text-[#7A7D8E]">
-                        AGENT MODE
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setAgentMode(!agentMode)}
-                        className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus:outline-none ${agentMode ? "bg-[#10B981]" : "bg-[#EF4444]"
-                          }`}
-                      >
-                        <span
-                          className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${agentMode ? "translate-x-[17px]" : "translate-x-1"
-                            }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>

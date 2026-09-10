@@ -4,6 +4,20 @@ import type { CodexSpace } from '../contexts/AIContext';
 import SpaceCard from './SpaceCard';
 import { config } from '../config';
 
+import {
+    //   Cog6ToothIcon,
+    //   CpuChipIcon,
+    //   BoltIcon,
+    //   GlobeAltIcon,
+    //   SparklesIcon,
+    //   PencilSquareIcon,
+    //   CloudIcon,
+    CubeTransparentIcon,
+    //   RectangleStackIcon,
+    //   ArrowPathIcon,
+    //   ShieldCheckIcon
+} from "@heroicons/react/24/outline";
+
 interface SpacesCatalogProps {
     onSpaceSelected: () => void;
 }
@@ -38,7 +52,7 @@ const SpacesCatalog: React.FC<SpacesCatalogProps> = ({ onSpaceSelected }) => {
             });
             if (res.ok) {
                 const data = await res.json();
-                
+
                 const allSpaces = [generalSpace, ...data.filter((s: CodexSpace) => s.slug !== 'general')];
                 allSpaces.sort((a, b) => {
                     if (a.slug === 'general') return -1;
@@ -47,7 +61,7 @@ const SpacesCatalog: React.FC<SpacesCatalogProps> = ({ onSpaceSelected }) => {
                     if (b.slug === 'spirit-book') return 1;
                     return 0;
                 });
-                
+
                 setSpaces(allSpaces);
             }
         } catch (e) {
@@ -68,15 +82,18 @@ const SpacesCatalog: React.FC<SpacesCatalogProps> = ({ onSpaceSelected }) => {
     };
 
     return (
-        <div className="flex-1 flex flex-col items-center justify-start p-8 overflow-y-auto">
+        <div className="codex-space-top-grad flex-1 flex flex-col items-center justify-start p-8 overflow-y-auto">
             <div className="max-w-5xl w-full">
                 <div className="text-center mb-12">
+                    <div className="mx-auto p-4">
+                        <CubeTransparentIcon className="w-[100px] h-[100px] mx-auto" />{/* sm:w-4 sm:h-4 */}
+                    </div>
                     <h1 className="text-4xl font-bold text-[var(--text-primary)] mb-4 tracking-tight">
-                        <span className="text-[var(--accent)]">Codex</span> Spaces
+                        <span className="text-[var(--accent)]">Codex</span>Spaces
                     </h1>
                     <p className="text-lg text-[var(--text-secondary)]">Discover and enter specialized agentic environments.</p>
                 </div>
-                
+
                 {loading ? (
                     <div className="text-center py-20 text-[var(--text-secondary)] animate-pulse font-semibold uppercase tracking-widest text-sm">
                         Loading Spaces...

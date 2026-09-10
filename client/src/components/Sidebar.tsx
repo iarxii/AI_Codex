@@ -10,7 +10,8 @@ import {
   CloudIcon,
   CubeTransparentIcon,
   RectangleStackIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  ShieldCheckIcon
 } from "@heroicons/react/24/outline";
 import { useAI } from "../contexts/AIContext";
 import { config, getApiUrl } from "../config";
@@ -252,7 +253,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         className={`
-        workspace-sidebar fixed lg:static top-0 left-0 h-full w-full sm:w-80 lg:w-72 flex flex-col backdrop-blur-2xl border-r border-black/[0.06] z-50 safe-area-top
+        workspace-sidebar fixed lg:static top-0 left-0 h-full w-full sm:w-90 -80 lg:w-80 -72 flex flex-col backdrop-blur-2xl border-r border-black/[0.06] z-50 safe-area-top
         transition-all duration-500 ease-in-out
         ${isOpen ? "translate-x-0 opacity-100" : "-translate-x-full lg:hidden lg:opacity-0"}
       `}
@@ -271,11 +272,6 @@ const Sidebar: React.FC<SidebarProps> = ({
               </svg>
             </button>
             <div className="relative mb-1">
-              {/* <img 
-                src="/media/logo.png" 
-                alt="AICodex Logo" 
-                className="w-18 h-18 object-contain transition-all duration-500 group-hover:scale-105"
-              /> */}
               <img
                 src="/media/aicodex-spirit-bird.png"
                 alt="Adaptivconcept FL Logo"
@@ -372,50 +368,13 @@ const Sidebar: React.FC<SidebarProps> = ({
               className={`flex-1 flex items-center justify-center gap-2 py-3 sm:py-2 lg:py-1.5 rounded-lg text-sm sm:text-xs font-semibold transition-all ${activeTab === 'spaces' ? 'bg-[var(--accent)]/10 text-[var(--accent)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-black/5'}`}
             >
               <CubeTransparentIcon className="w-5 h-5 sm:w-4 sm:h-4" />
-              Spaces
+              CodexSpaces
             </button>
           </div>
         </div>
 
-        <div className="p-4 border-b border-black/[0.06] space-y-2.5">
-          {activeTab === 'spaces' && (
-            <button
-              onClick={() => {
-                setActiveSpace(null);
-                setViewSpacesCatalog(true);
-                if (window.innerWidth < 1024) onClose();
-              }}
-              className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl text-xs font-bold transition-all bg-white/50 hover:bg-white border border-black/[0.05] hover:border-[var(--accent)]/30 text-[var(--text-secondary)] hover:text-[var(--accent)] group shadow-sm"
-            >
-              <CubeTransparentIcon className="w-4 h-4 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110" />
-              BROWSE SPACES CATALOG
-            </button>
-          )}
-
-          <button
-            onClick={async () => {
-              if (activeTab === 'spaces' && !activeSpace) {
-                setViewSpacesCatalog(true);
-              } else {
-                await onNewChat();
-                if (activeSpace) {
-                  await fetchSpaceConversations(activeSpace.slug);
-                } else {
-                  await fetchConversations();
-                }
-              }
-              if (window.innerWidth < 1024) onClose();
-            }}
-            className="w-full flex items-center justify-center gap-2.5 py-3.5 sm:py-2.5 px-4 rounded-xl text-base sm:text-sm font-bold transition-all active:scale-95 shadow-md group bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white shadow-[var(--accent)]/20"
-          >
-            <svg className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
-            </svg>
-            NEW WORKSPACE
-          </button>
-        </div>
-
-        <div className="relative flex-1 overflow-y-auto p-3 sm:p-3 space-y-2 sm:space-y-1.5 scrollbar-hide" aria-busy={isLoading}>
+        {/* workspace list */}
+        <div className="relative flex-1 overflow-y-auto p-3 sm:p-3 space-y-2 sm:space-y-1.5 scrollbar-hide min-h-[20vh]" aria-busy={isLoading}>
           {isLoading && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[var(--bg-primary)]/70 backdrop-blur-sm">
               <ArrowPathIcon className="w-6 h-6 text-[var(--accent)] animate-spin" />
@@ -473,15 +432,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                 }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 shrink-0 transition-colors ${currentConversationId === conv.id ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`}>
+                {/* icon */}
+                <div className={`workspace-icon-wrapper-sidebar w-10 h-10 shrink-0 transition-colors ${currentConversationId === conv.id ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`}>
                   {activeTab === 'workspaces'
-                    ? <RectangleStackIcon className="w-5 h-5" />
+                    ? <RectangleStackIcon className="w-8 h-8" />
                     : getIcon(
                       availableSpaces.find((space) => space.slug === conv.space_type)?.icon ?? null,
-                      "w-5 h-5",
-                      "w-5 h-5 object-contain",
+                      "w-8 h-8",
+                      "w-8 h-8 object-contain",
                     )}
                 </div>
+                {/* details */}
                 <div className="flex-1 min-w-0 flex items-center justify-between group/item">
                   <div className="flex-1 min-w-0">
                     {activeTab === 'spaces' && conv.space_name && (
@@ -549,46 +510,95 @@ const Sidebar: React.FC<SidebarProps> = ({
           ))}
         </div>
 
-        {['admin', 'super_admin'].includes(userProfile?.role || '') && (
-          <div className="px-4 py-2 border-t border-black/[0.04]">
+        {/* footer */}
+        <div style={{ /* position: "absolute", */ display: "sticky", bottom: "0px" }}>
+          {/* new workspace button | browse codexspaces */}
+          <div className="p-4 border-b border-black/[0.06] space-x-2.5 flex">
+            {activeTab === 'spaces' && (
+              <button
+                onClick={() => {
+                  setActiveSpace(null);
+                  setViewSpacesCatalog(true);
+                  if (window.innerWidth < 1024) onClose();
+                }}
+                className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl text-xs font-bold transition-all bg-white/50 hover:bg-white border border-black/[0.05] hover:border-[var(--accent)]/30 text-[var(--text-secondary)] hover:text-[var(--accent)] group shadow-sm"
+              >
+                <CubeTransparentIcon className="w-4 h-4 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110" />
+                Browse CodexSpaces
+              </button>
+            )}
+
             <button
-              onClick={() => {
-                const win = window.open('/admin/users', '_blank');
-                if (win) win.focus();
+              onClick={async () => {
+                if (activeTab === 'spaces' && !activeSpace) {
+                  setViewSpacesCatalog(true);
+                } else {
+                  await onNewChat();
+                  if (activeSpace) {
+                    await fetchSpaceConversations(activeSpace.slug);
+                  } else {
+                    await fetchConversations();
+                  }
+                }
+                if (window.innerWidth < 1024) onClose();
               }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-bold text-[#4A4D5E] hover:bg-[#fd3b12]/5 hover:text-[#fd3b12] transition-all group border border-transparent hover:border-[#fd3b12]/10"
+              className="w-full flex items-center justify-center gap-2.5 py-3.5 sm:py-2.5 px-4 rounded-xl text-base sm:text-sm font-bold transition-all active:scale-95 shadow-md group bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white shadow-[var(--accent)]/20"
             >
-              <div className="p-1.5 rounded-lg bg-white/50 group-hover:bg-white shadow-sm transition-all border border-black/[0.03]">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              </div>
-              ADMINISTRATIVE CONTROL
+              <svg className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+              </svg>
+              NEW WORKSPACE
             </button>
           </div>
-        )}
 
-        <div className="p-4 border-t border-black/[0.06] bg-[var(--bg-primary)]/50 safe-area-bottom">
-          <div className="flex items-center gap-3 px-2 pb-4">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-hover)] flex items-center justify-center text-[10px] font-bold text-white shadow-sm border border-white/20">
-              {displayName.substring(0, 2).toUpperCase()}
+          {/* footer badge and settings button */}
+          <div className="p-4 border-t border-black/[0.06] bg-[var(--bg-primary)]/50 safe-area-bottom">
+            <div className="flex items-center gap-3 px-2 pb-4">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--accent)] to-[var(--accent-hover)] flex items-center justify-center text-[10px] font-bold text-white shadow-sm border border-white/20">
+                {displayName.substring(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-[var(--text-primary)] truncate">
+                  {userProfile?.title ? `${userProfile.title}. ` : ''}{displayName}
+                </p>
+                <p className="text-[10px] text-[var(--accent)] font-mono truncate">
+                  {displayTitle}
+                </p>
+              </div>
+
+              {/* administrative control */}
+              {['admin', 'super_admin'].includes(userProfile?.role || '') && (
+                // <div className="px-4 py-2 border-t border-black/[0.04]">
+                // <div className="p-2.5 sm:p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors">
+                // </div>
+                <button
+                  onClick={() => {
+                    const win = window.open('/admin/users', '_blank');
+                    if (win) win.focus();
+                  }}
+                  className="p-2.5 sm:p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors"
+                  // className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-bold text-[#4A4D5E] hover:bg-[#fd3b12]/5 hover:text-[#fd3b12] transition-all group border border-transparent hover:border-[#fd3b12]/10"
+                >
+                  <ShieldCheckIcon className="w-6 h-6 sm:w-5 sm:h-5" />
+                  {/* <div className="p-1.5 rounded-lg bg-white/50 group-hover:bg-white shadow-sm transition-all border border-black/[0.03]">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div> */}
+                  {/* ADMINISTRATIVE CONTROL */}
+                </button>
+              )}
+
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-2.5 sm:p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors"
+              >
+                <Cog6ToothIcon className="w-6 h-6 sm:w-5 sm:h-5" />
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-[var(--text-primary)] truncate">
-                {userProfile?.title ? `${userProfile.title}. ` : ''}{displayName}
-              </p>
-              <p className="text-[10px] text-[var(--accent)] font-mono truncate">
-                {displayTitle}
-              </p>
-            </div>
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-2.5 sm:p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors"
-            >
-              <Cog6ToothIcon className="w-6 h-6 sm:w-5 sm:h-5" />
-            </button>
           </div>
         </div>
+
 
         <SettingsModal isOpen={isSettingsOpen} setIsOpen={setIsSettingsOpen} />
       </aside>

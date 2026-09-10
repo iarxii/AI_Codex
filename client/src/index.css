@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --font-sans: 'Poppins', system-ui, sans-serif;
@@ -40,11 +41,11 @@
   --ease-liquid: cubic-bezier(0.34, 1.4, 0.64, 1);
   --ease-material: cubic-bezier(0.2, 0, 0, 1);
   --page-silver: #D8DCE4;
-  --header-silver: rgba(216, 220, 228, 0.6);
+  --header-silver: rgba(216, 220, 228, 0.8);
   --header-silver-solid: #D8DCE4;
   --header-brand-text: #1A1D2E;
   --portal-brand-text: #1A1D2E;
-  --portal-header-start: #ffffff;
+  --portal-header-start: var(--header-silver-solid);
   --chat-surface-end: #ffffff;
   --workspace-chat-surface-end: #ffffff;
   --composer-surface-start: rgba(255, 255, 255, 0.95);
@@ -74,7 +75,7 @@
   --header-silver-solid: #353b46;
   --header-brand-text: #1A1D2E;
   --portal-brand-text: #ffffff;
-  --portal-header-start: #353b46;
+  --portal-header-start: var(--header-silver-solid);
   --chat-surface-end: #252a33;
   --workspace-chat-surface-end: #252a33;
   --composer-surface-start: rgba(62, 69, 81, 0.96);
@@ -220,7 +221,13 @@
 }
 
 .portal-header {
-  background: linear-gradient(to right, var(--portal-header-start), rgba(253, 59, 18, 0.4), #fd3b12);
+  background: linear-gradient(to right, var(--portal-header-start), var(--portal-header-start), #fd3b12);
+}
+
+.workspace-icon-wrapper-sidebar {
+  background-color: rgba(255, 255, 255, 0.4);
+  padding: 4px;
+  border-radius: 18%;
 }
 
 .workspace-header {
@@ -324,7 +331,8 @@
 }
 
 .litechat-new-session {
-  color: #4A4D5E;
+  color: var(--accent) /* #4A4D5E */;
+  border: 1px solid var(--accent);
 }
 
 :root[data-interface-theme="dark"] .litechat-new-session {
@@ -713,4 +721,12 @@ button, a, [role="button"] {
   input, textarea, select {
     font-size: 16px !important;
   }
+}
+
+.codex-space-top-grad {
+  background: linear-gradient(0deg,rgba(255, 255, 255, 0) 50%, /* rgba(235, 235, 235, 0.9) */ var(--header-silver) 100%);
+}
+
+.workspace-chat-top-grad {
+  background: linear-gradient(0deg,rgba(255, 255, 255, 0) 10%, /* rgba(235, 235, 235, 0.9) */ var(--header-silver) 100%);
 }

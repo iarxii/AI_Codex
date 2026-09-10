@@ -16,6 +16,7 @@ import {
   ChevronDown,
   SlidersHorizontal,
   Bot,
+  Brain,
   Microchip,
   FileText,
   Image as ImageIcon,
@@ -322,7 +323,7 @@ const LiteChat: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [promptHistory, setPromptHistory] = useState<string[]>(loadPromptHistory);
   const [openSection, setOpenSection] = useState<'prompts' | null>(null);
-  const [cloudConfigOpen, setCloudConfigOpen] = useState(true);
+  const [cloudConfigOpen, setCloudConfigOpen] = useState(false);
   const [isDesktopPanelOpen, setIsDesktopPanelOpen] = useState(true);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [attachmentWarning, setAttachmentWarning] = useState<string | null>(null);
@@ -606,10 +607,12 @@ const LiteChat: React.FC = () => {
             <span className="portal-brand-label text-sm font-bold tracking-wider truncate">
               AI<span className="text-[#fd3b12]">Codex</span> Chat
             </span>
-            <span className="text-[8px] uppercase tracking-widest text-[var(--text-muted)] font-semibold truncate">
+            {/* <span className="text-[8px] uppercase tracking-widest text-[var(--text-muted)] font-semibold truncate">
               Web AI Engine
-            </span>
+            </span> */}
           </div>
+
+          <div className="w-px h-4 bg-black/[0.08] mx-1 shrink-0 mx-2"></div>
 
           <button
             onClick={() => setIsSessionsPanelOpen(true)}
@@ -926,7 +929,7 @@ const LiteChat: React.FC = () => {
                       )}
 
                       {/* Message Content */}
-                      <div className="font-sans relative z-10 prose prose-sm max-w-none prose-pre:my-2 prose-code:text-inherit">
+                      <div className={`font-sans relative z-10 prose prose-sm max-w-none prose-pre:my-2 prose-code:text-inherit ${msg.sender === 'user' ? 'prose-invert' : ''}`}>
                         {contentForDisplay ? (
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm, remarkMath]}
@@ -1051,6 +1054,34 @@ const LiteChat: React.FC = () => {
           <div className="px-3 sm:px-6 pb-5 pt-3 bg-transparent border-t border-black/[0.04] shrink-0 safe-area-bottom">
             <form onSubmit={handleSubmit} className="max-w-4xl mx-auto space-y-2">
               <div className="composer p-2 pl-4 rounded-[1.6rem]">
+                {/* Composer Row */}
+                <div className="flex items-end gap-2">
+                  <textarea
+                    ref={composerRef}
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onInput={handleComposerInput}
+                    onKeyDown={handleComposerKeyDown}
+                    rows={1}
+                    placeholder={
+                      engineMode === 'local'
+                        ? "Chat with local Gemma after the model download..."
+                        : "Ask the AICodex Cloud Agent anything..."
+                    }
+                    className="flex-1 min-w-0 px-1 py-3 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none w-full resize-none leading-relaxed max-h-[168px] overflow-y-auto"
+                    disabled={loading}
+                  />
+
+
+                  <button
+                    type="submit"
+                    disabled={!inputText.trim() || loading}
+                    className="p-3 bg-[#fd3b12] text-white rounded-xl hover:bg-[#d6320f] transition-all disabled:opacity-50 disabled:hover:bg-[#fd3b12] disabled:cursor-not-allowed shadow-lg shadow-[#fd3b12]/15 active:scale-95 flex items-center justify-center press-lift"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+
                 {/* Cloud Configuration Selectors — collapsible group */}
                 <AnimatePresence initial={false}>
                   {engineMode === 'cloud' && cloudConfigOpen && (
@@ -1193,45 +1224,10 @@ const LiteChat: React.FC = () => {
                   </div>
                 )}
 
-                {/* Composer Row */}
-                <div className="flex items-end gap-2">
-                  <textarea
-                    ref={composerRef}
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onInput={handleComposerInput}
-                    onKeyDown={handleComposerKeyDown}
-                    rows={1}
-                    placeholder={
-                      engineMode === 'local'
-                        ? "Chat with local Gemma after the model download..."
-                        : "Ask the AICodex Cloud Agent anything..."
-                    }
-                    className="flex-1 min-w-0 px-1 py-3 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none w-full resize-none leading-relaxed max-h-[168px] overflow-y-auto"
-                    disabled={loading}
-                  />
+                {/* function buttons */}
+                <div>
 
                   <div className="flex items-center gap-2 shrink-0 pb-1.5">
-
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-black/[0.08] bg-white/70 text-[var(--text-muted)] hover:text-[#fd3b12] hover:border-[#fd3b12]/35 transition-all"
-                      title="Attach media or documents"
-                    >
-                      <Paperclip className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline text-xs font-semibold">Attach</span>
-                    </button>
-
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      className="hidden"
-                      accept=".png,.jpg,.jpeg,.webp,.gif,.md,.txt,.pdf,image/*,text/markdown,text/plain,application/pdf"
-                      onChange={handleAttachmentPick}
-                    />
-
                     {/* Engine Mode Selector Badge */}
                     <button
                       type="button"
@@ -1242,8 +1238,8 @@ const LiteChat: React.FC = () => {
                         }`}
                       title={
                         engineMode === 'cloud'
-                          ? "Currently querying the real AICodex Cloud Agent"
-                          : "Local Gemma requires the confirmed model download and LiteRT-LM runtime"
+                          ? "Connected to AICodex Cloud Agent"
+                          : "Connected to Local Web Gemma LiteRT-LM runtime"
                       }
                     >
                       {engineMode === 'cloud' ? (
@@ -1270,18 +1266,30 @@ const LiteChat: React.FC = () => {
                           }`}
                         title="Toggle provider & model configuration"
                       >
-                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                        <Bot className="w-3.5 h-3.5" />
                         <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${cloudConfigOpen ? 'rotate-180' : ''}`} />
                       </button>
                     )}
 
                     <button
-                      type="submit"
-                      disabled={!inputText.trim() || loading}
-                      className="p-3 bg-[#fd3b12] text-white rounded-xl hover:bg-[#d6320f] transition-all disabled:opacity-50 disabled:hover:bg-[#fd3b12] disabled:cursor-not-allowed shadow-lg shadow-[#fd3b12]/15 active:scale-95 flex items-center justify-center press-lift"
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-black/[0.08] bg-white/70 text-[var(--text-muted)] hover:text-[#fd3b12] hover:border-[#fd3b12]/35 transition-all"
+                      title="Attach media or documents"
                     >
-                      <Send className="w-4 h-4" />
+                      <Paperclip className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline text-xs font-semibold">Attach</span>
                     </button>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      accept=".png,.jpg,.jpeg,.webp,.gif,.md,.txt,.pdf,image/*,text/markdown,text/plain,application/pdf"
+                      onChange={handleAttachmentPick}
+                    />
+
                   </div>
                 </div>
               </div>

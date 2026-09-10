@@ -145,7 +145,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   };
 
   return (
-    <div className="mb-2 flex flex-col gap-2">
+    <div className="mb-2 flex flex-col gap-2 bg- [#fff] px-4 pt-4 rounded-lg">
       {/* Backend mode toggle — only visible when local provider is selected */}
       {provider === "local" && (
         <div className="flex items-center gap-2 px-1">

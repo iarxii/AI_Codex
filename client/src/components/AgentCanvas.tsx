@@ -19,7 +19,7 @@ interface AgentCanvasProps {
   conversationId?: string | number | null;
 }
 
-type TabType = 'Code' | 'Docs' | 'Research' | 'Graph';
+type TabType = 'Codex' | 'Docs' | 'Research' | 'Graph';
 type CanvasWidth = 'compact' | 'wide' | 'full';
 
 const WIDTH_MAP: Record<CanvasWidth, string> = {
@@ -29,9 +29,9 @@ const WIDTH_MAP: Record<CanvasWidth, string> = {
 };
 
 /** Standard-mode tabs */
-const STANDARD_TABS: TabType[] = ['Code', 'Docs', 'Research'];
+const STANDARD_TABS: TabType[] = ['Codex', 'Docs', 'Research'];
 /** CodeSpace-mode tabs (full IDE integration) */
-const CODESPACE_TABS: TabType[] = ['Code', 'Docs', 'Research', 'Graph'];
+const CODESPACE_TABS: TabType[] = ['Codex', 'Docs', 'Research', 'Graph'];
 
 const AgentCanvas: React.FC<AgentCanvasProps> = ({
   isOpen,
@@ -41,7 +41,7 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({
   conversationId,
 }) => {
   const { isPremiumSpace, activeSpace } = useAI();
-  const [activeTab, setActiveTab] = useState<TabType>('Code');
+  const [activeTab, setActiveTab] = useState<TabType>('Codex');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [canvasWidth, setCanvasWidth] = useState<CanvasWidth>('compact');
@@ -56,7 +56,7 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({
   // Reset to valid tab if current tab is hidden
   useEffect(() => {
     if (!availableTabs.includes(activeTab)) {
-      setActiveTab('Code');
+      setActiveTab('Codex');
     }
   }, [isPremiumSpace, activeTab, availableTabs]);
 
@@ -79,7 +79,7 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({
 
       if (art) {
         setSelectedId(art.id);
-        if (art.type === 'code') setActiveTab('Code');
+        if (art.type === 'code') setActiveTab('Codex');
         else if (art.type === 'docs') setActiveTab('Docs');
         else if (art.type === 'research') setActiveTab('Research');
       }
@@ -88,7 +88,7 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({
 
   // Filter artifacts based on active tab
   const filteredArtifacts = artifacts.filter(art => {
-    if (activeTab === 'Code') return art.type === 'code';
+    if (activeTab === 'Codex') return art.type === 'code';
     if (activeTab === 'Docs') return art.type === 'docs';
     if (activeTab === 'Research') return art.type === 'research';
     return false;
@@ -413,7 +413,7 @@ const AgentCanvas: React.FC<AgentCanvasProps> = ({
         ) : filteredArtifacts.length > 0 ? (
           <>
             {/* ━━ Code Tab: Full IDE layout ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-            {activeTab === 'Code' ? (
+            {activeTab === 'Codex' ? (
               <div className="flex-1 flex overflow-hidden">
                 {/* Left: File Explorer */}
                 <div className={`shrink-0 border-r border-black/[0.08] overflow-hidden flex flex-col ${canvasWidth === 'compact' ? 'w-44' : 'w-56'}`}>
