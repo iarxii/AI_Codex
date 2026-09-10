@@ -9,7 +9,7 @@ echo "=== Setting up AI_Codex ==="
 if [ -d "backend" ]; then
   echo "Setting up Python virtual environment in backend/..."
   cd backend
-  python3 -m venv .venv
+  python -m venv .venv
   source .venv/bin/activate || source .venv/Scripts/activate
   pip install -r requirements.txt
   cd ..
