@@ -109,14 +109,14 @@ def test_routing_logic():
     assert promoted_state["telemetry"]["tool_promotion"] is True
     assert promoted_state["routing_metadata"]["reason"] == "tool_call_promotion"
 
-    # Case C: Long process, no tool calls -> should route to validate
+    # Case C: Long process, no tool calls -> should route to update_scratchpad (ReSum pattern)
     state_c = {
         "messages": [mock_msg_no_tools],
         "is_short_process": False,
         "space_config": {}
     }
     route_c = should_continue(state_c)
-    assert route_c == "validate", f"Long process without tools should route to validate, got {route_c}"
+    assert route_c == "update_scratchpad", f"Long process without tools should route to update_scratchpad, got {route_c}"
 
     clean_state = {
         "messages": [mock_msg_no_tools],
@@ -132,7 +132,7 @@ def test_routing_logic():
         "routing_metadata": {"process_mode": "long", "action_indicators": ["action:create"]},
         "space_config": {}
     }
-    assert should_continue(action_state) == "validate"
+    assert should_continue(action_state) == "update_scratchpad"
 
     stalled_action_state = {
         "messages": [mock_msg_no_tools],

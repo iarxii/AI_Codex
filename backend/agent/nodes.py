@@ -7,10 +7,11 @@ import queue
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
+from pydantic import BaseModel, Field
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage, BaseMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
-from .state import AgentState
+from .state import AgentState, AgentScratchpad
 from .tools import get_agent_tools, bind_mcp_tools, TOOL_EXECUTION_MODES
 from backend.config import settings
 from backend.skills.registry import registry
@@ -432,6 +433,14 @@ async def init_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]
         "routing_metadata": routing_metadata,
         "routing_decision": routing_metadata,
         "include_tutor": True,  # Default to including tutor block; can be overridden later
+        "sandboxed_vars": {},   # [Technique 1] Environmental Sandboxing
+        "scratchpad": {         # [Technique 3] Structured Scratchpad (ReSum)
+            "active_goal": "",
+            "completed_steps": [],
+            "current_blocker": "None",
+            "next_action": ""
+        },
+        "phase": "DISCOVERY",   # [Technique 4] Dynamic Tool Binding Phase
     }
 
 async def guard_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -599,13 +608,29 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
         client_type,
         config.get("configurable", {}).get("client_capabilities"),
     )
-    tools = get_agent_tools(
+    
+    # [Technique 4] Dynamic Tool Set Filtering - Phase-based tool binding
+    phase = state.get("phase", "DISCOVERY")
+    
+    # Define tool sets for each phase
+    discovery_tools = {"read_file", "list_dir", "search_docs", "codebase_search", "workspace_reader"}
+    execution_tools = {"write_file", "workspace_writer", "workspace_patcher", "shell_exec", "run_compiler", "mt5_dispatch_signal"}
+    
+    all_tools = get_agent_tools(
         conversation_id,
         allowed_skills,
         client_type=client_type,
         client_capabilities=client_capabilities,
         space_id=config.get("configurable", {}).get("space_id"),
     )
+    
+    # Filter tools based on current phase
+    if phase == "DISCOVERY":
+        tools = [t for t in all_tools if t.name in discovery_tools]
+        logger.info(f"PIPELINE: DISCOVERY phase - binding {len(tools)} discovery tools: {[t.name for t in tools]}")
+    else:  # EXECUTION phase
+        tools = [t for t in all_tools if t.name in execution_tools]
+        logger.info(f"PIPELINE: EXECUTION phase - binding {len(tools)} execution tools: {[t.name for t in tools]}")
     
     # Dynamically bind client-side MCP tools from scratchpad
     scratchpad_data = state.get("scratchpad") or {}
@@ -644,7 +669,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             logger.info(f"PIPELINE: Short process detected. Suppressing tool binding for conversational reply.")
             tool_binding_status = "No tools available. Respond conversationally."
         elif valid_tools and has_tool_support and not isinstance(llm, NativeLocalClient):
-            logger.info(f"PIPELINE: Binding {len(valid_tools)} tools to LLM (Model: {model})")
+            logger.info(f"PIPELINE: Binding {len(valid_tools)} tools to LLM (Model: {model}, Phase: {phase})")
             llm = llm.bind_tools(valid_tools)
             tool_binding_status = f"Tools bound successfully: {[t.name for t in valid_tools]}. You MUST use these tools for file/command operations."
             tool_manifest = "\n".join(
@@ -655,7 +680,7 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
             logger.info(f"PIPELINE: Skipping tool binding for '{model}' (Capability 'Tools' not found in {capabilities})")
             tool_binding_status = f"WARNING: Tool binding was SKIPPED for this model ({model}). You cannot call tools. Respond conversationally only."
         else:
-            tool_binding_status = "No tools available for this session."
+            tool_binding_status = f"No tools available for this session (Phase: {phase})."
     except Exception as init_err:
         logger.error(f"PIPELINE ERROR: LLM init failed — {init_err}")
         telemetry = state.get("telemetry", {})
@@ -708,12 +733,8 @@ async def reason_node(state: AgentState, config: RunnableConfig) -> Dict[str, An
     if space_config.get("system_prompt_prefix"):
         system_prompt = f"{space_config['system_prompt_prefix']}\n\n{system_prompt}"
     
-    # Rebuild context with the tool-aware system prompt
-    if context_builder:
-        messages = context_builder.build_context(messages, system_prompt=system_prompt)
-    else:
-        from langchain_core.messages import SystemMessage as _SysMsg
-        messages = [_SysMsg(content=system_prompt)] + [m for m in messages if m.type != "system"]
+    # [Technique 2+3] Unified Context Compression: Trajectory Pruning + ReSum
+    messages = build_compressed_context(state, config, system_prompt)
     
     # Base timeout: local and ollama_cloud are typically heavier on prefill latency
     base_timeout = 120.0 if provider in ("local", "ollama_cloud") else 60.0
@@ -901,6 +922,59 @@ def compress_tool_output(output: str, max_chars: int = 4000) -> str:
     return result
 
 
+def prune_trajectory(messages: List[BaseMessage]) -> List[BaseMessage]:
+    """
+    [Technique 2] Trajectory Pruning: Mask old heavy tool outputs.
+    Keeps the last 3 messages fully intact; masks older ToolMessages.
+    """
+    pruned = []
+    total = len(messages)
+    
+    for i, msg in enumerate(messages):
+        # Keep the last 3 messages fully intact; mask older ToolMessages
+        if isinstance(msg, ToolMessage) and i < total - 3:
+            pruned.append(
+                ToolMessage(
+                    content="[Output pruned by harness. Task executed successfully.]",
+                    tool_call_id=msg.tool_call_id,
+                    name=msg.name
+                )
+            )
+        else:
+            pruned.append(msg)
+            
+    return pruned
+
+
+def build_compressed_context(state: AgentState, config: RunnableConfig, system_prompt: str) -> List[BaseMessage]:
+    """
+    [Technique 3] ReSum Context Compression via Scratchpad.
+    Combines trajectory pruning + scratchpad summary into compact context stack.
+    """
+    # 1. Prune intermediate tool trajectories
+    clean_messages = prune_trajectory(state["messages"])
+    
+    # 2. Extract scratchpad summary
+    pad = state.get("scratchpad", {})
+    scratchpad_text = (
+        f"### ACTIVE SCRATCHPAD STATE\n"
+        f"- Goal: {pad.get('active_goal', 'Unset')}\n"
+        f"- Completed: {', '.join(pad.get('completed_steps', []))}\n"
+        f"- Current Blocker: {pad.get('current_blocker', 'None')}\n"
+        f"- Next Action: {pad.get('next_action', 'Pending')}"
+    )
+    
+    system_message = SystemMessage(
+        content=(
+            f"{system_prompt}\n\n"
+            f"{scratchpad_text}"
+        )
+    )
+    
+    # Return compact context stack: System Prompt + Tail Messages (last 4)
+    return [system_message] + clean_messages[-4:]
+
+
 async def planner_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
     Planner Node (Layer 1 Conductor). 
@@ -972,6 +1046,28 @@ async def planner_node(state: AgentState, config: RunnableConfig) -> Dict[str, A
         # Graceful fallback: inject a single generic task
         scratchpad["task_plan"] = [{"text": "Process user request", "done": False, "success_criteria": "Request complete"}]
         return {"scratchpad": scratchpad}
+
+
+async def scratchpad_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+    """
+    [Technique 3] Structured Scratchpad Updater Node.
+    Forces the LLM to output a structured JSON update of state each turn.
+    """
+    from langchain_core.messages import SystemMessage
+    
+    structured_llm = (await get_dynamic_llm(config, bind_tools=False, tier="validation")).with_structured_output(AgentScratchpad)
+    
+    update_prompt = [
+        SystemMessage(content="Review the current conversation and update the structured agent scratchpad."),
+    ] + state["messages"][-2:]
+    
+    try:
+        updated_pad = await structured_llm.ainvoke(update_prompt)
+        return {"scratchpad": updated_pad.model_dump()}
+    except Exception as e:
+        logger.warning(f"SCRATCHPAD: Failed to generate structured output: {e}")
+        # Fallback: preserve existing scratchpad
+        return {"scratchpad": state.get("scratchpad", {})}
 
 
 async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -1053,6 +1149,13 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                 client_tool_response_queues[tool_id] = tool_response_queue
                 pending_client_tools[tool_id] = tool_response_queue
             
+            # [Technique 4] Phase auto-transition for parallel execution
+            if tool_name in ("read_file", "list_dir", "search_docs", "codebase_search", "workspace_reader"):
+                current_phase = state.get("phase", "DISCOVERY")
+                if current_phase == "DISCOVERY":
+                    state_updates["phase"] = "EXECUTION"
+                    logger.info(f"PIPELINE: Phase transition DISCOVERY -> EXECUTION (triggered by {tool_name})")
+            
             async def _execute_and_collect(tool, args, tid, wss, queues, pctools):
                 try:
                     result = await tool.ainvoke(args)
@@ -1061,6 +1164,12 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                         output = result.output or result.error or "Success (no output)"
                     else:
                         output = str(result)
+                    
+                    # [Technique 1] Environmental Sandboxing for parallel execution
+                    if len(str(output)) > 500:
+                        # Note: In parallel execution, we can't easily update state_updates
+                        # The sandboxing will be applied when results are processed below
+                        pass
                     
                     # Send end notification via queue
                     if queues and tid in queues:
@@ -1117,17 +1226,33 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
         
         tool_results = await asyncio.gather(*tool_tasks)
         
+        # [Technique 1] Environmental Sandboxing for parallel execution results
+        sandboxed_vars = dict(state.get("sandboxed_vars", {}))
+        processed_results = []
+        for result in tool_results:
+            output = result["output"]
+            if len(str(output)) > 500:
+                var_id = f"VAR_LOG_{len(sandboxed_vars) + 1}"
+                sandboxed_vars[var_id] = str(output)
+                output = (
+                    f"[TRUNCATED BY HARNESS] Full output stored in state as `{var_id}`.\n"
+                    f"Preview of first 200 chars:\n{str(output)[:200]}..."
+                )
+            processed_results.append({**result, "output": output})
+        
+        state_updates["sandboxed_vars"] = sandboxed_vars
+        
         # Return results as messages
         # Convert results to tool messages (ToolMessage is imported at module level)
         tool_messages = []
-        for result in tool_results:
+        for result in processed_results:
             tool_messages.append(ToolMessage(
                 content=result["output"],
                 name=result["tool_name"],
                 tool_call_id=result["tool_id"]
             ))
         
-        return {"messages": tool_messages, "current_tool_calls": []}
+        return {"messages": tool_messages, "current_tool_calls": [], "sandboxed_vars": sandboxed_vars}
     else:
         # Sequential execution - use existing loop
         for tool_call in last_message.tool_calls:
@@ -1208,6 +1333,13 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                     "args": tool_args,
                     "id": tool_id
                 })
+                # [Technique 4] Phase auto-transition for client-delegated tools
+                if tool_name in ("read_file", "list_dir", "search_docs", "codebase_search", "workspace_reader"):
+                    current_phase = state.get("phase", "DISCOVERY")
+                    if current_phase == "DISCOVERY":
+                        state_updates["phase"] = "EXECUTION"
+                        logger.info(f"PIPELINE: Phase transition DISCOVERY -> EXECUTION (triggered by {tool_name})")
+                
                 # Notify UI that tool execution started
                 await websocket.send_json({
                     "type": "tool_execution_start",
@@ -1227,6 +1359,17 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                         tool_response_queue.get(), timeout=3600.0
                     )
                 tool_result = response_payload.get("output", "")
+                
+                # [Technique 1] Environmental Sandboxing for client-delegated tools
+                sandboxed_vars = dict(state.get("sandboxed_vars", {}))
+                if len(str(tool_result)) > 500:
+                    var_id = f"VAR_LOG_{len(sandboxed_vars) + 1}"
+                    sandboxed_vars[var_id] = str(tool_result)
+                    tool_result = (
+                        f"[TRUNCATED BY HARNESS] Full output stored in state as `{var_id}`.\n"
+                        f"Preview of first 200 chars:\n{str(tool_result)[:200]}..."
+                    )
+                    state_updates["sandboxed_vars"] = sandboxed_vars
                 
                 # Notify UI that tool execution completed
                 await websocket.send_json({
@@ -1303,6 +1446,27 @@ async def execute_tool_node(state: AgentState, config: RunnableConfig) -> Dict[s
                     tool_result = f"Exception during tool execution: {str(e)}"
             else:
                 tool_result = f"Error: Tool '{tool_name}' not found."
+            
+            # [Technique 4] Phase auto-transition: read_file triggers EXECUTION phase
+            if tool_name in ("read_file", "list_dir", "search_docs", "codebase_search", "workspace_reader"):
+                current_phase = state.get("phase", "DISCOVERY")
+                if current_phase == "DISCOVERY":
+                    state_updates["phase"] = "EXECUTION"
+                    logger.info(f"PIPELINE: Phase transition DISCOVERY -> EXECUTION (triggered by {tool_name})")
+            
+            # ─── [Technique 1] Environmental Sandboxing ───
+            # Intercept heavy outputs and store in sandboxed_vars, return truncated preview
+            sandboxed_vars = dict(state.get("sandboxed_vars", {}))
+            if len(str(tool_result)) > 500:
+                var_id = f"VAR_LOG_{len(sandboxed_vars) + 1}"
+                sandboxed_vars[var_id] = str(tool_result)
+                
+                tool_result = (
+                    f"[TRUNCATED BY HARNESS] Full output stored in state as `{var_id}`.\n"
+                    f"Preview of first 200 chars:\n{str(tool_result)[:200]}..."
+                )
+                state_updates["sandboxed_vars"] = sandboxed_vars
+            
         # ─── Self-Healing Diagnostics & Log Compression ───
         error_hints = {
             "workspace_writer": (

@@ -1,6 +1,16 @@
-from typing import Annotated, List, Optional, TypedDict
+from typing import Annotated, List, Optional, TypedDict, Literal
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
+from pydantic import BaseModel, Field
+
+
+class AgentScratchpad(BaseModel):
+    """Structured scratchpad for ReSum context compression."""
+    active_goal: str = Field(default="", description="Primary objective")
+    completed_steps: list[str] = Field(default_factory=list, description="Completed tasks")
+    current_blocker: str = Field(default="None", description="Current error or blocker")
+    next_action: str = Field(default="", description="Next planned step")
+
 
 class AgentState(TypedDict):
     """
@@ -37,7 +47,11 @@ class AgentState(TypedDict):
     
     # Flag to control Tutor block inclusion in final report
     include_tutor: bool
-    scratchpad: Optional[dict]
+    
+    # --- Context Engineering Fields (from research) ---
+    sandboxed_vars: dict[str, str]          # [Technique 1] Environmental Sandboxing
+    scratchpad: dict                        # [Technique 3] Structured Scratchpad (ReSum)
+    phase: str                              # [Technique 4] Phase for Dynamic Tool Binding: DISCOVERY | EXECUTION
 
     # --- Extended ReAct Loop State ---
     task_goal: Optional[str]                         # The ultimate objective
