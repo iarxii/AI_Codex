@@ -62,3 +62,4 @@ deploy_production.bat
 deploy_frontend.bat
 
 .opencode
+jev-onnx/
