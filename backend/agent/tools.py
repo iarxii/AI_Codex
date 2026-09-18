@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict, Any
 from langchain_core.tools import StructuredTool
 from backend.skills.registry import registry
 from backend.skills.base import BaseSkill
@@ -24,6 +24,43 @@ def get_mcp_client_manager() -> MCPClientManager:
 # This avoids the pydantic field issue where StructuredTool does not allow
 # arbitrary attributes (e.g. "StructuredTool object has no field execution_mode").
 TOOL_EXECUTION_MODES: dict[str, str] = {}
+
+
+def execute_tool_sandboxed(tool_name: str, args: dict, state: dict) -> Tuple[str, dict]:
+    """
+    [Technique 1] Environmental Sandboxing: Intercepts tool execution to sandbox heavy outputs.
+    If output exceeds 500 chars, stores full output in state['sandboxed_vars'] and returns truncated preview.
+    """
+    # Get the tool from the global tool map (will be passed via closure in execute_tool_node)
+    # For now, we'll import the tool map builder
+    from backend.agent.tools import get_agent_tools
+    
+    # Build tool map - we need conversation_id from state/config
+    conversation_id = state.get("config", {}).get("configurable", {}).get("conversation_id", "default")
+    tools = get_agent_tools(conversation_id=conversation_id)
+    tool_map = {t.name: t for t in tools}
+    
+    tool_fn = tool_map.get(tool_name)
+    if not tool_fn:
+        return f"Error: Tool '{tool_name}' not found.", state.get("sandboxed_vars", {})
+    
+    raw_output = tool_fn.invoke(args)
+    
+    sandboxed = dict(state.get("sandboxed_vars", {}))
+    
+    # Sandbox outputs exceeding 500 chars to protect the model's context window
+    if len(str(raw_output)) > 500:
+        var_id = f"VAR_LOG_{len(sandboxed) + 1}"
+        sandboxed[var_id] = str(raw_output)
+        
+        truncated_output = (
+            f"[TRUNCATED BY HARNESS] Full output stored in state as `{var_id}`.\n"
+            f"Preview of first 200 chars:\n{str(raw_output)[:200]}..."
+        )
+        return truncated_output, sandboxed
+    
+    return str(raw_output), sandboxed
+
 
 def skill_to_langchain_tool(skill: BaseSkill, execution_mode: str = "sequential") -> StructuredTool:
     """
@@ -284,12 +321,17 @@ async def write_scratchpad(task_list_json: str) -> str:
 
 
 @StructuredTool.from_function
-async def read_full_tool_output() -> str:
+async def read_full_tool_output(var_id: str = "") -> str:
     """
-    Retrieves the complete, unpruned output of the most recent tool execution.
-    Use this if the output was compressed or truncated for token efficiency (indicated by [OMITTED] markers),
+    Retrieves the complete, unpruned output of a tool execution from the sandboxed_vars store.
+    Use this if the output was compressed or truncated for token efficiency (indicated by [TRUNCATED BY HARNESS] markers),
     and you need to inspect the full contents (e.g. detailed compile logs, test stacks, or output listings).
+    
+    Args:
+        var_id: The sandbox variable ID (e.g., "VAR_LOG_1"). If empty, returns the most recent.
     """
+    # This will be populated by the execute_tool_node which has access to state
+    # For now, fall back to log file
     import os
     log_path = "./logs/last_tool_output.log"
     if not os.path.exists(log_path):

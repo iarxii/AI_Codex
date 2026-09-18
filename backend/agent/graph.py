@@ -3,7 +3,8 @@ from .state import AgentState
 from .nodes import (
     reason_node, execute_tool_node, init_node, guard_node,
     validate_response_node, verification_node, evaluate_turn_node,
-    prepare_next_turn_node, final_report_node, handle_blocker_node, planner_node
+    prepare_next_turn_node, final_report_node, handle_blocker_node, planner_node,
+    scratchpad_node
 )
 from .trading_nodes import bull_bear_debate_node, mql5_execution_enforcer_node
 
@@ -70,7 +71,8 @@ def should_continue(state: AgentState):
         )
         return "handle_blocker"
         
-    return "validate"
+    # [Technique 3] Route to scratchpad update when no tool calls (ReSum pattern)
+    return "update_scratchpad"
 
 
 def route_after_evaluation(state: AgentState):
@@ -126,12 +128,13 @@ def route_after_init(state: AgentState):
 
 def after_validate(state: AgentState):
     """
-    Route after validation: retry reasoning (via guard) or continue to evaluation.
+    Route after validation: retry reasoning (via guard) or continue to scratchpad update.
     If the validator detected fabrication (is_complete=False), re-enter
-    through guard → reason for one retry. Otherwise, continue to evaluate_turn.
+    through guard → reason for one retry. Otherwise, continue to update_scratchpad
+    for ReSum context compression before ending the turn.
     """
     if state.get("is_complete", True):
-        return "evaluate_turn"
+        return "update_scratchpad"
     return "guard"
 
 def after_enforcer(state: AgentState):
@@ -163,6 +166,7 @@ def create_agent_graph():
     workflow.add_node("prepare_next_turn", prepare_next_turn_node)
     workflow.add_node("final_report", final_report_node)
     workflow.add_node("handle_blocker", handle_blocker_node)
+    workflow.add_node("update_scratchpad", scratchpad_node)
     
     # Set entry point
     workflow.set_entry_point("init")
@@ -202,7 +206,7 @@ def create_agent_graph():
         {
             "mql5_enforcer": "mql5_enforcer",
             "execute_tool": "execute_tool",
-            "validate": "validate",
+            "update_scratchpad": "update_scratchpad",
             "handle_blocker": "handle_blocker",
             "final_report": "final_report",
             END: END
@@ -225,6 +229,7 @@ def create_agent_graph():
     
     workflow.add_edge("final_report", END)
     workflow.add_edge("handle_blocker", END)
+    workflow.add_edge("update_scratchpad", END)
     
     # Validator → evaluate_turn or retry via guard
     workflow.add_conditional_edges(
@@ -232,7 +237,7 @@ def create_agent_graph():
         after_validate,
         {
             "guard": "guard",
-            "evaluate_turn": "evaluate_turn"
+            "update_scratchpad": "update_scratchpad"
         }
     )
     
